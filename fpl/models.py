@@ -6,6 +6,9 @@ class Player(models.Model):
     def __str__(self):
         return 'Player: ' + self.player_name
 
+    def calculate_gpg(self):
+        return float("{0:.2f}".format(self.goals / self.games))
+
     assists = models.IntegerField()
     games = models.IntegerField()
     goals = models.IntegerField()

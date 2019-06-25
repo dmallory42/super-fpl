@@ -1,0 +1,10 @@
+{
+  "name": "superfpl",
+  "version": "1.0.0",
+  "repository": "https://github.com/dmallory42/super-fpl.git",
+  "author": "Daniel Mallory <d.mallory42@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "bulma": "^0.7.5"
+  }
+}

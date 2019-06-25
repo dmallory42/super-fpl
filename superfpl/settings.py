@@ -70,7 +70,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'superfpl.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
@@ -120,6 +119,12 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
+# Run python manage.py collectstatic
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'node_modules')
+]
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
