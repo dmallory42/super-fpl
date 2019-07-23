@@ -1,83 +1,216 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Home{% endblock %}</h1>
+    <section class="hero is-medium is-primary is-bold">
+        <div class="hero-body">
+            <div class="container">
+                <h1 class="title">
+                    Player Comparison Tool
+                </h1>
+                <h2 class="subtitle">
+                    Please select the players you would like to compare:
+                </h2>
+                <form autocomplete="off" action="/">
+                    <div class="field">
+                        <div class="control">
+                            <div class="columns">
+                                <div class="column">
+                                    <div class="select">
+                                        <select id="first-player-select" class="player-select"></select>
+                                    </div>
+                                </div>
+                                <div class="column">
+                                    <div class="select">
+                                        <select id="second-player-select" class="player-select"></select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="control">
+                            <button class="button is-primary">Submit</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
 {% endblock %}
 
 {% block content %}
-    <form autocomplete="off" action="/">
-        <div class="select">
-          <select class="player-select">
-          </select>
-        </div>
-    </form>
+<section class="content">
+    <div class="container" width="400" height="400">
+        <canvas id="chart" width="400" height="400"></canvas>
+    </div>
+</section>
 
-   <canvas id="chart" width="400" height="400"></canvas>
+<script type="text/javascript">
+    let players = {};
+    let ctx = $('#chart');
 
-    <script type="text/javascript" src="{{ url_for('static', filename='js/d3.js') }}"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/RadarChart.js') }}"></script>
-    <script type="text/javascript">
-        let players = {};
-        let ctx = $('#chart');
+    // These are the metrics we are interested in plotting on the chart:
+    let breakdownMetrics = [
+        {key: "assists90", name: "Assists per 90"},
+        {key: "gs90", name: "Goals Scored per 90"},
+        {key: "gc90", name: "Goals Conceded per 90"},
+        {key: "cs90", name: "Clean Sheets per 90"},
+        {key: "bpsMin", name: "BPS per Min"},
+        {key: "creativityMin", name: "Creativity per Minute"},
+        {key: "threatMin", name: "Threat per Minute"},
+        {key: "influenceMin", name: "Influence per Minute"},
+        {key: "ppm", name: "Points per Minute"},
+    ]
 
-        // These are the metrics we are interested in plotting on the chart:
-        let metricsOfInterest = [
-            {key: "assists", name: "Assists"},
-            {key: "bonus", name: "Bonus Points"},
-            {key: "bps", name: "BPS"},
-            {key: "clean_sheets", name: "Clean Sheets"},
-            {key: "goals_conceded", name: "Goals Conceded"},
-            {key: "goals_scored", name: "Goals Scored"},
-            {key: "ict_index", name: "ICT index"},
-            {key: "influence", name: "Influence"},
-            {key: "creativity", name: "Creativity"},
-            {key: "threat", name: "Threat"},
-            {key: "minutes", name: "Minutes Played"},
-            {key: "points_per_game", name: "PPG"}
-        ];
+    let chartMetrics = [
+        {key: "assists", name: "Assists"},
+        {key: "bonus", name: "Bonus Points"},
+        {key: "bps", name: "BPS"},
+        {key: "bpsMin", name: "BPS per Min"},
+        {key: "clean_sheets", name: "Clean Sheets"},
+        {key: "cs90", name: "Clean Sheets per 90"},
+        {key: "goals_conceded", name: "Goals Conceded"},
+        {key: "gc90", name: "Goals Conceded per 90"},
+        {key: "goals_scored", name: "Goals Scored"},
+        {key: "gs90", name: "Goals Scored per 90"},
+        {key: "ict_index", name: "ICT index"},
+        {key: "influence", name: "Influence"},
+        {key: "creativity", name: "Creativity"},
+        {key: "threat", name: "Threat"},
+        {key: "minutes", name: "Minutes Played"},
+        {key: "points_per_game", name: "PPG"}
+    ];
 
-        $.ajax('/players', {
-            type: 'get',
-            dataType: 'json',
-            success: function (data) {
-                $.each(data, function (key, player) {
-                    // add this player to our search
-                    $('.player-select').append($('<option>', {
-                        value: player['id'],
-                        text: player['first_name'] + ' ' + player['second_name']
-                    }));
+    let valueArrays = {};
 
-                    // add this player to our object:
-                    players[player['id']] = player;
-                })
+    $.ajax('/players', {
+        type: 'get',
+        dataType: 'json',
+        success: function (data) {
+            $.each(data, function (key, player) {
+                // calculate the analysis numbers for this player:
+                player = preparePlayerAnalysis(player);
+
+                // add this player to our search
+                $('.player-select').append($('<option>', {
+                    value: player['id'],
+                    text: player['first_name'] + ' ' + player['second_name']
+                }));
+
+                // add this player to our object:
+                players[player['id']] = player;
+            })
+
+            for (let i = 0; i < chartMetrics.length; i++) {
+                let key = chartMetrics[i]['key'];
+
+                if (!_.has(valueArrays, key)) {
+                    valueArrays[key] = [];
+                }
+
+                $.each(players, function(playerKey, player) {
+                    if (player['minutes'] > 500) {
+                        valueArrays[key].push(parseFloat(player[key]))
+                    }
+                });
             }
-        });
+        }
+    });
 
-        $('.player-select').on('change', function() {
-            let v = $(this).val();
-            updateChart(players[v]);
-        });
+    $('.player-select').on('change', function() {
+        let v = $(this).val();
+        updateChart(players[v]);
+    });
 
-        function updateChart(player) {
-            let values = [];
-            let labels = [];
-            for (let i = 0; i < metricsOfInterest.length; i++) {
-                values.push(player[metricsOfInterest[i]['key']]);
-                labels.push(metricsOfInterest[i]['name']);
-            }
+    function preparePlayerAnalysis(player) {
+        player['bpsMin'] = calculatePerMin(player['bps'], player['minutes']);
+        player['cs90'] = calculatePer90(player['clean_sheets'], player['minutes']);
+        player['gc90'] = calculatePer90(player['goals_conceded'], player['minutes']);
+        player['gs90'] = calculatePer90(player['goals_scored'], player['minutes']);
+        player['assists90'] = calculatePer90(player['assists'], player['minutes']); 
+        player['creativityMin'] = calculatePerMin(player['creativity'], player['minutes']);
+        player['threatMin'] = calculatePerMin(player['threat'], player['minutes']);
+        player['influenceMin'] = calculatePerMin(player['influence'], player['minutes']); 
+        player['ppm'] = calculatePerMin(player['total_points'], player['minutes']);
+        return player;
+    }
 
-            let data = {
-                labels: labels,
-                datasets: [{
-                    data: values
-                }]
-            };
-
-            let myChart = new Chart(ctx, {
-                type: 'radar',
-                data: data
-            });
+    function calculatePerMin(metric, minutes) {
+        if (minutes == 0) {
+            return 0;
         }
 
-    </script>
+        return metric / minutes;
+    }
+
+    function calculatePerMil(metric, price) {
+        return (metric / price);
+    }
+
+    function calculatePer90(metric, minutes) {
+        if (minutes == 0) {
+            return 0;
+        }
+
+        return (metric / minutes) * 90;
+    }
+
+    /**
+     * Normalize a value in an array of values. This works
+     * by finding the min and max values in the array, then
+     * scaling the current value accordingly.
+     * 
+     * @param val: the current value to be normalized
+     * @param arr: the array of all values
+     */
+    function normalizeData(val, arr) {
+        let maxVal = _.max(arr);
+        let minVal = _.min(arr);
+
+        return val == 0 ? 0 : ((val - minVal) / (maxVal - minVal)).toFixed(2);
+    }
+
+
+    function updateChart(player) {
+        let values = [];
+        let normalizedValues = [];
+        let labels = [];
+
+        for (let i = 0; i < chartMetrics.length; i++) {
+            let key = chartMetrics[i]['key'];
+            let name = chartMetrics[i]['name'];
+            let value = player[key];
+            let normalizedValue = normalizeData(value, valueArrays[key]);
+
+            values.push(value);
+            normalizedValues.push(normalizedValue);
+            labels.push(name);
+        }
+
+        console.log(normalizedValues);
+
+        let data = {
+            labels: labels,
+            datasets: [{
+                data: normalizedValues
+            }]
+        };
+
+        let myChart = new Chart(ctx, {
+            type: 'radar',
+            data: data,
+            options: {
+                scale: {
+                    ticks: {
+                        beginAtZero: true,
+                        min: 0,
+                        step: 0.2,
+                        max: 1
+                    }
+                }
+            }
+        });
+    }
+
+</script>
 {% endblock %}

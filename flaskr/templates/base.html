@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/underscore.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/Chart.js') }}"></script>
 
 </head>
@@ -72,15 +73,13 @@
             </div>
         </div>
     </nav>
-     <section class="content container">
-          <header>
-            {% block header %}{% endblock %}
-          </header>
-          {% for message in get_flashed_messages() %}
-            <div class="flash">{{ message }}</div>
-          {% endfor %}
-          {% block content %}{% endblock %}
-     </section>
+    <header>
+    {% block header %}{% endblock %}
+    </header>
+    {% for message in get_flashed_messages() %}
+    <div class="flash">{{ message }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
     <footer class="footer">
         <div class="content has-text-centered">
             <p>

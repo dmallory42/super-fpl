@@ -6,7 +6,11 @@ from .api import Api
 from . import create_app
 
 app = create_app()
-api = Api(app.extensions['redis'])
+api = Api()
+
+# Redis logic, commented out for now
+# api = Api(app.extensions['redis'])
+
 
 
 @app.route('/', methods=['GET'])

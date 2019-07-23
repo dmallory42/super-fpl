@@ -30,7 +30,8 @@ def create_app(test_config=None):
     from . import db
     db.init_app(app)
 
-    redis = FlaskRedis()
-    redis.init_app(app)
+    # Uncomment this if we want to use redis:
+    # redis = FlaskRedis()
+    # redis.init_app(app)
 
     return app
