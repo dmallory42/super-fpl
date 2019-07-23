@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Home{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+    <form autocomplete="off" action="/">
+        <div class="select">
+          <select class="player-select">
+          </select>
+        </div>
+    </form>
+
+   <canvas id="chart" width="400" height="400"></canvas>
+
+    <script type="text/javascript" src="{{ url_for('static', filename='js/d3.js') }}"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/RadarChart.js') }}"></script>
+    <script type="text/javascript">
+        let players = {};
+        let ctx = $('#chart');
+
+        // These are the metrics we are interested in plotting on the chart:
+        let metricsOfInterest = [
+            {key: "assists", name: "Assists"},
+            {key: "bonus", name: "Bonus Points"},
+            {key: "bps", name: "BPS"},
+            {key: "clean_sheets", name: "Clean Sheets"},
+            {key: "goals_conceded", name: "Goals Conceded"},
+            {key: "goals_scored", name: "Goals Scored"},
+            {key: "ict_index", name: "ICT index"},
+            {key: "influence", name: "Influence"},
+            {key: "creativity", name: "Creativity"},
+            {key: "threat", name: "Threat"},
+            {key: "minutes", name: "Minutes Played"},
+            {key: "points_per_game", name: "PPG"}
+        ];
+
+        $.ajax('/players', {
+            type: 'get',
+            dataType: 'json',
+            success: function (data) {
+                $.each(data, function (key, player) {
+                    // add this player to our search
+                    $('.player-select').append($('<option>', {
+                        value: player['id'],
+                        text: player['first_name'] + ' ' + player['second_name']
+                    }));
+
+                    // add this player to our object:
+                    players[player['id']] = player;
+                })
+            }
+        });
+
+        $('.player-select').on('change', function() {
+            let v = $(this).val();
+            updateChart(players[v]);
+        });
+
+        function updateChart(player) {
+            let values = [];
+            let labels = [];
+            for (let i = 0; i < metricsOfInterest.length; i++) {
+                values.push(player[metricsOfInterest[i]['key']]);
+                labels.push(metricsOfInterest[i]['name']);
+            }
+
+            let data = {
+                labels: labels,
+                datasets: [{
+                    data: values
+                }]
+            };
+
+            let myChart = new Chart(ctx, {
+                type: 'radar',
+                data: data
+            });
+        }
+
+    </script>
+{% endblock %}

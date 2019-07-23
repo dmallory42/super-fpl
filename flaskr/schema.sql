@@ -1,0 +1,1 @@
+-- code to drop/recreate tables required in app goes here
