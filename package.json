@@ -8,11 +8,13 @@
     "bulma": "^0.7.5",
     "chart.js": "^2.8.0",
     "jquery": "^3.4.1",
+    "select2": "^4.0.8",
     "underscore": "^1.9.1"
   },
   "devDependencies": {
     "gulp": "^4.0.2",
     "gulp-sass": "^4.0.2",
+    "bulma": "^0.7.5",
     "node-sass": "^4.12.0"
   }
 }

@@ -1,3 +1,4 @@
+from unidecode import unidecode
 from flask import (
     Flask, flash, g, redirect, render_template, request, session, url_for, jsonify, current_app
 )
@@ -15,7 +16,9 @@ api = Api()
 
 @app.route('/', methods=['GET'])
 def home():
-    return render_template('fpl/home.html')
+    players = api.get_players()
+    players = sorted(players, key=lambda k: unidecode(k['name']))
+    return render_template('fpl/home.html', players=players)
 
 
 @app.route('/players', methods=['GET'])

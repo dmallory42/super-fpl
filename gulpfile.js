@@ -3,11 +3,15 @@ const sass = require('gulp-sass');
 
 sass.compiler = require('node-sass');
 
-function bulma(cb) {
-    return src('node_modules/bulma/css/*.css')
+function select2css(cb) {
+    return src('node_modules/select2/dist/css/select2.css')
         .pipe(dest('flaskr/static/css'));
 }
 
+function select2js(cb) {
+    return src('node_modules/select2/dist/js/select2.js')
+        .pipe(dest('flaskr/static/js'));
+}
 function jquery(cb) {
     return src('node_modules/jquery/dist/jquery.js')
         .pipe(dest('flaskr/static/js'));
@@ -28,6 +32,7 @@ function chartjsCss(cb) {
         .pipe(dest('flaskr/static/css'));
 }
 
+// This also imports bulma:
 function compileCss(cb) {
     return src('sass/**/*.scss')
         .pipe(sass().on('error', sass.logError))
@@ -35,5 +40,13 @@ function compileCss(cb) {
 }
 
 exports.default = series(
-    parallel(bulma, jquery, underscore, chartjs, chartjsCss, compileCss)     // compile static assets
+    parallel( 
+        jquery, 
+        select2js, 
+        select2css, 
+        underscore, 
+        chartjs, 
+        chartjsCss, 
+        compileCss
+    )     // compile static assets
 );

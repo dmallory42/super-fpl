@@ -16,12 +16,26 @@
                             <div class="columns">
                                 <div class="column">
                                     <div class="select">
-                                        <select id="first-player-select" class="player-select"></select>
+                                        <select id="first-player-select" class="player-select">
+                                            {% for player in players %}
+                                                <!-- use Salah as our default player:-->
+                                                <option {% if player.code == 118748 %} selected="selected" {% endif %} value="{{ loop.index - 1 }}">
+                                                    {{ player.name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
                                     </div>
                                 </div>
                                 <div class="column">
                                     <div class="select">
-                                        <select id="second-player-select" class="player-select"></select>
+                                        <select id="second-player-select" class="player-select">
+                                            {% for player in players %}
+                                                <!-- Use Mane as our default player:-->
+                                                <option {% if player.code == 110979 %} selected="selected" {% endif %} value="{{ loop.index - 1 }}">
+                                                    {{ player.name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -39,40 +53,73 @@
 {% endblock %}
 
 {% block content %}
-<section class="content">
-    <div class="container" width="400" height="400">
-        <canvas id="chart" width="400" height="400"></canvas>
+<section class="section options">
+    <div class="container">
+        <nav class="level">
+            <div class="level-left">
+                <div class="level-item">
+                    <div class="buttons has-addons">
+                        <span class="chart-toggle button is-success is-selected" data-value="radar">Radar</span>
+                        <span class="chart-toggle button" data-value="bar">Bar</span>
+                    </div>
+            </div>
+            <div class="level-right">
+            </div>
+        </div>
+    </div>
+</section>
+<section class="section charts">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-8">
+                <canvas id="chart" width="400" height="400"></canvas>
+            </div>
+            <div class="column is-6">
+                <table class="table comparison-table is-striped">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th id="player1-th"></th>
+                            <th id="player2-th"></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </section>
 
 <script type="text/javascript">
-    let players = {};
+    let players = JSON.parse('{{players|tojson|safe}}');
     let ctx = $('#chart');
+    let chart;
+    let chartType = 'radar';
 
     // These are the metrics we are interested in plotting on the chart:
     let breakdownMetrics = [
-        {key: "assists90", name: "Assists per 90"},
-        {key: "gs90", name: "Goals Scored per 90"},
-        {key: "gc90", name: "Goals Conceded per 90"},
-        {key: "cs90", name: "Clean Sheets per 90"},
-        {key: "bpsMin", name: "BPS per Min"},
-        {key: "creativityMin", name: "Creativity per Minute"},
-        {key: "threatMin", name: "Threat per Minute"},
-        {key: "influenceMin", name: "Influence per Minute"},
-        {key: "ppm", name: "Points per Minute"},
+        {key: "assists_per_90", name: "Assists per 90"},
+        {key: "goals_scored_per_90", name: "Goals Scored per 90"},
+        {key: "goals_conc_per_90", name: "Goals Conceded per 90"},
+        {key: "clean_sheets_per_90", name: "Clean Sheets per 90"},
+        {key: "bps_per_min", name: "BPS per Min"},
+        {key: "creativity_per_min", name: "Creativity per Minute"},
+        {key: "threat_per_min", name: "Threat per Minute"},
+        {key: "influence_per_min", name: "Influence per Minute"},
+        {key: "points_per_min", name: "Points per Minute"},
     ]
 
     let chartMetrics = [
-        {key: "assists", name: "Assists"},
         {key: "bonus", name: "Bonus Points"},
         {key: "bps", name: "BPS"},
-        {key: "bpsMin", name: "BPS per Min"},
+        {key: "bps_per_min", name: "BPS per Min"},
         {key: "clean_sheets", name: "Clean Sheets"},
-        {key: "cs90", name: "Clean Sheets per 90"},
+        {key: "clean_sheets_per_90", name: "Clean Sheets per 90"},
         {key: "goals_conceded", name: "Goals Conceded"},
-        {key: "gc90", name: "Goals Conceded per 90"},
+        {key: "goals_conc_per_90", name: "Goals Conceded per 90"},
+        {key: "assists", name: "Assists"},
         {key: "goals_scored", name: "Goals Scored"},
-        {key: "gs90", name: "Goals Scored per 90"},
+        {key: "goals_scored_per_90", name: "Goals Scored per 90"},
         {key: "ict_index", name: "ICT index"},
         {key: "influence", name: "Influence"},
         {key: "creativity", name: "Creativity"},
@@ -81,84 +128,80 @@
         {key: "points_per_game", name: "PPG"}
     ];
 
+    // todo, when we figure out a way of getting positions, we can add templates for each position here:
+    let templates = {
+        goalkeeper: [
+            {key: "penalties_saved", name: "Penalties Saved"},
+            {key: "saves", name: "Saves"},
+            {key: "minutes", name: "Minutes Played"},
+            {key: "points_per_game", name: "Points per Game"},
+            {key: "points_per_90", name: "Points per 90"},
+            {key: "points_per_mil", name: "Points  per Mil"},
+            {key: "bps", name: "BPS"},
+            {key: "bonus", name: "Bonus Points"},
+            {key: "goals_conceded", name: "Goals Conceded"},
+            {key: "goals_conc_per_90", name: "Goals Conceded per 90"},
+            {key: "clean_sheets", name: "Clean Sheets"},
+            {key: "clean_sheets_per_90", name: "Clean Sheets per 90"},
+        ]
+    }
+
+    // Used to normalize the values
     let valueArrays = {};
 
-    $.ajax('/players', {
-        type: 'get',
-        dataType: 'json',
-        success: function (data) {
-            $.each(data, function (key, player) {
-                // calculate the analysis numbers for this player:
-                player = preparePlayerAnalysis(player);
+    $(document).ready(function() {
+        $('.player-select').select2();
 
-                // add this player to our search
-                $('.player-select').append($('<option>', {
-                    value: player['id'],
-                    text: player['first_name'] + ' ' + player['second_name']
-                }));
+        for (let i = 0; i < chartMetrics.length; i++) {
+            let key = chartMetrics[i]['key'];
 
-                // add this player to our object:
-                players[player['id']] = player;
-            })
-
-            for (let i = 0; i < chartMetrics.length; i++) {
-                let key = chartMetrics[i]['key'];
-
-                if (!_.has(valueArrays, key)) {
-                    valueArrays[key] = [];
-                }
-
-                $.each(players, function(playerKey, player) {
-                    if (player['minutes'] > 500) {
-                        valueArrays[key].push(parseFloat(player[key]))
-                    }
-                });
+            if (!_.has(valueArrays, key)) {
+                valueArrays[key] = [];
             }
+
+            // Only push players who have played a significant amount of minutes
+            // to the array used to normalize the values (this avoids outliers)
+            $.each(players, function(playerKey, player) {
+                if (player['minutes'] > 500) {
+                    valueArrays[key].push(parseFloat(player[key]))
+                }
+            });
         }
+
+        updateUi();
     });
 
     $('.player-select').on('change', function() {
-        let v = $(this).val();
-        updateChart(players[v]);
+        updateUi();
     });
 
-    function preparePlayerAnalysis(player) {
-        player['bpsMin'] = calculatePerMin(player['bps'], player['minutes']);
-        player['cs90'] = calculatePer90(player['clean_sheets'], player['minutes']);
-        player['gc90'] = calculatePer90(player['goals_conceded'], player['minutes']);
-        player['gs90'] = calculatePer90(player['goals_scored'], player['minutes']);
-        player['assists90'] = calculatePer90(player['assists'], player['minutes']); 
-        player['creativityMin'] = calculatePerMin(player['creativity'], player['minutes']);
-        player['threatMin'] = calculatePerMin(player['threat'], player['minutes']);
-        player['influenceMin'] = calculatePerMin(player['influence'], player['minutes']); 
-        player['ppm'] = calculatePerMin(player['total_points'], player['minutes']);
-        return player;
-    }
-
-    function calculatePerMin(metric, minutes) {
-        if (minutes == 0) {
-            return 0;
+    $('.chart-toggle').on('click', function() {
+        // If this is already selected, do nothing:
+        if ($(this).hasClass('is-selected')) {
+            return;
         }
 
-        return metric / minutes;
-    }
+        // Toggle the classes on the buttons:
+        $('.chart-toggle').removeClass('is-selected is-success');
+        $(this).addClass('is-selected is-success');
 
-    function calculatePerMil(metric, price) {
-        return (metric / price);
-    }
+        // Get the value of this button
+        chartType = $(this).data('value');
 
-    function calculatePer90(metric, minutes) {
-        if (minutes == 0) {
-            return 0;
-        }
-
-        return (metric / minutes) * 90;
-    }
+        // Update the UI:
+        updateUi();
+    });
 
     /**
      * Normalize a value in an array of values. This works
      * by finding the min and max values in the array, then
      * scaling the current value accordingly.
+     *
+     * TODO: reverse if it is a metric like goals conceded
+     * or goals conc per 90 (so players who concede less score better)
+     *
+     * TODO: we only need to apply the min minutes played restriction for metrics
+     * which are per 90 or per min
      * 
      * @param val: the current value to be normalized
      * @param arr: the array of all values
@@ -170,33 +213,132 @@
         return val == 0 ? 0 : ((val - minVal) / (maxVal - minVal)).toFixed(2);
     }
 
+    function drawTable(player1, player2) {
+        // First, draw the table head:
+        let tbody = $('.comparison-table').find('tbody');
 
-    function updateChart(player) {
-        let values = [];
-        let normalizedValues = [];
+        $('#player1-th').text(player1['second_name']);
+        $('#player2-th').text(player2['second_name']);
+
+        tbody.empty();
+
+        for (let i = 0; i < chartMetrics.length; i++) {
+            let key = chartMetrics[i]['key'];
+            let name = chartMetrics[i]['name'];
+
+            tbody.append('<tr>').append('<td>' + name + '</td><td>' + player1[key] + '</td><td>' + player2[key] + '</td>');
+        }
+    }
+
+    function updateUi() {
+        // Redraw the chart:
+        let v1 = $('#first-player-select').val();
+        let v2 = $('#second-player-select').val();
+
+        drawTable(players[v1], players[v2]);
+        redrawChart(players[v1], players[v2], chartType);
+    }
+
+    function redrawChart(player1, player2, chartType) {
+        console.log(chartType);
+        if(!_.contains(['radar', 'bar'], chartType)) {
+            console.log('Chart type not expected value "radar" or "bar"');
+            return false;
+        }
+
+        // Redraw the chart:
+        updateChart(player1, player2, chartType);
+    }
+
+    function updateChart(player1, player2, chartType = 'radar') {
+        // real values:
+        let playerOneValues = [];
+        let playerTwoValues = [];
+
+        // normalized values:
+        let nPlayerOneValues = [];
+        let nPlayerTwoValues = [];
+        
         let labels = [];
 
         for (let i = 0; i < chartMetrics.length; i++) {
             let key = chartMetrics[i]['key'];
             let name = chartMetrics[i]['name'];
-            let value = player[key];
-            let normalizedValue = normalizeData(value, valueArrays[key]);
+            
+            let v1 = player1[key];
+            let v2 = player2[key];
 
-            values.push(value);
-            normalizedValues.push(normalizedValue);
+            let nv1 = normalizeData(player1[key], valueArrays[key]);
+            let nv2 = normalizeData(player2[key], valueArrays[key]);
+
+            playerOneValues.push(v1);
+            playerTwoValues.push(v2);
+            nPlayerOneValues.push(nv1);
+            nPlayerTwoValues.push(nv2);
             labels.push(name);
         }
 
-        console.log(normalizedValues);
-
         let data = {
             labels: labels,
-            datasets: [{
-                data: normalizedValues
-            }]
+            datasets: [
+                {
+                    label: player1['second_name'],
+                    backgroundColor: "rgba(200, 0, 0, 0.2)",
+                    data: nPlayerOneValues
+                },
+                {
+                    label: player2['second_name'],
+                    backgroundColor: "rgba(0, 0, 200, 0.2)",
+                    data: nPlayerTwoValues
+                }
+            ]
         };
 
-        let myChart = new Chart(ctx, {
+        // destroy the existing chart
+        destroyChart();
+
+        if (chartType === 'radar') {
+            drawRadarChart(data, player1, player2, playerOneValues, playerTwoValues);
+        } else if (chartType === 'bar') {
+            drawBarChart(data, player1, player2, playerOneValues, playerTwoValues);
+        }
+    }
+
+    function destroyChart() {
+        if (typeof chart == 'undefined') {
+            return;
+        }
+
+        chart.clear();
+        chart.destroy();
+    }
+
+    function drawBarChart(data, player1, player2, playerOneValues, playerTwoValues) {
+        chart = new Chart(ctx, {
+            type: 'horizontalBar',
+            data: data,
+            options: {
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            let val = ''
+
+                            if (data.datasets[tooltipItem.datasetIndex].label === player1['second_name']) {
+                                val = playerOneValues[tooltipItem.index];
+                            } else {
+                                val = playerTwoValues[tooltipItem.index];
+                            }
+
+                            return data.datasets[tooltipItem.datasetIndex].label + ' : ' + val;
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function drawRadarChart(data, player1, player2, playerOneValues, playerTwoValues) {
+        chart = new Chart(ctx, {
             type: 'radar',
             data: data,
             options: {
@@ -207,10 +349,24 @@
                         step: 0.2,
                         max: 1
                     }
+                },
+                tooltips: {
+                    callbacks: {
+                        label: function(tooltipItem, data) {
+                            let val = ''
+
+                            if (data.datasets[tooltipItem.datasetIndex].label === player1['second_name']) {
+                                val = playerOneValues[tooltipItem.index];
+                            } else {
+                                val = playerTwoValues[tooltipItem.index];
+                            }
+
+                            return data.datasets[tooltipItem.datasetIndex].label + ' : ' + val;
+                        }
+                    }
                 }
             }
         });
     }
-
 </script>
 {% endblock %}
