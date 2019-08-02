@@ -27,3 +27,6 @@ def home():
 def get_players():
     players = api.get_players()
     return jsonify(players)
+
+if __name__ == "__main__":
+    app.run(debug=True)
