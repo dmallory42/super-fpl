@@ -1,7 +1,6 @@
 import os
 
 from flask import Flask
-from flask_redis import FlaskRedis
 
 def create_app(test_config=None):
     # create and configure the app
@@ -26,12 +25,5 @@ def create_app(test_config=None):
         os.makedirs(app.instance_path)
     except OSError:
         pass
-
-    from . import db
-    db.init_app(app)
-
-    # Uncomment this if we want to use redis:
-    # redis = FlaskRedis()
-    # redis.init_app(app)
 
     return app

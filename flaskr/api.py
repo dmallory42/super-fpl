@@ -32,22 +32,3 @@ class Api:
                     return data['elements']
                 else:
                     return False
-
-    # Redis logic. May re-use in future
-    # def get_key(self, key):
-    #     val = self.redis.get(key)
-    #     try:
-    #         parsed = json.loads(val)
-    #         return parsed
-    #     except ValueError:
-    #         # If this is not a JSON object, then just return as is:
-    #         return val
-
-    # def set_key(self, key, val):
-    #     if isinstance(val, dict):
-    #         self.redis.set(key, json.dumps(val))
-    #     else:
-    #         self.redis.set(key, val)
-
-    # def del_key(self, key):
-    #     self.redis.delete(key)

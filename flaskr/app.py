@@ -9,11 +9,6 @@ from . import create_app
 app = create_app()
 api = Api()
 
-# Redis logic, commented out for now
-# api = Api(app.extensions['redis'])
-
-
-
 @app.route('/', methods=['GET'])
 def home():
     players = api.get_players()
