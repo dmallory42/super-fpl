@@ -1,12 +1,58 @@
 @charset "utf-8";
+
+// Import a Google Font
+@import url('https://fonts.googleapis.com/css?family=Nunito:400,700');
+@import url('https://fonts.googleapis.com/css?family=Comfortaa:400,500,700&display=swap');
+
+$sapphire_blue: rgba(1, 100, 170, 1);
+$ball_blue: rgba(33, 182, 209, 1);
+$white: rgba(255, 255, 255, 1);
+$keppel: rgba(59, 169, 156, 1);
+$turquoise: rgba(105, 209, 197, 1);
+$highlight_color: #E7F2F8;
+$roman_blue: #1e91d6;
+
+// Bulma global variables:
+$family-sans-serif: "Nunito", sans-serif;
+$primary: $sapphire_blue;
+$link: $sapphire_blue;
+$info: $ball_blue;
+$success: $roman_blue;
+$primary-invert: $white;
+
+// Update some of Bulma's component variables:
+$body-background-color: $white;
+
+// Import Bulma:
 @import "../node_modules/bulma/bulma.sass";
 
-$font-stack: Helvetica, sans-serif;
-$primary-color: #333;
+h1.header-logo {
+  font-family: "Comfortaa", cursive;
+  font-weight: 500;
+  font-size: 1.5rem;
+}
 
-body {
-  font: 100% $font-stack;
-  color: $primary-color;
+.is-highlighted {
+  background-color: $highlight_color; 
+}
+
+.column.has-vertically-aligned-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.tw-button {
+  color: white;
+  background-color: #38A1F3;
+
+  &:hover {
+    color: white;
+  }
+}
+
+footer.footer {
+  margin-top: 2rem;
 }
 
 .select2-container {
@@ -17,6 +63,7 @@ body {
 
     .select2-selection__arrow{
       top: 5px !important;
+      display: none !important
     }
 
     .select2-selection__placeholder {

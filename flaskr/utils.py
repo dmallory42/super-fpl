@@ -1,9 +1,17 @@
 class Utils:
+    POSITION_LOOKUP = {
+        1: 'GKP',
+        2: 'DEF',
+        3: 'MID',
+        4: 'FWD'
+    }
+
     def format_players(self, players):
         for player in players:
             player['name'] = player['first_name'] + ' ' + player['second_name']
             player['now_cost'] = player['now_cost'] / 10
             player['goal_involvements'] = player['goals_scored'] + player['assists'] 
+            player['position'] = self.POSITION_LOOKUP[player['element_type']]
             player = self.prepare_analysis_fields(player)
 
         return players
@@ -20,6 +28,7 @@ class Utils:
         player['points_per_min']      = self.calc_per_min(player['total_points'], player['minutes'])
         player['points_per_90']       = self.calc_per_90(player['total_points'], player['minutes'])
         player['points_per_mil']      = self.calc_per_mil(player['total_points'], player['now_cost'])
+        player['saves_per_90']        = self.calc_per_90(player['saves'], player['minutes'])
         return player
 
     def cacl_per_match(self, metric, matches):

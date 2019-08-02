@@ -1,5 +1,8 @@
+/*jshint esversion: 6 */
+
 const { series, parallel, src, dest } = require('gulp');
 const sass = require('gulp-sass');
+const rename = require('gulp-rename');
 
 sass.compiler = require('node-sass');
 

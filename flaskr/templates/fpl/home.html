@@ -1,55 +1,57 @@
 {% extends 'base.html' %}
 
 {% block header %}
-    <section class="hero is-medium is-primary is-bold">
-        <div class="hero-body">
-            <div class="container">
-                <h1 class="title">
-                    Player Comparison Tool
-                </h1>
-                <h2 class="subtitle">
-                    Please select the players you would like to compare:
-                </h2>
-                <form autocomplete="off" action="/">
-                    <div class="field">
-                        <div class="control">
-                            <div class="columns">
-                                <div class="column">
-                                    <div class="select">
-                                        <select id="first-player-select" class="player-select">
-                                            {% for player in players %}
-                                                <!-- use Salah as our default player:-->
-                                                <option {% if player.code == 118748 %} selected="selected" {% endif %} value="{{ loop.index - 1 }}">
-                                                    {{ player.name }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
+<section class="hero is-medium is-primary is-bold">
+    <div class="hero-body">
+        <div class="container">
+            <h1 class="title" />
+            Player Comparison Tool
+            </h1>
+            <h2 class="subtitle">
+                Please select the players you would like to compare:
+            </h2>
+            <form autocomplete="off" class="compare-form" action="/">
+                <div class="field">
+                    <div class="control">
+                        <div class="columns">
+                            <div class="column">
+                                <div class="select">
+                                    <select id="first-player-select" class="player-select">
+                                        {% for player in players %}
+                                        <!-- use Salah as our default player:-->
+                                        <option {% if player.code == 118748 %} selected="selected" {% endif %}
+                                            value="{{ loop.index - 1 }}">
+                                            {{ player.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
                                 </div>
-                                <div class="column">
-                                    <div class="select">
-                                        <select id="second-player-select" class="player-select">
-                                            {% for player in players %}
-                                                <!-- Use Mane as our default player:-->
-                                                <option {% if player.code == 110979 %} selected="selected" {% endif %} value="{{ loop.index - 1 }}">
-                                                    {{ player.name }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
+                            </div>
+                            <div class="column">
+                                <div class="select">
+                                    <select id="second-player-select" class="player-select">
+                                        {% for player in players %}
+                                        <!-- Use Mane as our default player:-->
+                                        <option {% if player.code == 110979 %} selected="selected" {% endif %}
+                                            value="{{ loop.index - 1 }}">
+                                            {{ player.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="field">
-                        <div class="control">
-                            <button class="button is-primary">Submit</button>
-                        </div>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <button class="button is-success">Compare!</button>
                     </div>
-                </form>
-            </div>
+                </div>
+            </form>
         </div>
-    </section>
+    </div>
+</section>
 {% endblock %}
 
 {% block content %}
@@ -62,33 +64,72 @@
                         <span class="chart-toggle button is-success is-selected" data-value="radar">Radar</span>
                         <span class="chart-toggle button" data-value="bar">Bar</span>
                     </div>
+                </div>
+                <div class="level-right"></div>
             </div>
-            <div class="level-right">
-            </div>
-        </div>
     </div>
 </section>
 <section class="section charts">
     <div class="container">
         <div class="columns">
             <div class="column is-8">
-                <canvas id="chart" width="400" height="400"></canvas>
+                <canvas id="chart" width="75%" height="75%"></canvas>
             </div>
-            <div class="column is-6">
-                <table class="table comparison-table is-striped">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th id="player1-th"></th>
-                            <th id="player2-th"></th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+            <div class="column is-4 has-vertically-aligned-content">
+                <div class="table-container">
+                    <table class="table is-bordered is-outlined rounded-edges comparison-table is-striped is-fullwidth">
+                        <thead class="has-background-primary">
+                            <tr>
+                                <th></th>
+                                <th class="has-text-white" id="player1-th"></th>
+                                <th class="has-text-white" id="player2-th"></th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </section>
+<section>
+    <div class="container">
+        <article class="message is-info">
+            <div class="message-body">
+                All data currently shown is from the 2018-19 season. Players who did
+                not play in the Premier League during that season are currently unavailable.
+                This chart will be updated after GW1 of the 2019-20 season to add the ability
+                to view the data for the 2019-20 season.
+            </div>
+        </article>
+    </div>
+</section>
+
+<div class="modal" id="about-modal">
+  <div class="modal-background"></div>
+  <div class="modal-card">
+    <header class="modal-card-head">
+      <p class="modal-card-title">What is this?</p>
+      <button class="delete modal-dismiss" aria-label="close"></button>
+    </header>
+    <section class="modal-card-body">
+      <p>The Player Comparison Tool can instantly generate a comparison between
+      any two players, making those all important draft decisions easier for fantasy
+      managers everywhere!</p>
+
+      <p>To use the tool, simply select the two players you would like to compare using
+      the dropdowns, press the 'compare' button and the tool will do its magic!</p>
+
+      <p>Most metrics on the charts are shown on either a per min or per 90 basis. This makes
+      it easier to compare players who have played a varying degree of minutes. The charts are ranked
+      in percentiles, but the actual values for each players metrics can be viewed by hovering over the
+      chart, and some summary information is displayed in the table. Enjoy!</p>
+    </section>
+    <footer class="modal-card-foot">
+      <button class="modal-dismiss button">Close</button>
+    </footer>
+  </div>
+</div>
 
 <script type="text/javascript">
     let players = JSON.parse('{{players|tojson|safe}}');
@@ -97,63 +138,351 @@
     let chartType = 'radar';
 
     // These are the metrics we are interested in plotting on the chart:
-    let breakdownMetrics = [
-        {key: "assists_per_90", name: "Assists per 90"},
-        {key: "goals_scored_per_90", name: "Goals Scored per 90"},
-        {key: "goals_conc_per_90", name: "Goals Conceded per 90"},
-        {key: "clean_sheets_per_90", name: "Clean Sheets per 90"},
-        {key: "bps_per_min", name: "BPS per Min"},
-        {key: "creativity_per_min", name: "Creativity per Minute"},
-        {key: "threat_per_min", name: "Threat per Minute"},
-        {key: "influence_per_min", name: "Influence per Minute"},
-        {key: "points_per_min", name: "Points per Minute"},
+    let tableMetrics = [{
+            key: "minutes",
+            name: "Minutes Played"
+        },
+        {
+            key: "now_cost",
+            name: "Current Value"
+        },
+        {
+            key: "total_points",
+            name: "Total Points"
+        },
+        {
+            key: "bps",
+            name: "BPS Points"
+        },
+        {
+            key: "bonus",
+            name: "Bonus Points"
+        },
+        {
+            key: "goals_scored",
+            name: "Goals Scored"
+        },
+        {
+            key: "assists",
+            name: "Assists"
+        },
+        {
+            key: "clean_sheets",
+            name: "Clean Sheets"
+        },
+        {
+            key: "goals_conceded",
+            name: "Goals Conceded"
+        },
+        {
+            key: "yellow_cards",
+            name: "Yellow Cards"
+        },
+        {
+            key: "ict_index",
+            name: "ICT Index"
+        },
+        {
+            key: "influence",
+            name: "Influence"
+        },
+        {
+            key: "creativity",
+            name: "Creativity"
+        },
+        {
+            key: "threat",
+            name: "Threat"
+        },
     ]
-
-    let chartMetrics = [
-        {key: "bonus", name: "Bonus Points"},
-        {key: "bps", name: "BPS"},
-        {key: "bps_per_min", name: "BPS per Min"},
-        {key: "clean_sheets", name: "Clean Sheets"},
-        {key: "clean_sheets_per_90", name: "Clean Sheets per 90"},
-        {key: "goals_conceded", name: "Goals Conceded"},
-        {key: "goals_conc_per_90", name: "Goals Conceded per 90"},
-        {key: "assists", name: "Assists"},
-        {key: "goals_scored", name: "Goals Scored"},
-        {key: "goals_scored_per_90", name: "Goals Scored per 90"},
-        {key: "ict_index", name: "ICT index"},
-        {key: "influence", name: "Influence"},
-        {key: "creativity", name: "Creativity"},
-        {key: "threat", name: "Threat"},
-        {key: "minutes", name: "Minutes Played"},
-        {key: "points_per_game", name: "PPG"}
-    ];
 
     // todo, when we figure out a way of getting positions, we can add templates for each position here:
     let templates = {
-        goalkeeper: [
-            {key: "penalties_saved", name: "Penalties Saved"},
-            {key: "saves", name: "Saves"},
-            {key: "minutes", name: "Minutes Played"},
-            {key: "points_per_game", name: "Points per Game"},
-            {key: "points_per_90", name: "Points per 90"},
-            {key: "points_per_mil", name: "Points  per Mil"},
-            {key: "bps", name: "BPS"},
-            {key: "bonus", name: "Bonus Points"},
-            {key: "goals_conceded", name: "Goals Conceded"},
-            {key: "goals_conc_per_90", name: "Goals Conceded per 90"},
-            {key: "clean_sheets", name: "Clean Sheets"},
-            {key: "clean_sheets_per_90", name: "Clean Sheets per 90"},
+        goalkeeper: [{
+                key: "penalties_saved",
+                name: "Penalties Saved"
+            },
+            {
+                key: "saves",
+                name: "Saves"
+            },
+            {
+                key: "saves_per_90",
+                name: "Saves per 90"
+            },
+            {
+                key: "minutes",
+                name: "Minutes Played"
+            },
+            {
+                key: "points_per_90",
+                name: "Points per 90"
+            },
+            {
+                key: "points_per_mil",
+                name: "Points per Mil"
+            },
+            {
+                key: "bps",
+                name: "BPS"
+            },
+            {
+                key: "bonus",
+                name: "Bonus Points"
+            },
+            {
+                key: "goals_conceded",
+                name: "Goals Conceded"
+            },
+            {
+                key: "goals_conc_per_90",
+                name: "Goals Conceded per 90"
+            },
+            {
+                key: "clean_sheets",
+                name: "Clean Sheets"
+            },
+            {
+                key: "clean_sheets_per_90",
+                name: "Clean Sheets per 90"
+            }
+        ],
+        defender: [{
+                key: "bonus",
+                name: "Bonus Points"
+            },
+            {
+                key: "bps",
+                name: "BPS"
+            },
+            {
+                key: "bps_per_min",
+                name: "BPS per Min"
+            },
+            {
+                key: "clean_sheets_per_90",
+                name: "Clean Sheets per 90"
+            },
+            {
+                key: "goals_conc_per_90",
+                name: "Goals Conceded per 90"
+            },
+            {
+                key: "yellow_cards",
+                name: "Yellow Cards"
+            },
+            {
+                key: "assists_per_90",
+                name: "Assists per 90"
+            },
+            {
+                key: "goals_scored_per_90",
+                name: "Goals Scored per 90"
+            },
+            {
+                key: "ict_index",
+                name: "ICT index"
+            },
+            {
+                key: "creativity_per_min",
+                name: "Creativity per Minute"
+            },
+            {
+                key: "threat_per_min",
+                name: "Threat per Minute"
+            },
+            {
+                key: "influence_per_min",
+                name: "Influence per Minute"
+            },
+            {
+                key: "minutes",
+                name: "Minutes Played"
+            },
+            {
+                key: "points_per_90",
+                name: "Points per 90"
+            },
+            {
+                key: "points_per_mil",
+                name: "Points per Mil"
+            }
+        ],
+        midfielder: [{
+                key: "bonus",
+                name: "Bonus Points"
+            },
+            {
+                key: "bps",
+                name: "BPS"
+            },
+            {
+                key: "bps_per_min",
+                name: "BPS per Min"
+            },
+            {
+                key: "clean_sheets_per_90",
+                name: "Clean Sheets per 90"
+            },
+            {
+                key: "goals_conc_per_90",
+                name: "Goals Conceded per 90"
+            },
+            {
+                key: "assists_per_90",
+                name: "Assists per 90"
+            },
+            {
+                key: "goals_scored_per_90",
+                name: "Goals Scored per 90"
+            },
+            {
+                key: "ict_index",
+                name: "ICT index"
+            },
+            {
+                key: "creativity_per_min",
+                name: "Creativity per Minute"
+            },
+            {
+                key: "threat_per_min",
+                name: "Threat per Minute"
+            },
+            {
+                key: "influence_per_min",
+                name: "Influence per Minute"
+            },
+            {
+                key: "minutes",
+                name: "Minutes Played"
+            },
+            {
+                key: "points_per_90",
+                name: "Points per 90"
+            },
+            {
+                key: "points_per_mil",
+                name: "Points per Mil"
+            }
+        ],
+        forward: [{
+                key: "bonus",
+                name: "Bonus Points"
+            },
+            {
+                key: "bps",
+                name: "BPS"
+            },
+            {
+                key: "bps_per_min",
+                name: "BPS per Min"
+            },
+            {
+                key: "goals_scored_per_90",
+                name: "Goals Scored per 90"
+            },
+            {
+                key: "assists_per_90",
+                name: "Assists per 90"
+            },
+            {
+                key: "ict_index",
+                name: "ICT index"
+            },
+            {
+                key: "creativity_per_min",
+                name: "Creativity per Minute"
+            },
+            {
+                key: "threat_per_min",
+                name: "Threat per Minute"
+            },
+            {
+                key: "influence_per_min",
+                name: "Influence per Minute"
+            },
+            {
+                key: "minutes",
+                name: "Minutes Played"
+            },
+            {
+                key: "points_per_90",
+                name: "Points per 90"
+            },
+            {
+                key: "points_per_mil",
+                name: "Points per Mil"
+            }
+        ],
+        generic: [{
+                key: "bonus",
+                name: "Bonus Points"
+            },
+            {
+                key: "bps",
+                name: "BPS"
+            },
+            {
+                key: "bps_per_min",
+                name: "BPS per Min"
+            },
+            {
+                key: "clean_sheets_per_90",
+                name: "Clean Sheets per 90"
+            },
+            {
+                key: "goals_conc_per_90",
+                name: "Goals Conceded per 90"
+            },
+            {
+                key: "assists_per_90",
+                name: "Assists per 90"
+            },
+            {
+                key: "goals_scored_per_90",
+                name: "Goals Scored per 90"
+            },
+            {
+                key: "ict_index",
+                name: "ICT index"
+            },
+            {
+                key: "creativity_per_min",
+                name: "Creativity per Minute"
+            },
+            {
+                key: "threat_per_min",
+                name: "Threat per Minute"
+            },
+            {
+                key: "influence_per_min",
+                name: "Influence per Minute"
+            },
+            {
+                key: "minutes",
+                name: "Minutes Played"
+            },
+            {
+                key: "points_per_90",
+                name: "Points per 90"
+            },
+            {
+                key: "points_per_mil",
+                name: "Points per Mil"
+            }
         ]
     }
 
     // Used to normalize the values
     let valueArrays = {};
 
-    $(document).ready(function() {
+    $(document).ready(function () {
         $('.player-select').select2();
 
+        let chartMetrics = getAllChartMetrics();
+
         for (let i = 0; i < chartMetrics.length; i++) {
-            let key = chartMetrics[i]['key'];
+            let key = chartMetrics[i];
 
             if (!_.has(valueArrays, key)) {
                 valueArrays[key] = [];
@@ -161,7 +490,7 @@
 
             // Only push players who have played a significant amount of minutes
             // to the array used to normalize the values (this avoids outliers)
-            $.each(players, function(playerKey, player) {
+            $.each(players, function (playerKey, player) {
                 if (player['minutes'] > 500) {
                     valueArrays[key].push(parseFloat(player[key]))
                 }
@@ -170,12 +499,16 @@
 
         updateUi();
     });
-
-    $('.player-select').on('change', function() {
+    
+    $('.compare-form').on('submit', function(e) {
+        e.preventDefault();
         updateUi();
+        $([document.documentElement, document.body]).animate({
+            scrollTop: $("section.options").offset().top
+        }, 1000);
     });
 
-    $('.chart-toggle').on('click', function() {
+    $('.chart-toggle').on('click', function () {
         // If this is already selected, do nothing:
         if ($(this).hasClass('is-selected')) {
             return;
@@ -210,7 +543,41 @@
         let maxVal = _.max(arr);
         let minVal = _.min(arr);
 
-        return val == 0 ? 0 : ((val - minVal) / (maxVal - minVal)).toFixed(2);
+        let normalizedVal = (val == 0) ?
+            0 :
+            ((val - minVal) / (maxVal - minVal)).toFixed(2);
+
+        if (normalizedVal < 0) {
+            return 0;
+        } else if (normalizedVal > 1) {
+            return 1;
+        } else {
+            return normalizedVal;
+        }
+    }
+
+    function getAllChartMetrics() {
+        let chartMetrics = [];
+
+        for (key in templates) {
+            chartMetrics = _.union(chartMetrics, templates[key].map(a => a.key));
+        }
+
+        return chartMetrics;
+    }
+
+    function getChartMetricsToUse(player1, player2) {
+        if (player1['position'] == 'GKP' && player2['position'] == 'GKP') {
+            return templates['goalkeeper'];
+        } else if (player1['position'] == 'DEF' && player2['position'] == 'DEF') {
+            return templates['defender'];
+        } else if (player1['position'] == 'MID' && player2['position'] == 'MID') {
+            return templates['midfielder']
+        } else if (player1['position'] == 'FWD' && player2['position'] == 'FWD') {
+            return templates['forward'];
+        } else {
+            return templates['generic'];
+        }
     }
 
     function drawTable(player1, player2) {
@@ -222,11 +589,29 @@
 
         tbody.empty();
 
-        for (let i = 0; i < chartMetrics.length; i++) {
-            let key = chartMetrics[i]['key'];
-            let name = chartMetrics[i]['name'];
+        for (let i = 0; i < tableMetrics.length; i++) {
+            let key = tableMetrics[i]['key'];
+            let name = tableMetrics[i]['name'];
 
-            tbody.append('<tr>').append('<td>' + name + '</td><td>' + player1[key] + '</td><td>' + player2[key] + '</td>');
+            let append_str = '';
+
+            let displayVal1 = player1[key];
+            let displayVal2 = player2[key];
+
+            if (key == 'now_cost') {
+                displayVal1 = displayVal1.toFixed(1);
+                displayVal2 = displayVal2.toFixed(1);
+            }
+
+            if (parseFloat(player1[key]) > parseFloat(player2[key])) {
+                append_str = '<td class="is-highlighted">' + displayVal1 + '</td><td>' + displayVal2 + '</td>';
+            } else if (parseFloat(player2[key]) > parseFloat(player1[key])) {
+                 append_str = '<td>' + displayVal1 + '</td><td class="is-highlighted">' + displayVal2 + '</td>';
+            } else {
+                append_str = '<td>' + displayVal1 + '</td><td>' + displayVal2 + '</td>';
+            }
+
+            tbody.append('<tr>').append('<td><b>' + name + '</b></td>' + append_str);
         }
     }
 
@@ -240,8 +625,7 @@
     }
 
     function redrawChart(player1, player2, chartType) {
-        console.log(chartType);
-        if(!_.contains(['radar', 'bar'], chartType)) {
+        if (!_.contains(['radar', 'bar'], chartType)) {
             console.log('Chart type not expected value "radar" or "bar"');
             return false;
         }
@@ -251,6 +635,10 @@
     }
 
     function updateChart(player1, player2, chartType = 'radar') {
+        let chartMetrics = getChartMetricsToUse(player1, player2);
+
+        console.log(chartMetrics);
+
         // real values:
         let playerOneValues = [];
         let playerTwoValues = [];
@@ -258,13 +646,13 @@
         // normalized values:
         let nPlayerOneValues = [];
         let nPlayerTwoValues = [];
-        
+
         let labels = [];
 
         for (let i = 0; i < chartMetrics.length; i++) {
             let key = chartMetrics[i]['key'];
             let name = chartMetrics[i]['name'];
-            
+
             let v1 = player1[key];
             let v2 = player2[key];
 
@@ -280,8 +668,7 @@
 
         let data = {
             labels: labels,
-            datasets: [
-                {
+            datasets: [{
                     label: player1['second_name'],
                     backgroundColor: "rgba(200, 0, 0, 0.2)",
                     data: nPlayerOneValues
@@ -320,7 +707,7 @@
             options: {
                 tooltips: {
                     callbacks: {
-                        label: function(tooltipItem, data) {
+                        label: function (tooltipItem, data) {
                             let val = ''
 
                             if (data.datasets[tooltipItem.datasetIndex].label === player1['second_name']) {
@@ -352,7 +739,7 @@
                 },
                 tooltips: {
                     callbacks: {
-                        label: function(tooltipItem, data) {
+                        label: function (tooltipItem, data) {
                             let val = ''
 
                             if (data.datasets[tooltipItem.datasetIndex].label === player1['second_name']) {

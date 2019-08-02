@@ -18,7 +18,14 @@ api = Api()
 def home():
     players = api.get_players()
     players = sorted(players, key=lambda k: unidecode(k['name']))
-    return render_template('fpl/home.html', players=players)
+
+    valid_players = []
+    
+    for player in players:
+        if player['minutes'] > 0:
+            valid_players.append(player)
+
+    return render_template('fpl/home.html', title='Super FPL - Player Comparison Tool', players=valid_players)
 
 
 @app.route('/players', methods=['GET'])
