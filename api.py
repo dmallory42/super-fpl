@@ -1,5 +1,5 @@
-from . import json_interface
-from .utils import Utils
+import json_interface
+from utils import Utils
 
 import urllib.request
 import json
