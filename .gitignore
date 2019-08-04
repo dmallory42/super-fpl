@@ -3,3 +3,4 @@ node_modules/
 .DS_STORE
 .vscode/
 __pycache__/
+superfpl.sock
