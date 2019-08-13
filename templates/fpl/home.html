@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block header %}
-<section class="hero is-medium is-primary is-bold">
+<section class="hero is-medium is-primary">
     <div class="hero-body">
         <div class="container">
             <h1 class="title" />
@@ -61,8 +61,8 @@
             <div class="level-left">
                 <div class="level-item">
                     <div class="buttons has-addons">
-                        <span class="chart-toggle button is-success is-selected" data-value="radar">Radar</span>
-                        <span class="chart-toggle button" data-value="bar">Bar</span>
+                        <span class="chart-toggle button is-success is-selected" data-value="bar">Bar</span>
+                        <span class="chart-toggle button" data-value="radar">Radar</span>
                     </div>
                 </div>
                 <div class="level-right"></div>
@@ -73,20 +73,28 @@
     <div class="container">
         <div class="columns">
             <div class="column is-8">
-                <canvas id="chart" width="95%" height="95%"></canvas>
+                <div class="card chart-card">
+                    <div class="card-content">
+                            <canvas id="chart" width="80%" height="80%"></canvas>
+                    </div>
+                </div>
             </div>
             <div class="column is-4 has-vertically-aligned-content">
-                <div class="table-container">
-                    <table class="table is-bordered is-outlined rounded-edges comparison-table is-striped is-fullwidth">
-                        <thead class="has-background-primary">
-                            <tr>
-                                <th></th>
-                                <th class="has-text-white" id="player1-th"></th>
-                                <th class="has-text-white" id="player2-th"></th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                <div class="card stats-card">
+                    <div class="card-content">
+                        <div class="table-container">
+                            <table class="table comparison-table is-fullwidth">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th id="player1-th"></th>
+                                        <th id="player2-th"></th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -131,350 +139,15 @@
   </div>
 </div>
 
+<script type="text/javascript" src="{{ url_for('static', filename='js/metrics.js') }}"></script>
 <script type="text/javascript">
     let players = JSON.parse('{{players|tojson|safe}}');
+    let staticPath = "{{ url_for('static', filename='') }}";
+    let negativeMetrics = ['goals_conceded', 'goals_conc_per_90', 'yellow_cards', 'red_cards'];
+
     let ctx = $('#chart');
     let chart;
-    let chartType = 'radar';
-
-    // These are the metrics we are interested in plotting on the chart:
-    let tableMetrics = [{
-            key: "minutes",
-            name: "Minutes Played"
-        },
-        {
-            key: "now_cost",
-            name: "Current Value"
-        },
-        {
-            key: "total_points",
-            name: "Total Points"
-        },
-        {
-            key: "bps",
-            name: "BPS Points"
-        },
-        {
-            key: "bonus",
-            name: "Bonus Points"
-        },
-        {
-            key: "goals_scored",
-            name: "Goals Scored"
-        },
-        {
-            key: "assists",
-            name: "Assists"
-        },
-        {
-            key: "clean_sheets",
-            name: "Clean Sheets"
-        },
-        {
-            key: "goals_conceded",
-            name: "Goals Conceded"
-        },
-        {
-            key: "yellow_cards",
-            name: "Yellow Cards"
-        },
-        {
-            key: "ict_index",
-            name: "ICT Index"
-        },
-        {
-            key: "influence",
-            name: "Influence"
-        },
-        {
-            key: "creativity",
-            name: "Creativity"
-        },
-        {
-            key: "threat",
-            name: "Threat"
-        },
-    ]
-
-    // todo, when we figure out a way of getting positions, we can add templates for each position here:
-    let templates = {
-        goalkeeper: [{
-                key: "penalties_saved",
-                name: "Penalties Saved"
-            },
-            {
-                key: "saves",
-                name: "Saves"
-            },
-            {
-                key: "saves_per_90",
-                name: "Saves per 90"
-            },
-            {
-                key: "minutes",
-                name: "Minutes Played"
-            },
-            {
-                key: "points_per_90",
-                name: "Points per 90"
-            },
-            {
-                key: "points_per_mil",
-                name: "Points per Mil"
-            },
-            {
-                key: "bps",
-                name: "BPS"
-            },
-            {
-                key: "bonus",
-                name: "Bonus Points"
-            },
-            {
-                key: "goals_conceded",
-                name: "Goals Conceded"
-            },
-            {
-                key: "goals_conc_per_90",
-                name: "Goals Conceded per 90"
-            },
-            {
-                key: "clean_sheets",
-                name: "Clean Sheets"
-            },
-            {
-                key: "clean_sheets_per_90",
-                name: "Clean Sheets per 90"
-            }
-        ],
-        defender: [{
-                key: "bonus",
-                name: "Bonus Points"
-            },
-            {
-                key: "bps",
-                name: "BPS"
-            },
-            {
-                key: "bps_per_min",
-                name: "BPS per Min"
-            },
-            {
-                key: "clean_sheets_per_90",
-                name: "Clean Sheets per 90"
-            },
-            {
-                key: "goals_conc_per_90",
-                name: "Goals Conceded per 90"
-            },
-            {
-                key: "yellow_cards",
-                name: "Yellow Cards"
-            },
-            {
-                key: "assists_per_90",
-                name: "Assists per 90"
-            },
-            {
-                key: "goals_scored_per_90",
-                name: "Goals Scored per 90"
-            },
-            {
-                key: "ict_index",
-                name: "ICT index"
-            },
-            {
-                key: "creativity_per_min",
-                name: "Creativity per Minute"
-            },
-            {
-                key: "threat_per_min",
-                name: "Threat per Minute"
-            },
-            {
-                key: "influence_per_min",
-                name: "Influence per Minute"
-            },
-            {
-                key: "minutes",
-                name: "Minutes Played"
-            },
-            {
-                key: "points_per_90",
-                name: "Points per 90"
-            },
-            {
-                key: "points_per_mil",
-                name: "Points per Mil"
-            }
-        ],
-        midfielder: [{
-                key: "bonus",
-                name: "Bonus Points"
-            },
-            {
-                key: "bps",
-                name: "BPS"
-            },
-            {
-                key: "bps_per_min",
-                name: "BPS per Min"
-            },
-            {
-                key: "clean_sheets_per_90",
-                name: "Clean Sheets per 90"
-            },
-            {
-                key: "goals_conc_per_90",
-                name: "Goals Conceded per 90"
-            },
-            {
-                key: "assists_per_90",
-                name: "Assists per 90"
-            },
-            {
-                key: "goals_scored_per_90",
-                name: "Goals Scored per 90"
-            },
-            {
-                key: "ict_index",
-                name: "ICT index"
-            },
-            {
-                key: "creativity_per_min",
-                name: "Creativity per Minute"
-            },
-            {
-                key: "threat_per_min",
-                name: "Threat per Minute"
-            },
-            {
-                key: "influence_per_min",
-                name: "Influence per Minute"
-            },
-            {
-                key: "minutes",
-                name: "Minutes Played"
-            },
-            {
-                key: "points_per_90",
-                name: "Points per 90"
-            },
-            {
-                key: "points_per_mil",
-                name: "Points per Mil"
-            }
-        ],
-        forward: [{
-                key: "bonus",
-                name: "Bonus Points"
-            },
-            {
-                key: "bps",
-                name: "BPS"
-            },
-            {
-                key: "bps_per_min",
-                name: "BPS per Min"
-            },
-            {
-                key: "goals_scored_per_90",
-                name: "Goals Scored per 90"
-            },
-            {
-                key: "assists_per_90",
-                name: "Assists per 90"
-            },
-            {
-                key: "ict_index",
-                name: "ICT index"
-            },
-            {
-                key: "creativity_per_min",
-                name: "Creativity per Minute"
-            },
-            {
-                key: "threat_per_min",
-                name: "Threat per Minute"
-            },
-            {
-                key: "influence_per_min",
-                name: "Influence per Minute"
-            },
-            {
-                key: "minutes",
-                name: "Minutes Played"
-            },
-            {
-                key: "points_per_90",
-                name: "Points per 90"
-            },
-            {
-                key: "points_per_mil",
-                name: "Points per Mil"
-            }
-        ],
-        generic: [{
-                key: "bonus",
-                name: "Bonus Points"
-            },
-            {
-                key: "bps",
-                name: "BPS"
-            },
-            {
-                key: "bps_per_min",
-                name: "BPS per Min"
-            },
-            {
-                key: "clean_sheets_per_90",
-                name: "Clean Sheets per 90"
-            },
-            {
-                key: "goals_conc_per_90",
-                name: "Goals Conceded per 90"
-            },
-            {
-                key: "assists_per_90",
-                name: "Assists per 90"
-            },
-            {
-                key: "goals_scored_per_90",
-                name: "Goals Scored per 90"
-            },
-            {
-                key: "ict_index",
-                name: "ICT index"
-            },
-            {
-                key: "creativity_per_min",
-                name: "Creativity per Minute"
-            },
-            {
-                key: "threat_per_min",
-                name: "Threat per Minute"
-            },
-            {
-                key: "influence_per_min",
-                name: "Influence per Minute"
-            },
-            {
-                key: "minutes",
-                name: "Minutes Played"
-            },
-            {
-                key: "points_per_90",
-                name: "Points per 90"
-            },
-            {
-                key: "points_per_mil",
-                name: "Points per Mil"
-            }
-        ]
-    }
-
-    // Used to normalize the values
-    let valueArrays = {};
+    let chartType = 'bar';
 
     $(document).ready(function () {
         $('.player-select').select2();
@@ -484,16 +157,23 @@
         for (let i = 0; i < chartMetrics.length; i++) {
             let key = chartMetrics[i];
 
-            if (!_.has(valueArrays, key)) {
-                valueArrays[key] = [];
-            }
+            // Used to normalize the values for this key
+            let playerValues = [];
 
             // Only push players who have played a significant amount of minutes
             // to the array used to normalize the values (this avoids outliers)
             $.each(players, function (playerKey, player) {
-                if (player['minutes'] > 500) {
-                    valueArrays[key].push(parseFloat(player[key]))
+                if (player['minutes'] > 60) {
+                    playerValues.push(parseFloat(player[key]))
                 }
+            });
+
+            // Second pass to normalize the values:
+            $.each(players, function (playerKey, player) {
+                let reverseScale =  _.contains(negativeMetrics, key);
+
+                let normalizedVal = normalizeData(player[key], playerValues, reverseScale);
+                player[key + '_normalized'] = normalizedVal;
             });
         }
 
@@ -539,18 +219,16 @@
      * @param val: the current value to be normalized
      * @param arr: the array of all values
      */
-    function normalizeData(val, arr) {
+    function normalizeData(val, arr, reverseScale = false) {
         let maxVal = _.max(arr);
         let minVal = _.min(arr);
 
-        let normalizedVal = (val == 0) ?
-            0 :
-            ((val - minVal) / (maxVal - minVal)).toFixed(2);
+        let normalizedVal = (val == 0) ? 0 : ((val - minVal) / (maxVal - minVal)).toFixed(2);
+    
+        normalizedVal = Math.min(Math.max(parseFloat(normalizedVal), 0), 1);
 
-        if (normalizedVal < 0) {
-            return 0;
-        } else if (normalizedVal > 1) {
-            return 1;
+        if (reverseScale) {
+            return 1 - normalizedVal;
         } else {
             return normalizedVal;
         }
@@ -560,7 +238,7 @@
         let chartMetrics = [];
 
         for (key in templates) {
-            chartMetrics = _.union(chartMetrics, templates[key].map(a => a.key));
+            chartMetrics = _.union(chartMetrics, templates[key].map(a => a.key), tableMetrics.map(a => a.key));
         }
 
         return chartMetrics;
@@ -603,16 +281,19 @@
                 displayVal2 = displayVal2.toFixed(1);
             }
 
-            if (parseFloat(player1[key]) > parseFloat(player2[key])) {
-                append_str = '<td class="is-highlighted">' + displayVal1 + '</td><td>' + displayVal2 + '</td>';
-            } else if (parseFloat(player2[key]) > parseFloat(player1[key])) {
-                 append_str = '<td>' + displayVal1 + '</td><td class="is-highlighted">' + displayVal2 + '</td>';
-            } else {
-                append_str = '<td>' + displayVal1 + '</td><td>' + displayVal2 + '</td>';
-            }
+            append_str = '<td class="' + getTableClass(player1[key + '_normalized']) + '">' + displayVal1 + '</td>' +
+                '<td class="' + getTableClass(player2[key + '_normalized']) + '">' + displayVal2 + '</td>';
 
-            tbody.append('<tr>').append('<td><b>' + name + '</b></td>' + append_str);
+            tbody.append('<tr>').append('<td>' + name + '</td>' + append_str);
         }
+    }
+
+    function getTableClass(val) {
+        if (val < 0.2) return 'is-worst';
+        else if (val >= 0.2 && val < 0.4) return 'is-bad';
+        else if (val >= 0.4 && val < 0.6) return 'is-okay';
+        else if (val >= 0.6 && val < 0.8) return 'is-good';
+        else return 'is-best';
     }
 
     function updateUi() {
@@ -637,8 +318,6 @@
     function updateChart(player1, player2, chartType = 'radar') {
         let chartMetrics = getChartMetricsToUse(player1, player2);
 
-        console.log(chartMetrics);
-
         // real values:
         let playerOneValues = [];
         let playerTwoValues = [];
@@ -656,8 +335,8 @@
             let v1 = player1[key];
             let v2 = player2[key];
 
-            let nv1 = normalizeData(player1[key], valueArrays[key]);
-            let nv2 = normalizeData(player2[key], valueArrays[key]);
+            let nv1 = player1[key + '_normalized'];
+            let nv2 = player2[key + '_normalized'];
 
             playerOneValues.push(v1);
             playerTwoValues.push(v2);
@@ -670,12 +349,12 @@
             labels: labels,
             datasets: [{
                     label: player1['second_name'],
-                    backgroundColor: "rgba(200, 0, 0, 0.2)",
+                    backgroundColor: "rgba(56, 0, 60, 0.2)",
                     data: nPlayerOneValues
                 },
                 {
                     label: player2['second_name'],
-                    backgroundColor: "rgba(0, 0, 200, 0.2)",
+                    backgroundColor: "rgba(233, 0, 82, 0.2)",
                     data: nPlayerTwoValues
                 }
             ]

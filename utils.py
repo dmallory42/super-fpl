@@ -1,3 +1,5 @@
+from datetime import date
+
 class Utils:
     POSITION_LOOKUP = {
         1: 'GKP',
@@ -6,15 +8,15 @@ class Utils:
         4: 'FWD'
     }
 
-    def format_players(self, players):
-        for player in players:
-            player['name'] = player['first_name'] + ' ' + player['second_name']
-            player['now_cost'] = player['now_cost'] / 10
-            player['goal_involvements'] = player['goals_scored'] + player['assists'] 
-            player['position'] = self.POSITION_LOOKUP[player['element_type']]
-            player = self.prepare_analysis_fields(player)
+    def format_player(self, player):
+        player['name'] = player['first_name'] + ' ' + player['second_name']
+        player['now_cost'] = player['now_cost'] / 10
+        player['goal_involvements'] = player['goals_scored'] + player['assists'] 
+        player['position'] = self.POSITION_LOOKUP[player['element_type']]
+        player['date_generated'] = date.today().strftime('%d%m%Y')
+        player = self.prepare_analysis_fields(player)
 
-        return players
+        return player
 
     def prepare_analysis_fields(self, player):
         player['bps_per_min']         = self.calc_per_min(player['bps'], player['minutes'])
