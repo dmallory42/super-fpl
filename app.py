@@ -4,8 +4,12 @@ from unidecode import unidecode
 from flask import (
     Flask, flash, g, redirect, render_template, request, session, url_for, jsonify, current_app
 )
+from flask.logging import create_logger
 
 from api import Api
+from datetime import date
+
+import logging
 
 def create_app(test_config=None):
     # create and configure the app
@@ -25,6 +29,13 @@ def create_app(test_config=None):
         # load the test config if passed in
         app.config.from_mapping(test_config)
 
+    # Configure logging:
+    logging.basicConfig(
+        filename='logs/' + date.today().strftime('%d-%m-%Y') + '.log', 
+        level=logging.WARNING,
+        format='%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s'
+    )
+
     # ensure the instance folder exists
     try:
         os.makedirs(app.instance_path)
@@ -33,11 +44,14 @@ def create_app(test_config=None):
 
     return app
 
-app = create_app()
-api = Api()
+app = create_app()  # Flask
+logger = create_logger(app)
+api = Api(logger)
 
 @app.route('/', methods=['GET'])
 def home():
+    logger.error('test')
+    logger.info('test2')
     players = api.get_players()
     players = sorted(players, key=lambda k: unidecode(k['name']))
 
