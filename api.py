@@ -9,7 +9,7 @@ import json
 class Api:
     # Constants: the various routes of interest
     API_URL = 'https://fantasy.premierleague.com/api'
-    ALL_DATA = '/bootstrap-static'
+    ALL_DATA = '/bootstrap-static/'
 
     utils = Utils()
     client = MongoClient()
