@@ -50,8 +50,6 @@ api = Api(logger)
 
 @app.route('/', methods=['GET'])
 def home():
-    logger.error('test')
-    logger.info('test2')
     players = api.get_players()
     players = sorted(players, key=lambda k: unidecode(k['name']))
 
