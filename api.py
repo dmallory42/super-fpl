@@ -16,9 +16,8 @@ class Api:
     db = client.fpl
 
     def get_players(self):
-        # players = self.get_players_from_db()
-        players = False
-
+        players = self.get_players_from_db()
+        
         if players is not False:
             return players
         else:
@@ -42,6 +41,9 @@ class Api:
         for player in cursor:
             players.append(player)
     
+        if len(players) == 0:
+            return False
+            
         return players
 
     def insert_players_to_db(self, players):
