@@ -17,6 +17,7 @@ $prem-green: rgb(0,255,133);
 $prem-green-light: rgba(0, 255, 133, 0.3);
 $prem-green-lighter: rgba(0, 255, 133, 0.1);
 $prem-white: rgb(255,255,255);
+$prem-light-grey: rgb(235, 235, 228);
 $prem-red: rgb(233,0,82);
 $prem-red-light: rgba(233, 0, 82, 0.3);
 $prem-red-lighter: rgba(233, 0, 82, 0.1);
@@ -45,6 +46,7 @@ $tablet: 988px;
 
 // Import Bulma:
 @import "../node_modules/bulma/bulma.sass";
+@import "dataTables.bulma.scss";
 @import "mixins";
 
 h1.header-logo {
@@ -75,6 +77,13 @@ h1.header-logo {
   &.chart-card {
     border-left: 8px solid $prem-red;
   }
+}
+
+// Few fixes to make sure the chart is always horizontally centered
+#chart {
+  max-height: 704px;
+  max-width: 704px;
+  margin: auto;
 }
 
 th {
@@ -111,6 +120,171 @@ td {
   }
 }
 
+table.is-datatable {
+  width: 100% !important;
+  th {
+    font-size: 0.75rem;
+    padding-right: 10px;
+  }
+
+  td {
+    font-size: 0.7rem;
+  }
+}
+
+span.fixture {
+  padding: 1px 3px 1px 3px;
+
+  &.difficulty-1 {
+    background-color: $prem-green;
+  }
+
+  &.difficulty-2 {
+    background-color: $prem-green-light;
+  }
+  
+  &.difficulty-3 {
+    background-color: $prem-light-grey;
+  }
+  
+  &.difficulty-4 {
+    background-color: $prem-red;
+    color: $prem-white;
+  }
+  
+  &.difficulty-5 {
+    background-color: $prem-purple;
+    color: $prem-white;
+  }
+}
+
+span.team {
+  padding: 1px 3px 1px 3px;
+  font-weight: 700;
+  width: 35px;
+  text-align: center;
+  display: inline-block;
+
+  &.ars {
+    background-color: rgb(219,0,7);
+    border-bottom: 2px solid rgb(156,130,74);
+    color: rgb(255,255,255);;
+  }
+
+  &.avl {
+    background-color: rgb(149,191,229);
+    border-bottom: 2px solid rgb(196, 18, 46);
+    color: rgb(103,14,54);
+  }
+
+  &.bou {
+    background-color: rgb(181,14,18);
+    border-bottom: 2px solid rgb(239,219,178);
+    color: rgb(239,219,178);
+  }
+
+  &.bha {
+    background-color: rgb(0,87,184);
+    border-bottom: 2px solid rgb(255,205,0);
+    color: rgb(255,205,0);
+  }
+
+  &.bur {
+    background-color: rgb(108,29,69);
+    border-bottom: 2px solid rgb(240,179,35);
+    color: rgb(153,214,234);
+  }
+
+  &.che {
+    background-color: rgb(3, 70, 148);
+    border-bottom: 2px solid rgb(238, 36, 44);
+    color: rgb(255,255,255);
+  }
+
+  &.cry {
+    background-color: rgb(27, 69, 143);
+    border-bottom: 2px solid rgb(196, 18, 46);
+    color: rgb(255,255,255);
+  }
+
+  &.eve {
+    background-color: rgb(39,68,136);
+    border-bottom: 2px solid rgb(39,68,136);
+    color: rgb(255,255,255);
+  }
+
+  &.lei {
+    background-color: rgb(0,83,160);
+    border-bottom: 2px solid rgb(253,190,17);
+    color: rgb(255,255,255);
+  }
+
+  &.liv {
+    background-color: rgb(200,16,46);
+    border-bottom: 2px solid rgb(0,178,169);
+    color: rgb(255,255,255);
+  }
+
+  &.mci {
+    background-color: rgb(108,171,221);
+    border-bottom: 2px solid rgb(236,51,37);
+    color: rgb(28,44,91);
+  }
+
+  &.mun {
+    background-color: rgb(218, 41, 28);
+    border-bottom: 2px solid rgb(251, 225, 34);
+    color: rgb(255, 255, 255);
+  }
+
+  &.new {
+    background-color: rgb(45, 41, 38);
+    border-bottom: 2px solid rgb(241,190,72);
+    color: rgb(255,255,255);
+  }
+
+  &.nor {
+    background-color: #ffee00;
+    border-bottom: 2px solid #007020;
+    color: #007020;
+  }
+
+  &.shu {
+    background-color: #010101;
+    border-bottom: 2px solid ec2227;
+    color: #ec2227;
+  }
+
+  &.sou {
+    background-color: rgb(215,25,32);
+    border-bottom: 2px solid rgb(255,194,14);
+    color: rgb(255,255,255);
+  }
+
+  &.tot {
+    background-color: rgb(255, 255, 255);
+    border-bottom: 2px solid rgb(19,34,87);
+    color: rgb(19,34,87);
+  }
+
+  &.wat {
+    background-color: rgb(251,238,35);
+    border-bottom: 2px solid rgb(237,33,39);
+    color: rgb(18,17,12);
+  }
+
+  &.whu {
+    background-color: rgb(122,38,58);
+    border-bottom: 2px solid rgb(27,177,231);
+    color: rgb(27,177,231);
+  }
+
+  &.wol {
+    background-color: rgb(253,185,19);
+    border-bottom: 2px solid rgb(35,31,32);
+    color: rgb(35,31,32);
+  }
+}
 .tw-button {
   color: white !important;
   background-color: #38A1F3 !important;

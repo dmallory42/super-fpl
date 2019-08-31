@@ -7,8 +7,11 @@
   "dependencies": {
     "bulma": "^0.7.5",
     "chart.js": "^2.8.0",
+    "datatables": "^1.10.18",
+    "datatables-bulma": "^1.0.1",
     "jquery": "^3.4.1",
     "select2": "^4.0.8",
+    "tooltip.js": "^1.3.2",
     "underscore": "^1.9.1"
   },
   "devDependencies": {

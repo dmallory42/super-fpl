@@ -75,7 +75,7 @@
             <div class="column is-8">
                 <div class="card chart-card">
                     <div class="card-content">
-                            <canvas id="chart" width="80%" height="80%"></canvas>
+                            <canvas id="chart" width="100%" height="100%"></canvas>
                     </div>
                 </div>
             </div>
@@ -250,8 +250,8 @@
         // First, draw the table head:
         let tbody = $('.comparison-table').find('tbody');
 
-        $('#player1-th').text(player1['second_name']);
-        $('#player2-th').text(player2['second_name']);
+        $('#player1-th').text(player1['web_name']);
+        $('#player2-th').text(player2['web_name']);
 
         tbody.empty();
 
@@ -336,12 +336,12 @@
         let data = {
             labels: labels,
             datasets: [{
-                    label: player1['second_name'],
+                    label: player1['web_name'],
                     backgroundColor: "rgba(56, 0, 60, 0.2)",
                     data: nPlayerOneValues
                 },
                 {
-                    label: player2['second_name'],
+                    label: player2['web_name'],
                     backgroundColor: "rgba(233, 0, 82, 0.2)",
                     data: nPlayerTwoValues
                 }

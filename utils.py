@@ -13,7 +13,6 @@ class Utils:
         player['now_cost'] = player['now_cost'] / 10
         player['goal_involvements'] = player['goals_scored'] + player['assists'] 
         player['position'] = self.POSITION_LOOKUP[player['element_type']]
-        player['date_generated'] = date.today().strftime('%d%m%Y')
         player = self.prepare_analysis_fields(player)
 
         return player

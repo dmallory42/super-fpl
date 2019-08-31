@@ -12,12 +12,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/Chart.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/select2.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
+   
     <script src="https://kit.fontawesome.com/359875072f.js"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/select2.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/underscore.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/Chart.js') }}"></script>
+    <script type="text/javascript" src="/node_modules/tooltip.js/dist/tooltip.js"></script>
 
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-145108312-1"></script>
@@ -47,8 +48,11 @@
 
         <div id="navbarBasicExample" class="navbar-menu">
             <div class="navbar-start">
-                <a class="navbar-item">
-                    Home
+                <a class="navbar-item" href="/">
+                    Comparison Tool
+                </a>
+                <a class="navbar-item" href="/player_stats">
+                    Player Stats
                 </a>
             </div>
 

@@ -1,6 +1,6 @@
 /*jshint esversion: 6 */
 
-const { series, parallel, src, dest } = require('gulp');
+const { series, parallel, watch, src, dest } = require('gulp');
 const sass = require('gulp-sass');
 const rename = require('gulp-rename');
 
@@ -15,9 +15,25 @@ function select2js(cb) {
     return src('node_modules/select2/dist/js/select2.js')
         .pipe(dest('static/js'));
 }
+
 function jquery(cb) {
     return src('node_modules/jquery/dist/jquery.js')
         .pipe(dest('static/js'));
+}
+
+function datatablesJs(cb) {
+    return src('node_modules/datatables/media/js/jquery.dataTables.js')
+        .pipe(dest('static/js'));
+}
+function bulmaDatatablesJs(cb) {
+    return src('node_modules/datatables-bulma/js/dataTables.bulma.js')
+        .pipe(dest('static/js'));
+}
+
+function bulmaDatatablesCss(cb) {
+    return src('node_modules/datatables-bulma/css/dataTables.bulma.css')
+        .pipe(rename('dataTables.bulma.scss'))
+        .pipe(dest('sass'));
 }
 
 function underscore(cb) {
@@ -42,14 +58,22 @@ function compileCss(cb) {
         .pipe(dest('static/css'));
 }
 
+function watchFiles() {
+    return watch("sass/**/*.scss", compileCss);
+}
+
 exports.default = series(
     parallel( 
         jquery, 
+        datatablesJs,
+        bulmaDatatablesJs,
+        bulmaDatatablesCss,
         select2js, 
         select2css, 
         underscore, 
         chartjs, 
         chartjsCss, 
         compileCss
-    )     // compile static assets
+    ), 
+    watchFiles
 );

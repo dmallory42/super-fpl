@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+
+{% block header %}
+{% endblock %}
+
+{% block content %}
+<section class="section options">
+    <div class="container">
+        <nav class="level">
+            <div class="level-left">
+                <div class="level-item">
+                    <div class="field is-grouped is-grouped-multiline is-horizontal">
+                        <div class="field-label">
+                            <label class="label">Position</label>
+                        </div>
+                        <div class="field-body">
+                            <div class="field is-narrow">
+                                <div class="control">
+                                    <div class="select">
+                                        <select id="position-select">
+                                            <option value="ALL">All Positions</option>
+                                            <option value="GKP">Goalkeepers</option>
+                                            <option value="DEF">Defenders</option>
+                                            <option value="MID">Midfielders</option>
+                                            <option value="FWD">Forwards</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field-label">
+                            <label class="label">Min Price</label>
+                        </div>
+                        <div class="field-body">
+                            <div class="field is-narrow">
+                                <div class="control">
+                                    <div class="select">
+                                        <select id="min-price-select">
+                                            <!-- todo-->
+                                            <option value="">Any Price</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field-label">
+                            <label class="label">Max Price</label>
+                        </div>
+                        <div class="field-body">
+                            <div class="field is-narrow">
+                                <div class="control">
+                                    <div class="select">
+                                        <select id="max-price-select">
+                                            <!-- todo-->
+                                            <option value="">Any Price</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </div>
+</section>
+<section class="section player-stats">
+    <div class="container">
+        <div class="columns">
+            <div class="column is-12">
+                <div class="table-container">
+                    <table class="table is-datatable is-fullwidth" data-order='[[ 3, "desc"]]' 
+                    data-page-length='20' data-length-change="false">
+                        <thead>
+                            <tr>
+                                <th class="tooltip" data-tooltip="Player Name">Name</th>
+                                <th class="tooltip" data-tooltip="Player Team">Team</th>
+                                <th class="tooltip" data-tooltip="Position">Pos</th>
+                                <th class="tooltip" data-tooltip="Selected By (%)">%</th>
+                                <th class="tooltip" data-tooltip="Current Value">£</th>
+                                <th class="tooltip" data-tooltip="Next 3 Fixtures">Fixtures&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+                                <th class="tooltip" data-tooltip="Total Points">Pts</th>
+                                <th class="tooltip" data-tooltip="Points per Minute">PPM</th>
+                                <th class="tooltip" data-tooltip="Points per Million">PPMil</th>
+                                <th class="tooltip" data-tooltip="Goals Scored">G</th>
+                                <th class="tooltip" data-tooltip="Assists">A</th>
+                                <th class="tooltip" data-tooltip="Goals Scored per 90">G/90</th>
+                                <th class="tooltip" data-tooltip="Assists per 90">A/90</th>
+                                <th class="tooltip" data-tooltip="Clean Sheets">CS</th>
+                                <th class="tooltip" data-tooltip="Total Bonus Points">BP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="modal" id="about-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+        <header class="modal-card-head">
+            <p class="modal-card-title">What is this?</p>
+            <button class="delete modal-dismiss" aria-label="close"></button>
+        </header>
+        <section class="modal-card-body">
+            <p>The Player Comparison Tool can instantly generate a comparison between
+                any two players, making those all important draft decisions easier for fantasy
+                managers everywhere!</p>
+
+            <p>To use the tool, simply select the two players you would like to compare using
+                the dropdowns, press the 'compare' button and the tool will do its magic!</p>
+
+            <p>Most metrics on the charts are shown on either a per min or per 90 basis. This makes
+                it easier to compare players who have played a varying degree of minutes. The charts are ranked
+                in percentiles, but the actual values for each players metrics can be viewed by hovering over the
+                chart, and some summary information is displayed in the table. Enjoy!</p>
+        </section>
+        <footer class="modal-card-foot">
+            <button class="modal-dismiss button">Close</button>
+        </footer>
+    </div>
+</div>
+
+<script type="text/javascript" src="{{ url_for('static', filename='js/jquery.dataTables.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/dataTables.bulma.js') }}"></script>
+<script type="text/javascript">
+    let players = JSON.parse('{{players|tojson|safe}}');
+    let teams = JSON.parse('{{teams|tojson|safe}}');
+    let staticPath = "{{ url_for('static', filename='') }}";
+
+    $(document).ready(function () {
+        $('table').dataTable({
+            "ajax": "ajax/player_stats",
+            "autoWidth": true,
+            "columns": [
+                { "data": "web_name"},
+                { "data": "team.short_name", "render": function(data) { return '<span class="team ' + data.toLowerCase() + '">' + data + '</span>'; } },
+                { "data": "position" },
+                { "data": "selected_by_percent", "orderSequence": ["desc", "asc"] },
+                { "data": "now_cost", "render": function(data) { return data.toFixed(1); } },
+                { "data": "team", "render": function(data) { return formatFixtures(data['fixtures'], data['id']); } },
+                { "data": "total_points", "orderSequence": ["desc", "asc"] },
+                { "data": "points_per_min", "orderSequence": ["desc", "asc"] },
+                { "data": "points_per_mil", "orderSequence": ["desc", "asc"] },
+                { "data": "goals_scored", "orderSequence": ["desc", "asc"] },
+                { "data": "assists", "orderSequence": ["desc", "asc"] },
+                { "data": "goals_scored_per_90", "orderSequence": ["desc", "asc"] },
+                { "data": "assists_per_90", "orderSequence": ["desc", "asc"] },
+                { "data": "clean_sheets", "orderSequence": ["desc", "asc"] },
+                { "data": "bonus", "orderSequence": ["desc", "asc"] }
+            ]
+        });
+    });
+
+    function formatFixtures(fixtures, team_id) {
+        let returnStr = '';
+        let count = 0;
+        const maxRows = 3;
+
+        $.each(fixtures, function(key, fixture) {
+            if (count == maxRows) {
+                return returnStr;
+            }
+            
+            if (fixture['finished'] == false && fixture['finished_provisional'] == false && fixture['started'] == false) {
+                if (fixture['team_h'] == team_id) {
+                    returnStr += '<span class="fixture difficulty-' + fixture['team_a_difficulty'] + '">';
+                    returnStr += teams[fixture['team_a']]['short_name'].toUpperCase() + '';
+                } else {
+                    returnStr += '<span class="fixture difficulty-' + fixture['team_h_difficulty'] + '">';
+                    returnStr += teams[fixture['team_h']]['short_name'].toLowerCase() + '';
+                }
+
+                returnStr += '</span> ';
+
+                count++;
+            }
+        });
+
+        return returnStr;
+    }
+</script>
+{% endblock %}
