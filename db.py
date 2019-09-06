@@ -17,10 +17,23 @@ class Db:
         
         return client
 
-    def get_teams_from_db(self):
-        today = date.today()
+    def get_min_and_max_value(self):
+        cursor = self.db.players.aggregate([
+            { "$match": {"date_generated": self.get_date()} },
+            { 
+                "$group": {
+                    "_id": {}, 
+                    "min_value": { "$min": "$now_cost" },
+                    "max_value": { "$max": "$now_cost" } 
+                }
+            }
+        ])
 
-        cursor = self.db.teams.find({"date_generated": today.strftime("%d%m%Y")})
+        return list(cursor)[0]
+
+
+    def get_teams_from_db(self):
+        cursor = self.db.teams.find({"date_generated": self.get_date()})
         teams = []
 
         for team in cursor:
@@ -31,10 +44,39 @@ class Db:
 
         return teams
             
-    def get_players_from_db(self):
-        today = date.today()
+    def get_players_from_db(
+        self, 
+        min_price: float = None, 
+        max_price: float = None, 
+        min_minutes_played: int = None, 
+        positions: list = None,
+        max_ownership: float = None
+    ):
+        search_query = {"date_generated": self.get_date()}
 
-        cursor = self.db.players.find({"date_generated": today.strftime("%d%m%Y")})    
+        if min_price is not None or max_price is not None:
+            search_query['now_cost'] = {}
+
+            if min_price is not None:
+                search_query['now_cost']['$gte'] = float(min_price)
+
+            if max_price is not None:
+                search_query['now_cost']['$lte'] = float(max_price)
+
+        if min_minutes_played is not None:
+            search_query['minutes'] = {"$gte": int(min_minutes_played)}
+
+        if positions is not None and len(positions) > 0:
+            search_query['$or'] = []
+            for position in positions:
+                search_query['$or'].append({'position': position.upper()})
+
+        if max_ownership is not None:
+            search_query['selected_by_percent'] = {'$lte': float(max_ownership)}
+        
+        print(search_query)
+        cursor = self.db.players.find(search_query)
+
         players = []
 
         for player in cursor:
@@ -46,9 +88,7 @@ class Db:
         return players
         
     def get_fixtures_from_db(self):
-        today = date.today()
-
-        cursor = self.db.fixtures.find({"date_generated": today.strftime("%d%m%Y")})
+        cursor = self.db.fixtures.find({"date_generated": self.get_date()})
         fixtures = []
 
         for fixture in cursor:
@@ -62,27 +102,30 @@ class Db:
     def insert_teams_to_db(self, teams):
         for team in teams:
             team['_id'] = self.generate_uid(team['id'])
-            team['date_generated'] = date.today().strftime('%d%m%Y')
+            team['date_generated'] = self.get_date()
             self.db.teams.save(team)
 
 
     def insert_fixtures_to_db(self, fixtures):
         for fixture in fixtures:
             fixture['_id'] = self.generate_uid(fixture['id'])
-            fixture['date_generated'] = date.today().strftime('%d%m%Y')
+            fixture['date_generated'] = self.get_date()
             self.db.fixtures.save(fixture)
 
     def insert_players_to_db(self, players):
         for player in players:
             # Generate our UID (used to track changes)
             player['_id'] = self.generate_uid(player['id'])
-            player['date_generated'] = date.today().strftime('%d%m%Y')
+            player['date_generated'] = self.get_date()
             self.db.players.save(player)
 
-    def generate_uid(self, id):
-        # use todays date in our unique ID:
-        today = date.today()
-        return str(id) + '_' + today.strftime("%d%m%Y")
+    def generate_uid(self, id) -> str:
+        # use today's date in our unique ID:
+        return str(id) + '_' + self.get_date()
+
+    # Helper method to get today's date as a string
+    def get_date(self) -> str:
+        return date.today().strftime("%d%m%Y")
 
     def check_record_exists(self, player_id):
         uid = self.generate_uid(player_id)

@@ -4,7 +4,7 @@ from logging import Logger
 
 import urllib.request
 import json
-
+import decimal
 
 class Api:
     # Constants: the various routes of interest
@@ -17,8 +17,21 @@ class Api:
         self.db = Db(logger)
         self.utils = Utils()
 
-    def get_players(self):
-        players = self.db.get_players_from_db()
+    def get_players(
+        self, 
+        min_price: float = None, 
+        max_price: float = None, 
+        min_minutes_played: int = None, 
+        positions: list = None,
+        max_ownership: float = None
+    ):
+        players = self.db.get_players_from_db(
+            min_price, 
+            max_price, 
+            min_minutes_played, 
+            positions, 
+            max_ownership
+        )
         
         if players is not False:
             return players
@@ -34,7 +47,7 @@ class Api:
                     self.db.insert_players_to_db(data['elements'])
 
                     # Get the players from the DB (means we can apply any filters needed):
-                    return self.db.get_players_from_db()
+                    players = self.db.get_players_from_db(min_price, max_price, min_minutes_played)
                 else:
                     return False
     
@@ -66,3 +79,15 @@ class Api:
 
                 # Get the fixtures from the DB (means we can apply any filters we want):
                 return self.db.get_fixtures_from_db()
+
+    def get_value_range(self):
+        min_and_max = self.db.get_min_and_max_value()
+
+        value_range = []
+
+        i = min_and_max['min_value']
+        while i <= min_and_max['max_value']:
+            value_range.append(round(i,1))
+            i += 0.1
+
+        return value_range

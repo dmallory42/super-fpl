@@ -18,7 +18,7 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/select2.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/underscore.js') }}"></script>
     <script type="text/javascript" src="{{ url_for('static', filename='js/Chart.js') }}"></script>
-    <script type="text/javascript" src="/node_modules/tooltip.js/dist/tooltip.js"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/remove-accents.js') }}"></script>
 
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-145108312-1"></script>
@@ -34,7 +34,7 @@
 <body>
     <nav class="navbar is-primary" role="navigation" aria-label="main navigation">
         <div class="navbar-brand">
-            <a class="navbar-item" href="http://superfpl.com">
+            <a class="navbar-item" href="/">
                 <h1 class="header-logo">SUPER <b>FPL</b></h1>
             </a>
 
@@ -46,7 +46,7 @@
             </a>
         </div>
 
-        <div id="navbarBasicExample" class="navbar-menu">
+        <div id="navbarBasicExample" class="navbar-menu is-primary">
             <div class="navbar-start">
                 <a class="navbar-item" href="/">
                     Comparison Tool
@@ -59,7 +59,7 @@
             <div class="navbar-end">
                 <div class="navbar-item">
                     <div class="field is-grouped">
-                        <p class="control">
+                        <!-- <p class="control">
                             <a class="tw-button button is-info" data-social-network="Twitter"
                                 target="_blank" href="https://twitter.com/FplStatsdan">
                                 <span class="icon">
@@ -69,8 +69,8 @@
                                     Tweet Me!
                                 </span>
                             </a>
-                        </p>   
-                        <p class="control">
+                        </p>    -->
+                        <!-- <p class="control">
                             <a class="button is-info" id="about-button">
                                 <span class="icon">
                                     <i class="fas fa-info-circle"></i>
@@ -79,7 +79,7 @@
                                     Help
                                 </span>
                             </a>
-                        </p>                     
+                        </p>                      -->
                     </div>
 
                 </div>
@@ -92,7 +92,11 @@
     {% for message in get_flashed_messages() %}
     <div class="flash">{{ message }}</div>
     {% endfor %}
+    <div class="loader-container" style="display:none">
+        <div class="loader hide-loader" id="loader"></div>
+    </div>
     {% block content %}{% endblock %}
+
     <footer class="footer">
         <div class="content has-text-centered">
             <p>&copy; <a href="https://twitter.com/fplStatsdan">Statsdan</a>, 2019</p>
@@ -108,7 +112,7 @@
     </footer>
 
     <script type="text/javascript">
-        const version = 0.1;
+        const version = 1.0;
 
         $('#about-button').on('click', function() {
             $('#about-modal').addClass('is-active');
@@ -120,5 +124,9 @@
             $('html').removeClass('is-clipped');
         });
 
+        $('.navbar-burger').on('click', function() {
+            $(this).toggleClass('is-active');
+            $('.navbar-menu').toggleClass('is-active');
+        });
     </script>
 </body>

@@ -42,6 +42,7 @@ $primary-invert: $prem-white;
 $body-background-color: $prem-white;
 
 // Make the breakpoint slightly higher than default
+$small-tablet: 768px;
 $tablet: 988px;  
 
 // Import Bulma:
@@ -70,12 +71,34 @@ h1.header-logo {
   border-radius: 3px;
   height: 100%;
 
+  &.filter-card {
+    @include until($small-tablet) {
+      border-top: 8px solid $prem-red; 
+    }
+
+    @include from($small-tablet) {
+      border-left: 8px solid $prem-red;
+    }
+  }
+
   &.stats-card {
-    border-left: 8px solid $prem-pink;
+    @include until($small-tablet) {
+      border-top: 8px solid $prem-pink; 
+    }
+
+    @include from($small-tablet) {
+      border-left: 8px solid $prem-pink;
+    }
   }
 
   &.chart-card {
-    border-left: 8px solid $prem-red;
+    @include until($small-tablet) {
+      border-top: 8px solid $prem-red; 
+    }
+
+    @include from($small-tablet) {
+      border-left: 8px solid $prem-red; 
+    }
   }
 }
 
@@ -347,4 +370,37 @@ footer.footer {
       }
     }
   }
+}
+
+section.player-stats {
+  min-height: 1000px;
+}
+
+.loader-container {
+  position: absolute;
+  background: transparent;
+  width: 100%;
+  height: 100%;
+  z-index: 10000;
+}
+
+.loader {
+  border: 16px solid #f3f3f3; /* Light grey */
+  border-top: 16px solid $prem-pink; /* Blue */
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  animation: spin 2s linear infinite;
+  display: block;
+  margin: 0 auto;
+  top: 50%;
+
+  &.hide-loader{
+    display:none;
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

@@ -11,6 +11,7 @@ class Utils:
     def format_player(self, player):
         player['name'] = player['first_name'] + ' ' + player['second_name']
         player['now_cost'] = player['now_cost'] / 10
+        player['selected_by_percent'] = round(float(player['selected_by_percent']), 2)
         player['goal_involvements'] = player['goals_scored'] + player['assists'] 
         player['position'] = self.POSITION_LOOKUP[player['element_type']]
         player = self.prepare_analysis_fields(player)

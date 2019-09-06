@@ -51,6 +51,11 @@ function chartjsCss(cb) {
         .pipe(dest('static/css'));
 }
 
+function tooltipJs(cb) {
+    return src('node_modules/tooltip.js/dist/tooltip.js')
+        .pipe(dest('static/js'));
+}
+
 // This also imports bulma:
 function compileCss(cb) {
     return src('sass/**/*.scss')
@@ -71,6 +76,7 @@ exports.default = series(
         select2js, 
         select2css, 
         underscore, 
+        tooltipJs,
         chartjs, 
         chartjsCss, 
         compileCss

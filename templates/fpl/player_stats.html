@@ -6,71 +6,127 @@
 {% block content %}
 <section class="section options">
     <div class="container">
-        <nav class="level">
-            <div class="level-left">
-                <div class="level-item">
-                    <div class="field is-grouped is-grouped-multiline is-horizontal">
-                        <div class="field-label">
-                            <label class="label">Position</label>
+        <div class="card filter-card">
+            <div class="card-content">
+                <form id="filter-form">
+                    <div class="columns">
+                        <div class="column is-12">
+                            <label class="label">Positions:</label>
+                            <div class="field">
+                                <div class="field is-grouped">
+                                    <p class="control is-grouped">
+                                        <label class="checkbox">
+                                            <input checked="checked" name="positions[gkp]" type="checkbox"
+                                                value="1">
+                                            Goalkeeper
+                                        </label>
+                                    </p>
+                                    <p class="control is-grouped">
+                                        <label class="checkbox">
+                                            <input checked="checked" name="positions[def]" type="checkbox"
+                                                value="1">
+                                            Defender
+                                        </label>
+                                    </p>
+                                    <p class="control is-grouped">
+                                        <label class="checkbox">
+                                            <input checked="checked" name="positions[mid]" type="checkbox"
+                                                value="1">
+                                            Midfielder
+                                        </label>
+                                    </p>
+                                    <p class="control is-grouped">
+                                        <label class="checkbox">
+                                            <input checked="checked" name="positions[fwd]" type="checkbox"
+                                                value="1">
+                                            Forward
+                                        </label>
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="field-body">
-                            <div class="field is-narrow">
-                                <div class="control">
-                                    <div class="select">
-                                        <select id="position-select">
-                                            <option value="ALL">All Positions</option>
-                                            <option value="GKP">Goalkeepers</option>
-                                            <option value="DEF">Defenders</option>
-                                            <option value="MID">Midfielders</option>
-                                            <option value="FWD">Forwards</option>
-                                        </select>
+                    </div>
+                    <div class="columns">
+                        <div class="column is-3">
+                            <label class="label">Min Price: </label>
+                            <div class="field-body">
+                                <div class="field is-narrow">
+                                    <div class="control">
+                                        <div class="select">
+                                            <select name="minPrice" id="min-price-select">
+                                                <option value="0">Any Price</option>
+                                                {% for i in value_range %}
+                                                <option value="{{ i }}">{{ i }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="field-label">
-                            <label class="label">Min Price</label>
-                        </div>
-                        <div class="field-body">
-                            <div class="field is-narrow">
-                                <div class="control">
-                                    <div class="select">
-                                        <select id="min-price-select">
-                                            <!-- todo-->
-                                            <option value="">Any Price</option>
-                                        </select>
+                        <div class="column is-3">
+                            <label class="label">Max Price: </label>
+                            <div class="field-body">
+                                <div class="field is-narrow">
+                                    <div class="control">
+                                        <div class="select">
+                                            <select name="maxPrice" id="max-price-select">
+                                                <option value="15">Any Price</option>
+                                                {% for i in value_range %}
+                                                <option value="{{ i }}">{{ i }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="field-label">
-                            <label class="label">Max Price</label>
+                        <div class="column is-3">
+                            <label class="label">Max Ownership (%)</label>
+                            <div class="field-body">
+                                <div class="field is-narrow">
+                                    <div class="control">
+                                        <input class="input" name="maxOwnership" type="number" step="5" min="0"
+                                            max="100" value="100">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="field-body">
-                            <div class="field is-narrow">
-                                <div class="control">
-                                    <div class="select">
-                                        <select id="max-price-select">
-                                            <!-- todo-->
-                                            <option value="">Any Price</option>
-                                        </select>
+                        <div class="column is-3">
+                            <label class="label">Min Mins Played: </label>
+                            <div class="field-body">
+                                <div class="field is-narrow">
+                                    <div class="control">
+                                        <input class="input" name="minsPlayed" type="number" step="10" min="0"
+                                            max="10000" value="0">
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                    <div class="field is-horizontal">
+                        <div class="field-body">
+                            <div class="field">
+                                <div class="control">
+                                    <button class="button is-primary" type="submit">
+                                        Apply Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
             </div>
-        </nav>
+        </div>
     </div>
 </section>
-<section class="section player-stats">
+<section class="section player-stats" style="opacity: 0;">
     <div class="container">
         <div class="columns">
             <div class="column is-12">
                 <div class="table-container">
-                    <table class="table is-datatable is-fullwidth" data-order='[[ 3, "desc"]]' 
-                    data-page-length='20' data-length-change="false">
+                    <table id="players-table" class="table is-datatable is-fullwidth" data-order='[[ 3, "desc"]]'
+                        data-page-length='20' data-length-change="false">
                         <thead>
                             <tr>
                                 <th class="tooltip" data-tooltip="Player Name">Name</th>
@@ -78,7 +134,8 @@
                                 <th class="tooltip" data-tooltip="Position">Pos</th>
                                 <th class="tooltip" data-tooltip="Selected By (%)">%</th>
                                 <th class="tooltip" data-tooltip="Current Value">£</th>
-                                <th class="tooltip" data-tooltip="Next 3 Fixtures">Fixtures&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+                                <th class="tooltip" data-tooltip="Next 3 Fixtures">
+                                    Fixtures&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
                                 <th class="tooltip" data-tooltip="Total Points">Pts</th>
                                 <th class="tooltip" data-tooltip="Points per Minute">PPM</th>
                                 <th class="tooltip" data-tooltip="Points per Million">PPMil</th>
@@ -128,50 +185,137 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/jquery.dataTables.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/dataTables.bulma.js') }}"></script>
 <script type="text/javascript">
-    let players = JSON.parse('{{players|tojson|safe}}');
     let teams = JSON.parse('{{teams|tojson|safe}}');
     let staticPath = "{{ url_for('static', filename='') }}";
+    let table;
 
+    showLoader();
     $(document).ready(function () {
-        $('table').dataTable({
+        table = $('#players-table').DataTable({
             "ajax": "ajax/player_stats",
             "autoWidth": true,
-            "columns": [
-                { "data": "web_name"},
-                { "data": "team.short_name", "render": function(data) { return '<span class="team ' + data.toLowerCase() + '">' + data + '</span>'; } },
-                { "data": "position" },
-                { "data": "selected_by_percent", "orderSequence": ["desc", "asc"] },
-                { "data": "now_cost", "render": function(data) { return data.toFixed(1); } },
-                { "data": "team", "render": function(data) { return formatFixtures(data['fixtures'], data['id']); } },
-                { "data": "total_points", "orderSequence": ["desc", "asc"] },
-                { "data": "points_per_min", "orderSequence": ["desc", "asc"] },
-                { "data": "points_per_mil", "orderSequence": ["desc", "asc"] },
-                { "data": "goals_scored", "orderSequence": ["desc", "asc"] },
-                { "data": "assists", "orderSequence": ["desc", "asc"] },
-                { "data": "goals_scored_per_90", "orderSequence": ["desc", "asc"] },
-                { "data": "assists_per_90", "orderSequence": ["desc", "asc"] },
-                { "data": "clean_sheets", "orderSequence": ["desc", "asc"] },
-                { "data": "bonus", "orderSequence": ["desc", "asc"] }
-            ]
+            "initComplete": function() {
+                hideLoader();
+                $('.player-stats').fadeTo('slow', 1);
+            },
+            "columns": [{
+                    "data": "web_name",
+                    "render": function (data, type) {
+                        if (type == 'filter' || type == 'sort') {
+                            return removeAccents(data);
+                        } 
+
+                        return '<span class="has-text-weight-bold">' + data + '</span>';
+                    }
+                },
+                {
+                    "data": "team.short_name",
+                    "render": function (data, type) {
+                        if (type == 'filter' || type == 'sort') {
+                            return data;
+                        }
+
+                        return '<span class="team ' + data.toLowerCase() + '">' + data +
+                            '</span>';
+                    }
+                },
+                {
+                    "data": "position"
+                },
+                {
+                    "data": "selected_by_percent",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "now_cost",
+                    "orderSequence": ["desc", "asc"],
+                    "render": function (data) {
+                        return data.toFixed(1);
+                    }
+                },
+                {
+                    "data": "team",
+                    "render": function (data) {
+                        return formatFixtures(data['fixtures'], data['id']);
+                    }
+                },
+                {
+                    "data": "total_points",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "points_per_min",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "points_per_mil",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "goals_scored",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "assists",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "goals_scored_per_90",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "assists_per_90",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "clean_sheets",
+                    "orderSequence": ["desc", "asc"]
+                },
+                {
+                    "data": "bonus",
+                    "orderSequence": ["desc", "asc"]
+                }
+            ],
+            "language": {
+                "search": ""
+            }
         });
+        $('.dataTables_filter')
+            .find('input')
+            .addClass('is-rounded')
+            .attr('placeholder', 'Search')
     });
+
+    $('#filter-form').on('submit', function (e) {
+        e.preventDefault();
+
+        $('.player-stats').fadeTo('fast', 0);
+        showLoader();
+        
+        $.get("ajax/player_stats", $(this).serializeArray(), function (data) {
+            table.clear().rows.add(data['data']).draw();
+            hideLoader();
+            $('.player-stats').fadeTo('slow', 1);
+        })
+    })
 
     function formatFixtures(fixtures, team_id) {
         let returnStr = '';
         let count = 0;
         const maxRows = 3;
 
-        $.each(fixtures, function(key, fixture) {
+        $.each(fixtures, function (key, fixture) {
             if (count == maxRows) {
                 return returnStr;
             }
-            
-            if (fixture['finished'] == false && fixture['finished_provisional'] == false && fixture['started'] == false) {
+
+            if (fixture['finished'] == false && fixture['finished_provisional'] == false && fixture[
+                    'started'] == false) {
                 if (fixture['team_h'] == team_id) {
-                    returnStr += '<span class="fixture difficulty-' + fixture['team_a_difficulty'] + '">';
+                    returnStr += '<span class="fixture difficulty-' + fixture['team_h_difficulty'] + '">';
                     returnStr += teams[fixture['team_a']]['short_name'].toUpperCase() + '';
                 } else {
-                    returnStr += '<span class="fixture difficulty-' + fixture['team_h_difficulty'] + '">';
+                    returnStr += '<span class="fixture difficulty-' + fixture['team_a_difficulty'] + '">';
                     returnStr += teams[fixture['team_h']]['short_name'].toLowerCase() + '';
                 }
 
@@ -183,5 +327,15 @@
 
         return returnStr;
     }
+
+    function showLoader() {
+            $('.loader-container').show();
+            $('.loader').removeClass('hide-loader');
+        }
+
+        function hideLoader() {
+            $('.loader-container').hide();
+            $('.loader').addClass('hide-loader');
+        }
 </script>
 {% endblock %}

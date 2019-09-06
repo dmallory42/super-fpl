@@ -10,6 +10,7 @@
     "datatables": "^1.10.18",
     "datatables-bulma": "^1.0.1",
     "jquery": "^3.4.1",
+    "remove-accents": "^0.4.2",
     "select2": "^4.0.8",
     "tooltip.js": "^1.3.2",
     "underscore": "^1.9.1"
