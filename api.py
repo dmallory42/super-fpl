@@ -47,7 +47,7 @@ class Api:
                     self.db.insert_players_to_db(data['elements'])
 
                     # Get the players from the DB (means we can apply any filters needed):
-                    players = self.db.get_players_from_db(min_price, max_price, min_minutes_played)
+                    players = self.db.get_players_from_db(min_price, max_price, min_minutes_played, positions, max_ownership)
                 else:
                     return False
     

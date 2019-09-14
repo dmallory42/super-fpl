@@ -2,7 +2,7 @@ import os
 
 from unidecode import unidecode
 from flask import (
-    Flask, flash, g, redirect, render_template, request, session, url_for, jsonify, current_app
+    Flask, flash, g, redirect, render_template, request, session, url_for, jsonify, current_app, send_from_directory
 )
 from flask.logging import create_logger
 
@@ -13,9 +13,10 @@ import logging
 
 def create_app(test_config=None):
     # create and configure the app
-    app = Flask(__name__, instance_relative_config=True)
+    app = Flask(__name__, instance_relative_config=True, static_folder='static')
     app.config.from_mapping(
         SECRET_KEY='dev',
+        TEMPLATES_AUTO_RELOAD = True,
         DATABASE=os.path.join(app.instance_path, 'flaskr.sqlite'),
         REDIS_HOST='localhost',
         REDIS_PORT=6379,
@@ -61,6 +62,10 @@ def home():
 
     return render_template('fpl/home.html', title='Super FPL - Player Comparison Tool', players=valid_players)
 
+@app.route('/robots.txt')
+@app.route('/sitemap.xml')
+def static_from_root():
+    return send_from_directory(app.static_folder, request.path[1:])
 
 @app.route('/player_stats', methods=['GET'])
 def get_player_stats():
