@@ -4,6 +4,7 @@
 @import url('https://fonts.googleapis.com/css?family=Nunito:100,200,300,400,500,600,700');
 @import url('https://fonts.googleapis.com/css?family=Comfortaa:400,500,700&display=swap');
 
+$bg_color: #fafafa;
 $sapphire_blue: rgba(1, 100, 170, 1);
 $ball_blue: rgba(33, 182, 209, 1);
 $white: rgba(255, 255, 255, 1);
@@ -31,7 +32,7 @@ $table-good: $prem-green-lighter;
 $table-best: $prem-green-light;
 
 // Bulma global variables (set before we import bulma):
-$family-sans-serif: "Nunito", sans-serif;
+$family-sans-serif: "Nunito", Helvetica, Arial, sans-serif;
 $primary: $prem-purple;
 $link: $prem-red;
 $info: $prem-red;
@@ -39,7 +40,8 @@ $success: $prem-red;
 $primary-invert: $prem-white;
 
 // Update some of Bulma's component variables:
-$body-background-color: $prem-white;
+$body-background-color: $bg_color;
+$footer-background-color: $prem-purple;
 
 // Make the breakpoint slightly higher than default
 $small-tablet: 768px;
@@ -68,7 +70,7 @@ h1.header-logo {
 
 .card {
   box-shadow: 0 1px 4px 0 rgba(0,0,0,.15);
-  border-radius: 3px;
+  border-radius: 4px;
   height: 100%;
 
   &.filter-card {
@@ -82,23 +84,23 @@ h1.header-logo {
   }
 
   &.stats-card {
-    @include until($small-tablet) {
-      border-top: 8px solid $prem-pink; 
-    }
+    // @include until($small-tablet) {
+    //   border-top: 8px solid $prem-pink; 
+    // }
 
-    @include from($small-tablet) {
-      border-left: 8px solid $prem-pink;
-    }
+    // @include from($small-tablet) {
+    //   border-left: 8px solid $prem-pink;
+    // }
   }
 
   &.chart-card {
-    @include until($small-tablet) {
-      border-top: 8px solid $prem-red; 
-    }
+    // @include until($small-tablet) {
+    //   border-top: 8px solid $prem-red; 
+    // }
 
-    @include from($small-tablet) {
-      border-left: 8px solid $prem-red; 
-    }
+    // @include from($small-tablet) {
+    //   border-left: 8px solid $prem-red; 
+    // }
   }
 }
 
@@ -318,6 +320,14 @@ span.team {
 }
 
 footer.footer {
+  & p {
+    color: $prem-white;
+  }
+
+  & a:hover {
+    color: $prem-white;
+  }
+
   margin-top: 2rem;
 }
 

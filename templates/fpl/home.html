@@ -67,10 +67,7 @@
                 </div>
                 <div class="level-right"></div>
             </div>
-    </div>
-</section>
-<section class="section charts">
-    <div class="container">
+        </nav>
         <div class="columns">
             <div class="column is-8">
                 <div class="card chart-card">
@@ -94,6 +91,15 @@
                                 <tbody></tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="columns">
+            <div class="column is-12">
+                <div class="card chart-card">
+                    <div class="card-content">
+                        <canvas id="line-chart" width="100%" height="100%"></canvas>
                     </div>
                 </div>
             </div>
@@ -134,7 +140,9 @@
     let negativeMetrics = ['goals_conceded', 'goals_conc_per_90', 'yellow_cards', 'red_cards'];
 
     let ctx = $('#chart');
+    let lineCtx = $('#line-chart');
     let chart;
+    let lineChart;
     let chartType = 'bar';
 
     $(document).ready(function () {
@@ -291,19 +299,48 @@
 
         drawTable(players[v1], players[v2]);
         redrawChart(players[v1], players[v2], chartType);
+        redrawFormChart(v1, v2);
     }
 
-    function redrawChart(player1, player2, chartType) {
+    function redrawFormChart(player1, player2) {
+        $.get('/ajax/player_form', {'players': [player1, player2]}).done(function(result) {
+            const form = result['data'];
+
+            console.log(player1);
+            console.log(form);
+
+            let player1s = players[player1];
+            console.log(player1s);
+
+            let player2s = players[player2];
+            console.log(player2s);
+            let data = {
+                labels: [players[player1]['web_name'], players[player2]['web_name']],
+                datasets: [{
+                        label: players[player1]['web_name'],
+                        backgroundColor: "rgba(56, 0, 60, 0.2)",
+                        data: form[player1]
+                    },
+                    {
+                        label: players[player2]['web_name'],
+                        backgroundColor: "rgba(233, 0, 82, 0.2)",
+                        data: form[player2]
+                    }
+                ]
+            };
+            
+            console.log(data);
+            destroyChart(lineChart);
+            drawLineChart(data, players[player1], players[player2]);
+        });
+    }
+
+    function redrawChart(player1, player2, chartType = 'radar') {
         if (!_.contains(['radar', 'bar'], chartType)) {
             console.log('Chart type not expected value "radar" or "bar"');
             return false;
         }
 
-        // Redraw the chart:
-        updateChart(player1, player2, chartType);
-    }
-
-    function updateChart(player1, player2, chartType = 'radar') {
         let chartMetrics = getChartMetricsToUse(player1, player2);
 
         // real values:
@@ -349,7 +386,7 @@
         };
 
         // destroy the existing chart
-        destroyChart();
+        destroyChart(chart);
 
         if (chartType === 'radar') {
             drawRadarChart(data, player1, player2, playerOneValues, playerTwoValues);
@@ -358,13 +395,21 @@
         }
     }
 
-    function destroyChart() {
+    function destroyChart(chart) {
         if (typeof chart == 'undefined') {
             return;
         }
 
         chart.clear();
         chart.destroy();
+    }
+
+    function drawLineChart(data, player1, player2) {
+        lineChart = new Chart(lineCtx, {
+            type: 'line',
+            data: data,
+            options: {}
+        })
     }
 
     function drawBarChart(data, player1, player2, playerOneValues, playerTwoValues) {
@@ -392,6 +437,7 @@
     }
 
     function drawRadarChart(data, player1, player2, playerOneValues, playerTwoValues) {
+        console.log(data)
         chart = new Chart(ctx, {
             type: 'radar',
             data: data,

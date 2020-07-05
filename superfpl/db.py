@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from datetime import date
 from logging import Logger
 
+
 class Db:
     def __init__(self, logger : Logger):
         self.logger : Logger = logger
@@ -9,9 +10,8 @@ class Db:
         self.db = self.client.fpl
 
     def connect(self):
-        self.logger.debug('testing the logging in the DB')
         try:
-            client = MongoClient()
+            client = MongoClient('127.0.0.1', 27017)
         except Exception as e:
             self.logger.error(e)
         
@@ -74,7 +74,6 @@ class Db:
         if max_ownership is not None:
             search_query['selected_by_percent'] = {'$lte': float(max_ownership)}
         
-        print(search_query)
         cursor = self.db.players.find(search_query)
 
         players = []
@@ -87,6 +86,16 @@ class Db:
 
         return players
         
+    # Get a player summary (including fixtures and history) from the DB
+    def get_player_summary_from_db(self, player_id):
+        search_query = {"date_generated": self.get_date(), 'player_id': player_id}
+
+        player = self.db.player_history.find_one(search_query)
+        if player is None:
+            return False
+            
+        return player
+
     def get_fixtures_from_db(self):
         cursor = self.db.fixtures.find({"date_generated": self.get_date()})
         fixtures = []
@@ -118,6 +127,12 @@ class Db:
             player['_id'] = self.generate_uid(player['id'])
             player['date_generated'] = self.get_date()
             self.db.players.save(player)
+
+    def insert_player_summary_to_db(self, player_id, player):
+        player['_id'] = self.generate_uid(player_id)
+        player['id'] = player_id
+        player['date_generated'] = self.get_date()
+        self.db.player_history.save(player)
 
     def generate_uid(self, id) -> str:
         # use today's date in our unique ID:

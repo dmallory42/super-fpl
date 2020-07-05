@@ -6,7 +6,7 @@ from flask import (
 )
 from flask.logging import create_logger
 
-from api import Api
+from superfpl.api import Api
 from datetime import date
 
 import logging
@@ -70,7 +70,7 @@ def static_from_root():
 @app.route('/player_stats', methods=['GET'])
 def get_player_stats():
     # Get the players (make sure we have players in our mongodb):
-    players = api.get_players()
+    api.get_players()
 
     # get our teams and then format them:
     teams = api.get_teams()
@@ -87,6 +87,23 @@ def get_ajax_players():
     players = api.get_players()
     return jsonify(players)
 
+
+@app.route('/ajax/player_form', methods=['GET'])
+def get_player_form():
+    # Get the player IDs to get form for. Should be an array of IDs
+    players = request.args.getlist('players[]', None)
+
+    if players is None:
+        return jsonify({"data": []})
+
+    result = {}
+
+    for player in players:
+        form = api.get_player_form(player)
+        result[player] = form
+
+    return jsonify({"data": result})
+    
 
 @app.route('/ajax/player_stats', methods=['GET'])
 def get_ajax_player_stats():
