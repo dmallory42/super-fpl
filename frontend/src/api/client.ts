@@ -159,3 +159,78 @@ export async function fetchComparison(managerIds: number[], gameweek?: number): 
   const gwParam = gameweek ? `&gw=${gameweek}` : ''
   return fetchApi<ComparisonResponse>(`/compare?ids=${idsParam}${gwParam}`)
 }
+
+// Live data types
+export interface LivePlayerStats {
+  minutes: number
+  goals_scored: number
+  assists: number
+  clean_sheets: number
+  goals_conceded: number
+  own_goals: number
+  penalties_saved: number
+  penalties_missed: number
+  yellow_cards: number
+  red_cards: number
+  saves: number
+  bonus: number
+  bps: number
+  total_points: number
+}
+
+export interface LiveElement {
+  id: number
+  stats: LivePlayerStats
+  web_name?: string
+  team?: number
+  position?: number
+}
+
+export interface LiveDataResponse {
+  elements: LiveElement[]
+}
+
+export interface LiveManagerPlayer {
+  player_id: number
+  position: number
+  multiplier: number
+  points: number
+  effective_points: number
+  stats: LivePlayerStats | null
+  is_playing: boolean
+  is_captain: boolean
+}
+
+export interface LiveManagerResponse {
+  manager_id: number
+  gameweek: number
+  total_points: number
+  bench_points: number
+  players: LiveManagerPlayer[]
+  updated_at: string
+  error?: string
+}
+
+export interface BonusPrediction {
+  player_id: number
+  bps: number
+  predicted_bonus: number
+  fixture_id: number
+}
+
+export interface LiveBonusResponse {
+  gameweek: number
+  bonus_predictions: BonusPrediction[]
+}
+
+export async function fetchLiveData(gameweek: number): Promise<LiveDataResponse> {
+  return fetchApi<LiveDataResponse>(`/live/${gameweek}`)
+}
+
+export async function fetchLiveManager(gameweek: number, managerId: number): Promise<LiveManagerResponse> {
+  return fetchApi<LiveManagerResponse>(`/live/${gameweek}/manager/${managerId}`)
+}
+
+export async function fetchLiveBonus(gameweek: number): Promise<LiveBonusResponse> {
+  return fetchApi<LiveBonusResponse>(`/live/${gameweek}/bonus`)
+}

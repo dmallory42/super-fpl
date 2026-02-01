@@ -12,6 +12,7 @@ use SuperFPL\Api\Services\ManagerService;
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\LeagueService;
 use SuperFPL\Api\Services\ComparisonService;
+use SuperFPL\Api\Services\LiveService;
 use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
@@ -75,6 +76,9 @@ try {
         preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
         $uri === '/compare' => handleCompare($db, $fplClient),
+        preg_match('#^/live/(\d+)$#', $uri, $m) === 1 => handleLive($db, $fplClient, $config, (int) $m[1]),
+        preg_match('#^/live/(\d+)/manager/(\d+)$#', $uri, $m) === 1 => handleLiveManager($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
+        preg_match('#^/live/(\d+)/bonus$#', $uri, $m) === 1 => handleLiveBonus($db, $fplClient, $config, (int) $m[1]),
         default => handleNotFound(),
     };
 } catch (Throwable $e) {
@@ -304,6 +308,33 @@ function handleCompare(Database $db, FplClient $fplClient): void
     $comparison = $service->compare($managerIds, $gameweek);
 
     echo json_encode($comparison);
+}
+
+function handleLive(Database $db, FplClient $fplClient, array $config, int $gameweek): void
+{
+    $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+    $data = $service->getLiveData($gameweek);
+
+    echo json_encode($data);
+}
+
+function handleLiveManager(Database $db, FplClient $fplClient, array $config, int $gameweek, int $managerId): void
+{
+    $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+    $data = $service->getManagerLivePoints($managerId, $gameweek);
+
+    echo json_encode($data);
+}
+
+function handleLiveBonus(Database $db, FplClient $fplClient, array $config, int $gameweek): void
+{
+    $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+    $predictions = $service->getBonusPredictions($gameweek);
+
+    echo json_encode([
+        'gameweek' => $gameweek,
+        'bonus_predictions' => $predictions,
+    ]);
 }
 
 function handleNotFound(): void
