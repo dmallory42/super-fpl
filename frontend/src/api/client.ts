@@ -58,3 +58,39 @@ export interface TeamsResponse {
 export async function fetchTeams(): Promise<TeamsResponse> {
   return fetchApi<TeamsResponse>('/teams')
 }
+
+export interface PlayerPrediction {
+  player_id: number
+  web_name: string
+  team: number
+  position: number
+  now_cost: number
+  form: string | number
+  total_points: number
+  predicted_points: number
+  confidence: number
+  breakdown?: {
+    appearance: number
+    goals: number
+    assists: number
+    clean_sheet: number
+    bonus: number
+    goals_conceded: number
+    saves: number
+  }
+  fixture?: {
+    opponent: number
+    is_home: boolean
+    difficulty: number
+  }
+}
+
+export interface PredictionsResponse {
+  gameweek: number
+  predictions: PlayerPrediction[]
+  generated_at: string
+}
+
+export async function fetchPredictions(gameweek: number): Promise<PredictionsResponse> {
+  return fetchApi<PredictionsResponse>(`/predictions/${gameweek}`)
+}

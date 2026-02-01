@@ -13,4 +13,8 @@ return [
     'fpl' => [
         'rate_limit_dir' => '/tmp/fpl-rate-limit',
     ],
+    'odds_api' => [
+        'api_key' => getenv('ODDS_API_KEY') ?: '',
+        'enabled' => (bool) getenv('ODDS_API_KEY'),
+    ],
 ];

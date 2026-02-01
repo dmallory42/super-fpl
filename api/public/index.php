@@ -9,6 +9,7 @@ use SuperFPL\Api\Services\PlayerService;
 use SuperFPL\Api\Services\FixtureService;
 use SuperFPL\Api\Services\TeamService;
 use SuperFPL\Api\Services\ManagerService;
+use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
@@ -67,6 +68,8 @@ try {
         preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, (int) $m[1], (int) $m[2]),
         preg_match('#^/managers/(\d+)/history$#', $uri, $m) === 1 => handleManagerHistory($db, $fplClient, (int) $m[1]),
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
+        preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1]),
+        preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
         default => handleNotFound(),
     };
 } catch (Throwable $e) {
@@ -209,6 +212,32 @@ function handleSyncManagers(Database $db, FplClient $fplClient): void
         'synced' => $result['synced'],
         'failed' => $result['failed'],
     ]);
+}
+
+function handlePredictions(Database $db, int $gameweek): void
+{
+    $service = new PredictionService($db);
+    $predictions = $service->getPredictions($gameweek);
+
+    echo json_encode([
+        'gameweek' => $gameweek,
+        'predictions' => $predictions,
+        'generated_at' => date('c'),
+    ]);
+}
+
+function handlePlayerPrediction(Database $db, int $gameweek, int $playerId): void
+{
+    $service = new PredictionService($db);
+    $prediction = $service->getPlayerPrediction($playerId, $gameweek);
+
+    if ($prediction === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Player not found']);
+        return;
+    }
+
+    echo json_encode($prediction);
 }
 
 function handleNotFound(): void

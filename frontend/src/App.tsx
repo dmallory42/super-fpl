@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Home } from './pages/Home'
 import { TeamAnalyzer } from './pages/TeamAnalyzer'
+import { Predictor } from './pages/Predictor'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -13,7 +14,7 @@ const queryClient = new QueryClient({
   },
 })
 
-type Page = 'home' | 'team-analyzer'
+type Page = 'home' | 'team-analyzer' | 'predictor'
 
 function App() {
   const [page, setPage] = useState<Page>('home')
@@ -49,6 +50,16 @@ function App() {
                 >
                   Team Analyzer
                 </button>
+                <button
+                  onClick={() => setPage('predictor')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    page === 'predictor'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  Predictor
+                </button>
               </nav>
             </div>
           </div>
@@ -56,6 +67,7 @@ function App() {
         <main className="container mx-auto px-4 py-8">
           {page === 'home' && <Home />}
           {page === 'team-analyzer' && <TeamAnalyzer />}
+          {page === 'predictor' && <Predictor />}
         </main>
       </div>
     </QueryClientProvider>

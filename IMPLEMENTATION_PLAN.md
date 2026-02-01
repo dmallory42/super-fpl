@@ -742,15 +742,16 @@ function calculateRiskScore(manager: Manager, group: Manager[]) {
 - [ ] GW history chart (optional enhancement)
 - [x] Verify: enter manager ID, see full squad analysis
 
-### Phase 3: Predictions Core (Week 3)
+### Phase 3: Predictions Core (Week 3) ✅ DONE
 
-- [ ] Historical data sync (3 seasons from vaastav repo)
-- [ ] Odds API integration (The Odds API)
-- [ ] Odds probability conversion
-- [ ] Rule-based prediction engine
-- [ ] Prediction API: GET /predictions/{gw}
-- [ ] Prediction table UI with sorting
-- [ ] Verify: predictions match reasonable expectations
+- [ ] Historical data sync (3 seasons from vaastav repo) - deferred to Phase 4
+- [x] Odds integration (Oddschecker scraper)
+- [x] Odds probability conversion
+- [x] Rule-based prediction engine (MinutesProbability, GoalProbability, CleanSheetProbability, BonusProbability)
+- [x] Prediction API: GET /predictions/{gw}
+- [x] Prediction table UI with sorting
+- [x] OddsSync and predictions cron jobs
+- [ ] Verify: predictions match reasonable expectations (needs live data)
 
 ### Phase 4: Prediction Refinement (Week 4)
 
