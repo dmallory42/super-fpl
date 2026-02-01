@@ -10,6 +10,8 @@ use SuperFPL\Api\Services\FixtureService;
 use SuperFPL\Api\Services\TeamService;
 use SuperFPL\Api\Services\ManagerService;
 use SuperFPL\Api\Services\PredictionService;
+use SuperFPL\Api\Services\LeagueService;
+use SuperFPL\Api\Services\ComparisonService;
 use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
@@ -70,6 +72,9 @@ try {
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1]),
         preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
+        preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
+        preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
+        $uri === '/compare' => handleCompare($db, $fplClient),
         default => handleNotFound(),
     };
 } catch (Throwable $e) {
@@ -238,6 +243,67 @@ function handlePlayerPrediction(Database $db, int $gameweek, int $playerId): voi
     }
 
     echo json_encode($prediction);
+}
+
+function handleLeague(Database $db, FplClient $fplClient, int $leagueId): void
+{
+    $service = new LeagueService($db, $fplClient);
+    $page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+    $league = $service->getLeague($leagueId, $page);
+
+    if ($league === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'League not found']);
+        return;
+    }
+
+    echo json_encode($league);
+}
+
+function handleLeagueStandings(Database $db, FplClient $fplClient, int $leagueId): void
+{
+    $service = new LeagueService($db, $fplClient);
+    $standings = $service->getAllStandings($leagueId);
+
+    echo json_encode([
+        'league_id' => $leagueId,
+        'standings' => $standings,
+    ]);
+}
+
+function handleCompare(Database $db, FplClient $fplClient): void
+{
+    // Parse manager IDs from query string (e.g., ?ids=123,456,789&gw=25)
+    $idsParam = $_GET['ids'] ?? '';
+    $gameweek = isset($_GET['gw']) ? (int) $_GET['gw'] : null;
+
+    if (empty($idsParam)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing ids parameter (e.g., ?ids=123,456,789)']);
+        return;
+    }
+
+    $managerIds = array_map('intval', explode(',', $idsParam));
+    $managerIds = array_filter($managerIds, fn($id) => $id > 0);
+
+    if (count($managerIds) < 2) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Need at least 2 manager IDs to compare']);
+        return;
+    }
+
+    // If no gameweek specified, try to detect current
+    if ($gameweek === null) {
+        $fixture = $db->fetchOne(
+            "SELECT gameweek FROM fixtures WHERE finished = 0 ORDER BY kickoff_time LIMIT 1"
+        );
+        $gameweek = $fixture ? (int) $fixture['gameweek'] : 1;
+    }
+
+    $service = new ComparisonService($db, $fplClient);
+    $comparison = $service->compare($managerIds, $gameweek);
+
+    echo json_encode($comparison);
 }
 
 function handleNotFound(): void

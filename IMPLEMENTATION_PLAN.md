@@ -762,14 +762,14 @@ function calculateRiskScore(manager: Manager, group: Manager[]) {
 - [ ] FDR calendar view
 - [ ] Verify: backtest against completed GWs
 
-### Phase 5: Mini-League & Comparison (Week 5)
+### Phase 5: Mini-League & Comparison (Week 5) ✅ DONE
 
-- [ ] League lookup and auto-cache members
-- [ ] Effective ownership calculation
-- [ ] Ownership matrix visualization
-- [ ] Differential finder
-- [ ] Risk score calculation
-- [ ] Verify: compare 2+ managers in same league
+- [x] League lookup and auto-cache members
+- [x] Effective ownership calculation
+- [x] Ownership matrix visualization
+- [x] Differential finder
+- [x] Risk score calculation
+- [ ] Verify: compare 2+ managers in same league (needs live data)
 
 ### Phase 6: Live Features (Week 6)
 

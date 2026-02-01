@@ -94,3 +94,68 @@ export interface PredictionsResponse {
 export async function fetchPredictions(gameweek: number): Promise<PredictionsResponse> {
   return fetchApi<PredictionsResponse>(`/predictions/${gameweek}`)
 }
+
+export interface LeagueStanding {
+  entry: number
+  player_name: string
+  entry_name: string
+  rank: number
+  total: number
+}
+
+export interface LeagueResponse {
+  league: {
+    id: number
+    name: string
+    type: string
+  }
+  standings: {
+    results: LeagueStanding[]
+    has_next?: boolean
+  }
+}
+
+export async function fetchLeague(id: number, page = 1): Promise<LeagueResponse> {
+  return fetchApi<LeagueResponse>(`/leagues/${id}?page=${page}`)
+}
+
+export interface ComparisonPlayer {
+  id: number
+  web_name: string
+  team: number
+  position: number
+  now_cost: number
+  total_points: number
+}
+
+export interface Differential {
+  player_id: number
+  eo: number
+  is_captain: boolean
+  multiplier: number
+}
+
+export interface RiskScore {
+  score: number
+  level: 'low' | 'medium' | 'high'
+  breakdown: {
+    captain_risk: number
+    playing_count: number
+  }
+}
+
+export interface ComparisonResponse {
+  gameweek: number
+  manager_count: number
+  effective_ownership: Record<number, number>
+  differentials: Record<number, Differential[]>
+  risk_scores: Record<number, RiskScore>
+  ownership_matrix: Record<number, Record<number, number>>
+  players: Record<number, ComparisonPlayer>
+}
+
+export async function fetchComparison(managerIds: number[], gameweek?: number): Promise<ComparisonResponse> {
+  const idsParam = managerIds.join(',')
+  const gwParam = gameweek ? `&gw=${gameweek}` : ''
+  return fetchApi<ComparisonResponse>(`/compare?ids=${idsParam}${gwParam}`)
+}
