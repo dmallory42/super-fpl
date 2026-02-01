@@ -1,6 +1,9 @@
 FROM php:8.2-fpm-alpine
 
-# Install extensions
+# Install SQLite and build dependencies
+RUN apk add --no-cache sqlite-dev
+
+# Install PHP extensions
 RUN docker-php-ext-install pdo pdo_sqlite
 
 # Install Composer
