@@ -13,6 +13,7 @@ use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\LeagueService;
 use SuperFPL\Api\Services\ComparisonService;
 use SuperFPL\Api\Services\LiveService;
+use SuperFPL\Api\Services\TransferService;
 use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
@@ -79,6 +80,9 @@ try {
         preg_match('#^/live/(\d+)$#', $uri, $m) === 1 => handleLive($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/live/(\d+)/manager/(\d+)$#', $uri, $m) === 1 => handleLiveManager($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
         preg_match('#^/live/(\d+)/bonus$#', $uri, $m) === 1 => handleLiveBonus($db, $fplClient, $config, (int) $m[1]),
+        $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
+        $uri === '/transfers/simulate' => handleTransferSimulate($db, $fplClient),
+        $uri === '/transfers/targets' => handleTransferTargets($db, $fplClient),
         default => handleNotFound(),
     };
 } catch (Throwable $e) {
@@ -334,6 +338,82 @@ function handleLiveBonus(Database $db, FplClient $fplClient, array $config, int 
     echo json_encode([
         'gameweek' => $gameweek,
         'bonus_predictions' => $predictions,
+    ]);
+}
+
+function handleTransferSuggest(Database $db, FplClient $fplClient): void
+{
+    $managerId = isset($_GET['manager']) ? (int) $_GET['manager'] : null;
+    $gameweek = isset($_GET['gw']) ? (int) $_GET['gw'] : null;
+    $transfers = isset($_GET['transfers']) ? (int) $_GET['transfers'] : 1;
+
+    if ($managerId === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing manager parameter']);
+        return;
+    }
+
+    // If no gameweek specified, detect current
+    if ($gameweek === null) {
+        $fixture = $db->fetchOne(
+            "SELECT gameweek FROM fixtures WHERE finished = 0 ORDER BY kickoff_time LIMIT 1"
+        );
+        $gameweek = $fixture ? (int) $fixture['gameweek'] : 1;
+    }
+
+    $service = new TransferService($db, $fplClient);
+    $suggestions = $service->getSuggestions($managerId, $gameweek, $transfers);
+
+    echo json_encode($suggestions);
+}
+
+function handleTransferSimulate(Database $db, FplClient $fplClient): void
+{
+    $managerId = isset($_GET['manager']) ? (int) $_GET['manager'] : null;
+    $gameweek = isset($_GET['gw']) ? (int) $_GET['gw'] : null;
+    $outPlayerId = isset($_GET['out']) ? (int) $_GET['out'] : null;
+    $inPlayerId = isset($_GET['in']) ? (int) $_GET['in'] : null;
+
+    if ($managerId === null || $outPlayerId === null || $inPlayerId === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing parameters: manager, out, in required']);
+        return;
+    }
+
+    // If no gameweek specified, detect current
+    if ($gameweek === null) {
+        $fixture = $db->fetchOne(
+            "SELECT gameweek FROM fixtures WHERE finished = 0 ORDER BY kickoff_time LIMIT 1"
+        );
+        $gameweek = $fixture ? (int) $fixture['gameweek'] : 1;
+    }
+
+    $service = new TransferService($db, $fplClient);
+    $simulation = $service->simulateTransfer($managerId, $gameweek, $outPlayerId, $inPlayerId);
+
+    echo json_encode($simulation);
+}
+
+function handleTransferTargets(Database $db, FplClient $fplClient): void
+{
+    $gameweek = isset($_GET['gw']) ? (int) $_GET['gw'] : null;
+    $position = isset($_GET['position']) ? (int) $_GET['position'] : null;
+    $maxPrice = isset($_GET['max_price']) ? (float) $_GET['max_price'] : null;
+
+    // If no gameweek specified, detect current
+    if ($gameweek === null) {
+        $fixture = $db->fetchOne(
+            "SELECT gameweek FROM fixtures WHERE finished = 0 ORDER BY kickoff_time LIMIT 1"
+        );
+        $gameweek = $fixture ? (int) $fixture['gameweek'] : 1;
+    }
+
+    $service = new TransferService($db, $fplClient);
+    $targets = $service->getTopTargets($gameweek, $position, $maxPrice !== null ? $maxPrice * 10 : null);
+
+    echo json_encode([
+        'gameweek' => $gameweek,
+        'targets' => $targets,
     ]);
 }
 

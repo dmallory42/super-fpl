@@ -771,13 +771,13 @@ function calculateRiskScore(manager: Manager, group: Manager[]) {
 - [x] Risk score calculation
 - [ ] Verify: compare 2+ managers in same league (needs live data)
 
-### Phase 6: Live Features (Week 6)
+### Phase 6: Live Features (Week 6) ✅ DONE
 
-- [ ] Live GW data proxy with caching
-- [ ] Real-time points calculation
-- [ ] Rank movement tracker
-- [ ] Bonus point predictor (live BPS)
-- [ ] Auto-sub simulator
+- [x] Live GW data proxy with caching (LiveService with 60s TTL)
+- [x] Real-time points calculation (getManagerLivePoints)
+- [ ] Rank movement tracker (deferred - needs more API data)
+- [x] Bonus point predictor (live BPS)
+- [ ] Auto-sub simulator (deferred - complex logic)
 - [ ] Verify: test during actual match day
 
 ### Phase 7: Transfer Planner (Week 7)

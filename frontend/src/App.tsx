@@ -5,6 +5,7 @@ import { TeamAnalyzer } from './pages/TeamAnalyzer'
 import { Predictor } from './pages/Predictor'
 import { Compare } from './pages/Compare'
 import { Live } from './pages/Live'
+import { Planner } from './pages/Planner'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -16,7 +17,7 @@ const queryClient = new QueryClient({
   },
 })
 
-type Page = 'home' | 'team-analyzer' | 'predictor' | 'compare' | 'live'
+type Page = 'home' | 'team-analyzer' | 'predictor' | 'compare' | 'live' | 'planner'
 
 function App() {
   const [page, setPage] = useState<Page>('home')
@@ -82,6 +83,16 @@ function App() {
                 >
                   Live
                 </button>
+                <button
+                  onClick={() => setPage('planner')}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    page === 'planner'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  Planner
+                </button>
               </nav>
             </div>
           </div>
@@ -92,6 +103,7 @@ function App() {
           {page === 'predictor' && <Predictor />}
           {page === 'compare' && <Compare />}
           {page === 'live' && <Live />}
+          {page === 'planner' && <Planner />}
         </main>
       </div>
     </QueryClientProvider>

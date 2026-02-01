@@ -234,3 +234,118 @@ export async function fetchLiveManager(gameweek: number, managerId: number): Pro
 export async function fetchLiveBonus(gameweek: number): Promise<LiveBonusResponse> {
   return fetchApi<LiveBonusResponse>(`/live/${gameweek}/bonus`)
 }
+
+// Transfer planner types
+export interface TransferOutPlayer {
+  player_id: number
+  web_name: string
+  team: number
+  position: number
+  selling_price: number
+  predicted_points: number
+  reason: string
+}
+
+export interface TransferInPlayer {
+  player_id: number
+  web_name: string
+  team: number
+  position: number
+  now_cost: number
+  predicted_points: number
+  form: number
+  total_points: number
+}
+
+export interface TransferSuggestion {
+  out: TransferOutPlayer
+  in: TransferInPlayer[]
+}
+
+export interface TransferSuggestResponse {
+  manager_id: number
+  gameweek: number
+  bank: number
+  squad_value: number
+  free_transfers: number
+  suggestions: TransferSuggestion[]
+  squad_analysis: {
+    total_predicted_points: number
+    weakest_players: Array<{
+      player_id: number
+      web_name: string
+      predicted_points: number
+      form: number
+    }>
+  }
+  error?: string
+}
+
+export interface TransferSimulateResponse {
+  transfer_out: {
+    player_id: number
+    web_name: string
+    predicted_points: number
+    now_cost: number
+  }
+  transfer_in: {
+    player_id: number
+    web_name: string
+    predicted_points: number
+    now_cost: number
+  }
+  points_difference: number
+  current_squad_total: number
+  new_squad_total: number
+  cost_difference: number
+}
+
+export interface TransferTarget {
+  player_id: number
+  web_name: string
+  team: number
+  position: number
+  now_cost: number
+  predicted_points: number
+  form: number
+  value_score: number
+}
+
+export interface TransferTargetsResponse {
+  gameweek: number
+  targets: TransferTarget[]
+}
+
+export async function fetchTransferSuggestions(
+  managerId: number,
+  gameweek?: number,
+  transfers = 1
+): Promise<TransferSuggestResponse> {
+  const gwParam = gameweek ? `&gw=${gameweek}` : ''
+  return fetchApi<TransferSuggestResponse>(`/transfers/suggest?manager=${managerId}${gwParam}&transfers=${transfers}`)
+}
+
+export async function fetchTransferSimulate(
+  managerId: number,
+  outPlayerId: number,
+  inPlayerId: number,
+  gameweek?: number
+): Promise<TransferSimulateResponse> {
+  const gwParam = gameweek ? `&gw=${gameweek}` : ''
+  return fetchApi<TransferSimulateResponse>(
+    `/transfers/simulate?manager=${managerId}&out=${outPlayerId}&in=${inPlayerId}${gwParam}`
+  )
+}
+
+export async function fetchTransferTargets(
+  gameweek?: number,
+  position?: number,
+  maxPrice?: number
+): Promise<TransferTargetsResponse> {
+  const params = new URLSearchParams()
+  if (gameweek) params.set('gw', String(gameweek))
+  if (position) params.set('position', String(position))
+  if (maxPrice) params.set('max_price', String(maxPrice))
+  const query = params.toString()
+  return fetchApi<TransferTargetsResponse>(`/transfers/targets${query ? `?${query}` : ''}`)
+}
