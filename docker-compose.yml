@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./api/public:/var/www/html/public
+      - ./deploy/nginx-dev.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+
+  php:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.php
+    volumes:
+      - ./packages:/var/www/html/packages
+      - ./api:/var/www/html/api
+    working_dir: /var/www/html/api
+
+volumes:
+  db-data:

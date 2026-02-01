@@ -1,0 +1,34 @@
+{
+    "name": "superfpl/super-fpl",
+    "description": "Fantasy Premier League Analytics Suite",
+    "type": "project",
+    "license": "MIT",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "SuperFPL\\Api\\": "api/src/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./packages/fpl-client"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "superfpl/fpl-client": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}

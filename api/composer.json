@@ -1,0 +1,24 @@
+{
+    "name": "superfpl/api",
+    "description": "SuperFPL API Backend",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "SuperFPL\\Api\\": "src/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../packages/fpl-client"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "superfpl/fpl-client": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    }
+}

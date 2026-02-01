@@ -1,0 +1,40 @@
+# Dependencies
+/vendor/
+/node_modules/
+/packages/*/vendor/
+
+# Build outputs
+/frontend/dist/
+/.phpunit.cache/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Database
+/api/data/*.db
+/api/data/*.sqlite
+
+# Cache
+/api/cache/
+/packages/fpl-client/cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/api/logs/
+
+# Testing
+/coverage/
+.phpunit.result.cache

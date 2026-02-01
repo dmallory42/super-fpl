@@ -1,0 +1,19 @@
+{
+    "name": "superfpl/fpl-client",
+    "description": "PHP client for the Fantasy Premier League API",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "SuperFPL\\FplClient\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SuperFPL\\FplClient\\Tests\\": "tests/"
+        }
+    }
+}
