@@ -780,13 +780,13 @@ function calculateRiskScore(manager: Manager, group: Manager[]) {
 - [ ] Auto-sub simulator (deferred - complex logic)
 - [ ] Verify: test during actual match day
 
-### Phase 7: Transfer Planner (Week 7)
+### Phase 7: Transfer Planner (Week 7) ✅ DONE
 
-- [ ] Transfer suggestions based on predictions
-- [ ] Budget-aware recommendations
-- [ ] Chip strategy advisor
-- [ ] "What if" simulator
-- [ ] Verify: reasonable transfer suggestions
+- [x] Transfer suggestions based on predictions
+- [x] Budget-aware recommendations
+- [ ] Chip strategy advisor (deferred - needs more logic)
+- [x] "What if" simulator (transfer simulation endpoint)
+- [ ] Verify: reasonable transfer suggestions (needs live data)
 
 ---
 
