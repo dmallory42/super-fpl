@@ -79,6 +79,7 @@ try {
         $uri === '/predictions/methodology' => handlePredictionMethodology(),
         preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
+        preg_match('#^/leagues/(\d+)/analysis$#', $uri, $m) === 1 => handleLeagueAnalysis($db, $fplClient, (int) $m[1]),
         $uri === '/compare' => handleCompare($db, $fplClient),
         $uri === '/live/current' => handleLiveCurrentGameweek($db, $fplClient, $config),
         preg_match('#^/live/(\d+)$#', $uri, $m) === 1 => handleLive($db, $fplClient, $config, (int) $m[1]),
@@ -361,6 +362,59 @@ function handleLeagueStandings(Database $db, FplClient $fplClient, int $leagueId
     echo json_encode([
         'league_id' => $leagueId,
         'standings' => $standings,
+    ]);
+}
+
+function handleLeagueAnalysis(Database $db, FplClient $fplClient, int $leagueId): void
+{
+    $gameweek = isset($_GET['gw']) ? (int) $_GET['gw'] : null;
+
+    // Get current gameweek if not specified
+    if ($gameweek === null) {
+        $gwService = new \SuperFPL\Api\Services\GameweekService($db);
+        $gameweek = $gwService->getCurrentGameweek();
+    }
+
+    // Get league standings
+    $leagueService = new LeagueService($db, $fplClient);
+    $league = $leagueService->getLeague($leagueId);
+
+    if ($league === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'League not found']);
+        return;
+    }
+
+    // Get top 20 manager IDs from league
+    $standings = $league['standings']['results'] ?? [];
+    $managerIds = array_slice(array_column($standings, 'entry'), 0, 20);
+
+    if (count($managerIds) < 2) {
+        http_response_code(400);
+        echo json_encode(['error' => 'League needs at least 2 managers']);
+        return;
+    }
+
+    // Run comparison on league members
+    $comparisonService = new ComparisonService($db, $fplClient);
+    $comparison = $comparisonService->compare($managerIds, $gameweek);
+
+    echo json_encode([
+        'league' => [
+            'id' => $leagueId,
+            'name' => $league['league']['name'] ?? 'Unknown',
+        ],
+        'gameweek' => $gameweek,
+        'managers' => array_map(function($s) {
+            return [
+                'id' => $s['entry'],
+                'name' => $s['player_name'],
+                'team_name' => $s['entry_name'],
+                'rank' => $s['rank'],
+                'total' => $s['total'],
+            ];
+        }, array_slice($standings, 0, 20)),
+        'comparison' => $comparison,
     ]);
 }
 
