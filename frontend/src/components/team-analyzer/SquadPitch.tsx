@@ -1,18 +1,11 @@
 import { useMemo } from 'react'
 import type { Pick, Player } from '../../types'
-import { getPositionName, formatPrice } from '../../types'
+import { formatPrice } from '../../types'
 
 interface SquadPitchProps {
   picks: Pick[]
   players: Map<number, Player>
   teams: Map<number, string>
-}
-
-const positionColors: Record<string, string> = {
-  GKP: 'from-yellow-500 to-yellow-600',
-  DEF: 'from-green-500 to-green-600',
-  MID: 'from-blue-500 to-blue-600',
-  FWD: 'from-red-500 to-red-600',
 }
 
 interface PlayerSlotProps {
@@ -31,16 +24,13 @@ function PlayerSlot({ pick, player, teamName }: PlayerSlotProps) {
     )
   }
 
-  const position = getPositionName(player.element_type)
   const isCaptain = pick.is_captain
   const isViceCaptain = pick.is_vice_captain
 
   return (
     <div className="w-20 flex flex-col items-center">
       <div className="relative">
-        <div className={`w-12 h-12 rounded-full bg-gradient-to-b ${positionColors[position]} flex items-center justify-center text-white font-bold text-sm shadow-lg`}>
-          {player.total_points}
-        </div>
+        <div className="w-12 h-12 rounded-full bg-emerald-600 shadow-lg"></div>
         {isCaptain && (
           <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-black shadow">
             C

@@ -15,10 +15,10 @@ const queryClient = new QueryClient({
   },
 })
 
-type Page = 'team-analyzer' | 'league-analyzer' | 'live' | 'planner'
+type Page = 'season-review' | 'league-analyzer' | 'live' | 'planner'
 
 function App() {
-  const [page, setPage] = useState<Page>('team-analyzer')
+  const [page, setPage] = useState<Page>('season-review')
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -32,14 +32,14 @@ function App() {
               </div>
               <nav className="flex gap-2">
                 <button
-                  onClick={() => setPage('team-analyzer')}
+                  onClick={() => setPage('season-review')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
-                    page === 'team-analyzer'
+                    page === 'season-review'
                       ? 'bg-green-600 text-white'
                       : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                   }`}
                 >
-                  Team Analyzer
+                  Season Review
                 </button>
                 <button
                   onClick={() => setPage('league-analyzer')}
@@ -76,7 +76,7 @@ function App() {
           </div>
         </header>
         <main className="container mx-auto px-4 py-8">
-          {page === 'team-analyzer' && <TeamAnalyzer />}
+          {page === 'season-review' && <TeamAnalyzer />}
           {page === 'league-analyzer' && <LeagueAnalyzer />}
           {page === 'live' && <Live />}
           {page === 'planner' && <Planner />}

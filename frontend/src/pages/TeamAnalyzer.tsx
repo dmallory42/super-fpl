@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
-import { useManager, useManagerPicks } from '../hooks/useManager'
+import { useManager, useManagerPicks, useManagerHistory } from '../hooks/useManager'
 import { ManagerSearch } from '../components/team-analyzer/ManagerSearch'
 import { SquadPitch } from '../components/team-analyzer/SquadPitch'
 import { SquadStats } from '../components/team-analyzer/SquadStats'
+import { SeasonReview } from '../components/team-analyzer/SeasonReview'
 
 export function TeamAnalyzer() {
   const [managerId, setManagerId] = useState<number | null>(null)
@@ -13,6 +14,7 @@ export function TeamAnalyzer() {
     managerId,
     manager?.current_event ?? null
   )
+  const { data: history, isLoading: historyLoading } = useManagerHistory(managerId)
 
   const playersMap = useMemo(() => {
     if (!playersData?.players) return new Map()
@@ -28,15 +30,15 @@ export function TeamAnalyzer() {
     setManagerId(id)
   }
 
-  const isLoading = playersLoading || managerLoading || picksLoading
+  const isLoading = playersLoading || managerLoading || picksLoading || historyLoading
   const error = managerError || picksError
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-white mb-2">Team Analyzer</h2>
+        <h2 className="text-xl font-bold text-white mb-2">Season Review</h2>
         <p className="text-gray-400 text-sm mb-4">
-          Enter your FPL Manager ID to analyze your squad. You can find this in your FPL URL (e.g., fantasy.premierleague.com/entry/<strong>123456</strong>/event/1)
+          Enter your FPL Manager ID to review your season performance. You can find this in your FPL URL (e.g., fantasy.premierleague.com/entry/<strong>123456</strong>/event/1)
         </p>
         <ManagerSearch onSearch={handleSearch} isLoading={isLoading} />
       </div>
@@ -87,6 +89,10 @@ export function TeamAnalyzer() {
             </div>
           )}
         </>
+      )}
+
+      {manager && history && (
+        <SeasonReview history={history} />
       )}
 
       {!manager && !isLoading && !error && (
