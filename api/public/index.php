@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use SuperFPL\Api\Database;
 use SuperFPL\Api\Services\PlayerService;
@@ -63,6 +63,7 @@ try {
     match (true) {
         $uri === '' || $uri === '/health' => handleHealth(),
         $uri === '/players' => handlePlayers($db),
+        $uri === '/players/enhanced' => handlePlayersEnhanced($db),
         $uri === '/fixtures' => handleFixtures($db),
         $uri === '/teams' => handleTeams($db),
         $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
@@ -111,6 +112,28 @@ function handlePlayers(Database $db): void
     }
 
     $players = $service->getAll($filters);
+    $teamService = new TeamService($db);
+    $teams = $teamService->getAll();
+
+    echo json_encode([
+        'players' => $players,
+        'teams' => $teams,
+    ]);
+}
+
+function handlePlayersEnhanced(Database $db): void
+{
+    $service = new \SuperFPL\Api\Services\PlayerMetricsService($db);
+
+    $filters = [];
+    if (isset($_GET['position'])) {
+        $filters['position'] = (int) $_GET['position'];
+    }
+    if (isset($_GET['team'])) {
+        $filters['team'] = (int) $_GET['team'];
+    }
+
+    $players = $service->getAllWithMetrics($filters);
     $teamService = new TeamService($db);
     $teams = $teamService->getAll();
 
