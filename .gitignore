@@ -38,3 +38,6 @@ Thumbs.db
 # Testing
 /coverage/
 .phpunit.result.cache
+
+# Worktrees
+.worktrees/
