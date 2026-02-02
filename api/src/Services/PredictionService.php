@@ -211,4 +211,67 @@ class PredictionService
         }
         return null;
     }
+
+    /**
+     * Get methodology documentation for prediction model.
+     *
+     * @return array<string, mixed>
+     */
+    public static function getMethodology(): array
+    {
+        return [
+            'version' => 'v1.0',
+            'overview' => 'Points predicted using probability models for each FPL scoring action',
+            'scoring_rules' => [
+                'goals' => 'GK/DEF: 6pts, MID: 5pts, FWD: 4pts',
+                'assists' => '3pts all positions',
+                'clean_sheets' => 'GK/DEF: 4pts, MID: 1pt, FWD: 0pts',
+                'appearance' => '2pts for 60+ mins, 1pt for <60 mins',
+                'bonus' => '1-3pts based on BPS ranking',
+                'saves' => 'GK only: 1pt per 3 saves',
+                'goals_conceded' => 'GK/DEF: -1pt per 2 goals conceded',
+            ],
+            'probability_models' => [
+                'minutes' => [
+                    'description' => 'Probability of playing based on historical start rate and chance_of_playing flag',
+                    'factors' => ['starts/games ratio', 'chance_of_playing_next_round', 'recent form'],
+                ],
+                'goals' => [
+                    'description' => 'Goal probability using Poisson distribution on xG per 90',
+                    'factors' => ['expected_goals', 'minutes played', 'fixture difficulty', 'goalscorer odds when available'],
+                ],
+                'assists' => [
+                    'description' => 'Assist probability using Poisson distribution on xA per 90',
+                    'factors' => ['expected_assists', 'historical assist rate', 'fixture difficulty'],
+                ],
+                'clean_sheets' => [
+                    'description' => 'Clean sheet probability based on team defensive strength',
+                    'factors' => ['team xGC', 'opponent attack strength', 'fixture odds when available'],
+                ],
+                'bonus' => [
+                    'description' => 'Expected bonus using sigmoid on BPS per 90',
+                    'factors' => ['bps', 'minutes', 'historical bonus rate'],
+                ],
+            ],
+            'fixture_adjustments' => [
+                'difficulty_1_2' => '+15-20% goal/assist probability, +15-30% clean sheet',
+                'difficulty_3' => 'No adjustment (baseline)',
+                'difficulty_4' => '-10-15% goal/assist probability, -15-25% clean sheet',
+                'difficulty_5' => '-20-30% goal/assist probability, -30-50% clean sheet',
+                'home_advantage' => '+10% goals, +15% clean sheet probability',
+            ],
+            'confidence_calculation' => [
+                'base' => 0.5,
+                'minutes_bonus' => '+0.15 for 450+ mins, +0.10 for 270+ mins',
+                'xg_data_bonus' => '+0.10 when xG data available',
+                'odds_data_bonus' => '+0.10 for fixture odds, +0.10 for goalscorer odds',
+                'maximum' => 0.95,
+            ],
+            'limitations' => [
+                'Does not account for tactical changes or rotation',
+                'Fixture difficulty ratings are FPL official, not form-adjusted',
+                'DGW/BGW handling is separate from base predictions',
+            ],
+        ];
+    }
 }

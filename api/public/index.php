@@ -76,6 +76,7 @@ try {
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1]),
         preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
+        $uri === '/predictions/methodology' => handlePredictionMethodology(),
         preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
         $uri === '/compare' => handleCompare($db, $fplClient),
@@ -271,12 +272,24 @@ function handlePredictions(Database $db, int $gameweek): void
     $service = new PredictionService($db);
     $predictions = $service->getPredictions($gameweek);
 
-    echo json_encode([
+    $response = [
         'gameweek' => $gameweek,
         'current_gameweek' => $currentGw,
         'predictions' => $predictions,
         'generated_at' => date('c'),
-    ]);
+    ];
+
+    // Include methodology if requested
+    if (isset($_GET['include_methodology'])) {
+        $response['methodology'] = PredictionService::getMethodology();
+    }
+
+    echo json_encode($response);
+}
+
+function handlePredictionMethodology(): void
+{
+    echo json_encode(PredictionService::getMethodology());
 }
 
 function handleCurrentGameweek(Database $db): void
