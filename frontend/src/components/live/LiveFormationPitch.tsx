@@ -93,6 +93,7 @@ export function LiveFormationPitch({
                   playerId={player.player_id}
                   webName={info?.web_name ?? `P${player.player_id}`}
                   teamName={teamName}
+                  teamId={info?.team ?? 0}
                   points={player.points}
                   multiplier={player.multiplier}
                   isCaptain={player.is_captain}
@@ -129,6 +130,7 @@ export function LiveFormationPitch({
                 playerId={player.player_id}
                 webName={info?.web_name ?? `P${player.player_id}`}
                 teamName={teamName}
+                teamId={info?.team ?? 0}
                 points={player.points}
                 multiplier={1} // Bench always has multiplier 1
                 isCaptain={false}

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Pick, Player } from '../../types'
 import { formatPrice } from '../../types'
+import { TeamShirt } from '../live/TeamShirt'
 
 interface SquadPitchProps {
   picks: Pick[]
@@ -30,6 +31,7 @@ function PlayerSlot({ pick, player, teamName, animationDelay = 0 }: PlayerSlotPr
 
   const isCaptain = pick.is_captain
   const isViceCaptain = pick.is_vice_captain
+  const teamId = player.team ?? 0
 
   return (
     <div
@@ -37,29 +39,26 @@ function PlayerSlot({ pick, player, teamName, animationDelay = 0 }: PlayerSlotPr
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <div className="relative group">
-        {/* Jersey shape - unified green color */}
+        {/* Team shirt */}
         <div
           className={`
-            w-12 h-12 rounded-lg bg-gradient-to-b from-fpl-green to-emerald-600
-            shadow-lg transform transition-transform duration-200
+            relative w-14 h-14 flex items-center justify-center
+            transform transition-transform duration-200
             group-hover:scale-110
             ${isCaptain ? 'animate-pulse-glow' : ''}
           `}
         >
-          {/* Jersey details */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-6 h-0.5 bg-white/30 rounded-full" />
-          </div>
+          <TeamShirt teamId={teamId} size={52} className="drop-shadow-lg" />
         </div>
 
         {/* Captain badge */}
         {isCaptain && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center text-xs font-bold text-black shadow-lg ring-2 ring-yellow-400/50">
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center text-xs font-bold text-black shadow-lg ring-2 ring-yellow-400/50 z-10">
             C
           </div>
         )}
         {isViceCaptain && !isCaptain && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center text-xs font-bold text-black shadow">
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center text-xs font-bold text-black shadow z-10">
             V
           </div>
         )}

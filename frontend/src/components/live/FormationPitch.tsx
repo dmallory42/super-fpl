@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { TeamShirt } from './TeamShirt'
 
 interface Player {
   player_id: number
@@ -121,33 +122,44 @@ function PlayerCard({ player, teams, showEO = false, isBench = false, animationD
   const points = player.stats?.total_points ?? player.points ?? 0
   const displayPoints = player.effective_points ?? (points * player.multiplier)
   const teamName = player.team ? teams[player.team]?.short_name ?? '???' : '???'
+  const teamId = player.team ?? 0
 
   return (
     <div
       className={`flex flex-col items-center ${isBench ? 'opacity-60' : ''} animate-fade-in-up opacity-0`}
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      {/* Jersey with points - unified green color */}
+      {/* Shirt with points */}
       <div className="relative group">
         <div
           className={`
-            w-12 h-12 md:w-14 md:h-14 rounded-lg bg-gradient-to-b from-fpl-green to-emerald-600
-            flex items-center justify-center text-white font-mono font-bold shadow-lg
+            relative w-14 h-14 md:w-16 md:h-16 flex items-center justify-center
             transform transition-transform duration-200 group-hover:scale-110
             ${player.is_captain ? 'animate-pulse-glow' : ''}
           `}
         >
-          <span className="text-lg">{displayPoints}</span>
+          {/* Team shirt SVG */}
+          <TeamShirt teamId={teamId} size={56} className="drop-shadow-lg" />
+
+          {/* Points overlay */}
+          <div className="absolute inset-0 flex items-center justify-center pt-2">
+            <span
+              className="text-lg font-mono font-bold drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]"
+              style={{ color: '#FFFFFF' }}
+            >
+              {displayPoints}
+            </span>
+          </div>
         </div>
 
         {/* Captain badge */}
         {player.is_captain && (
-          <span className="absolute -top-1 -right-1 bg-gradient-to-br from-yellow-400 to-yellow-600 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow-lg ring-2 ring-yellow-400/50">
+          <span className="absolute -top-1 -right-1 bg-gradient-to-br from-yellow-400 to-yellow-600 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow-lg ring-2 ring-yellow-400/50 z-10">
             C
           </span>
         )}
         {player.is_vice_captain && !player.is_captain && (
-          <span className="absolute -top-1 -right-1 bg-gradient-to-br from-gray-300 to-gray-500 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow">
+          <span className="absolute -top-1 -right-1 bg-gradient-to-br from-gray-300 to-gray-500 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow z-10">
             V
           </span>
         )}
