@@ -81,6 +81,7 @@ try {
         preg_match('#^/live/(\d+)$#', $uri, $m) === 1 => handleLive($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/live/(\d+)/manager/(\d+)$#', $uri, $m) === 1 => handleLiveManager($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
         preg_match('#^/live/(\d+)/bonus$#', $uri, $m) === 1 => handleLiveBonus($db, $fplClient, $config, (int) $m[1]),
+        preg_match('#^/ownership/(\d+)$#', $uri, $m) === 1 => handleOwnership($db, $fplClient, $config, (int) $m[1]),
         $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
         $uri === '/transfers/simulate' => handleTransferSimulate($db, $fplClient),
         $uri === '/transfers/targets' => handleTransferTargets($db, $fplClient),
@@ -362,6 +363,22 @@ function handleLiveBonus(Database $db, FplClient $fplClient, array $config, int 
         'gameweek' => $gameweek,
         'bonus_predictions' => $predictions,
     ]);
+}
+
+function handleOwnership(Database $db, FplClient $fplClient, array $config, int $gameweek): void
+{
+    $sampleSize = isset($_GET['sample']) ? (int) $_GET['sample'] : 100;
+    $sampleSize = min(max($sampleSize, 50), 500); // Clamp between 50-500
+
+    $service = new \SuperFPL\Api\Services\OwnershipService(
+        $db,
+        $fplClient,
+        $config['cache']['path'] . '/ownership'
+    );
+
+    $data = $service->getEffectiveOwnership($gameweek, $sampleSize);
+
+    echo json_encode($data);
 }
 
 function handleTransferSuggest(Database $db, FplClient $fplClient): void
