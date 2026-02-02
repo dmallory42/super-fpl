@@ -34,6 +34,8 @@ CREATE TABLE players (
     starts INTEGER,
     chance_of_playing INTEGER,
     news TEXT,
+    penalties_order INTEGER DEFAULT 0,
+    penalties_taken INTEGER DEFAULT 0,
     updated_at TIMESTAMP
 );
 
