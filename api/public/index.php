@@ -80,8 +80,10 @@ try {
         preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
         $uri === '/compare' => handleCompare($db, $fplClient),
+        $uri === '/live/current' => handleLiveCurrentGameweek($db, $fplClient, $config),
         preg_match('#^/live/(\d+)$#', $uri, $m) === 1 => handleLive($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/live/(\d+)/manager/(\d+)$#', $uri, $m) === 1 => handleLiveManager($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
+        preg_match('#^/live/(\d+)/manager/(\d+)/enhanced$#', $uri, $m) === 1 => handleLiveManagerEnhanced($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
         preg_match('#^/live/(\d+)/bonus$#', $uri, $m) === 1 => handleLiveBonus($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/ownership/(\d+)$#', $uri, $m) === 1 => handleOwnership($db, $fplClient, $config, (int) $m[1]),
         $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
@@ -422,6 +424,39 @@ function handleLiveBonus(Database $db, FplClient $fplClient, array $config, int 
         'gameweek' => $gameweek,
         'bonus_predictions' => $predictions,
     ]);
+}
+
+function handleLiveCurrentGameweek(Database $db, FplClient $fplClient, array $config): void
+{
+    $gwService = new \SuperFPL\Api\Services\GameweekService($db);
+    $currentGw = $gwService->getCurrentGameweek();
+
+    $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+    $data = $service->getLiveData($currentGw);
+
+    $data['current_gameweek'] = $currentGw;
+
+    echo json_encode($data);
+}
+
+function handleLiveManagerEnhanced(Database $db, FplClient $fplClient, array $config, int $gameweek, int $managerId): void
+{
+    $liveService = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+    $ownershipService = new \SuperFPL\Api\Services\OwnershipService(
+        $db,
+        $fplClient,
+        $config['cache']['path'] . '/ownership'
+    );
+
+    $data = $liveService->getManagerLivePointsEnhanced($managerId, $gameweek, $ownershipService);
+
+    if (isset($data['error'])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Manager or gameweek data not found']);
+        return;
+    }
+
+    echo json_encode($data);
 }
 
 function handleOwnership(Database $db, FplClient $fplClient, array $config, int $gameweek): void
