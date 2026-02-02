@@ -13,6 +13,7 @@ use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\LeagueService;
 use SuperFPL\Api\Services\ComparisonService;
 use SuperFPL\Api\Services\LiveService;
+use SuperFPL\Api\Services\SampleService;
 use SuperFPL\Api\Services\TransferService;
 use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
@@ -86,6 +87,9 @@ try {
         preg_match('#^/live/(\d+)/manager/(\d+)$#', $uri, $m) === 1 => handleLiveManager($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
         preg_match('#^/live/(\d+)/manager/(\d+)/enhanced$#', $uri, $m) === 1 => handleLiveManagerEnhanced($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
         preg_match('#^/live/(\d+)/bonus$#', $uri, $m) === 1 => handleLiveBonus($db, $fplClient, $config, (int) $m[1]),
+        preg_match('#^/live/(\d+)/samples$#', $uri, $m) === 1 => handleLiveSamples($db, $fplClient, $config, (int) $m[1]),
+        preg_match('#^/admin/sample/(\d+)$#', $uri, $m) === 1 => handleAdminSample($db, $fplClient, $config, (int) $m[1]),
+        $uri === '/fixtures/status' => handleFixturesStatus($db),
         preg_match('#^/ownership/(\d+)$#', $uri, $m) === 1 => handleOwnership($db, $fplClient, $config, (int) $m[1]),
         $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
         $uri === '/transfers/simulate' => handleTransferSimulate($db, $fplClient),
@@ -512,6 +516,139 @@ function handleLiveManagerEnhanced(Database $db, FplClient $fplClient, array $co
     }
 
     echo json_encode($data);
+}
+
+function handleLiveSamples(Database $db, FplClient $fplClient, array $config, int $gameweek): void
+{
+    $liveService = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+    $sampleService = new SampleService($db, $fplClient, $config['cache']['path'] . '/samples');
+
+    // Get live data for points
+    $liveData = $liveService->getLiveData($gameweek);
+    $elements = $liveData['elements'] ?? [];
+
+    // Get sample data with calculated averages
+    $data = $sampleService->getSampleData($gameweek, $elements);
+
+    echo json_encode($data);
+}
+
+function handleAdminSample(Database $db, FplClient $fplClient, array $config, int $gameweek): void
+{
+    // Simple sampling - just sample a small number for quick results
+    $sampleService = new SampleService($db, $fplClient, $config['cache']['path'] . '/samples');
+
+    // Check if we should do a full sync (will take a long time)
+    $full = ($_GET['full'] ?? '') === '1';
+
+    if ($full) {
+        // Full sync - this will take several minutes due to API rate limits
+        $results = $sampleService->sampleManagersForGameweek($gameweek);
+    } else {
+        // Quick sync - just verify samples exist
+        $hasSamples = $sampleService->hasSamplesForGameweek($gameweek);
+        $results = [
+            'has_samples' => $hasSamples,
+            'message' => $hasSamples
+                ? 'Samples already exist for this gameweek'
+                : 'No samples found. Use ?full=1 to run full sample sync (takes several minutes)',
+        ];
+    }
+
+    echo json_encode([
+        'gameweek' => $gameweek,
+        'results' => $results,
+    ]);
+}
+
+function handleFixturesStatus(Database $db): void
+{
+    // Get fixture status for current/active gameweek detection
+    $fixtures = $db->fetchAll(
+        'SELECT id, gameweek, kickoff_time, finished, home_score, away_score,
+                home_club_id, away_club_id
+         FROM fixtures
+         WHERE kickoff_time IS NOT NULL
+         ORDER BY kickoff_time ASC'
+    );
+
+    // Add started/finished status based on kickoff time
+    // Use 120 minutes as a heuristic for match completion if not already marked finished
+    $now = time();
+    foreach ($fixtures as &$fixture) {
+        $kickoff = strtotime($fixture['kickoff_time']);
+        $fixture['started'] = $now >= $kickoff;
+
+        // If kickoff was more than 120 minutes ago, consider it finished
+        // This handles cases where the database sync hasn't run recently
+        $minutesSinceKickoff = ($now - $kickoff) / 60;
+        if (!$fixture['finished'] && $minutesSinceKickoff >= 120) {
+            $fixture['finished'] = true;
+        }
+
+        $fixture['minutes'] = $fixture['started'] && !$fixture['finished']
+            ? min(90, (int)$minutesSinceKickoff)
+            : ($fixture['finished'] ? 90 : 0);
+    }
+
+    // Group by gameweek
+    $byGameweek = [];
+    foreach ($fixtures as $f) {
+        $gw = $f['gameweek'];
+        if (!isset($byGameweek[$gw])) {
+            $byGameweek[$gw] = [
+                'gameweek' => $gw,
+                'fixtures' => [],
+                'total' => 0,
+                'started' => 0,
+                'finished' => 0,
+                'first_kickoff' => null,
+                'last_kickoff' => null,
+            ];
+        }
+        $byGameweek[$gw]['fixtures'][] = $f;
+        $byGameweek[$gw]['total']++;
+        if ($f['started']) $byGameweek[$gw]['started']++;
+        if ($f['finished']) $byGameweek[$gw]['finished']++;
+
+        if ($byGameweek[$gw]['first_kickoff'] === null || $f['kickoff_time'] < $byGameweek[$gw]['first_kickoff']) {
+            $byGameweek[$gw]['first_kickoff'] = $f['kickoff_time'];
+        }
+        if ($byGameweek[$gw]['last_kickoff'] === null || $f['kickoff_time'] > $byGameweek[$gw]['last_kickoff']) {
+            $byGameweek[$gw]['last_kickoff'] = $f['kickoff_time'];
+        }
+    }
+
+    // Determine current/active gameweek
+    // Active if: now >= first_kickoff - 90min AND now <= last_kickoff + 12hrs
+    $activeGw = null;
+    $latestFinished = null;
+
+    foreach ($byGameweek as $gw => $data) {
+        $firstKickoff = strtotime($data['first_kickoff']);
+        $lastKickoff = strtotime($data['last_kickoff']);
+
+        $gwStart = $firstKickoff - (90 * 60); // 90 min before first kickoff
+        $gwEnd = $lastKickoff + (12 * 60 * 60); // 12 hours after last kickoff
+
+        if ($now >= $gwStart && $now <= $gwEnd) {
+            $activeGw = $gw;
+            break;
+        }
+
+        if ($data['finished'] === $data['total'] && $data['total'] > 0) {
+            $latestFinished = $gw;
+        }
+    }
+
+    // If no active GW, use latest finished
+    $currentGw = $activeGw ?? $latestFinished ?? 1;
+
+    echo json_encode([
+        'current_gameweek' => $currentGw,
+        'is_live' => $activeGw !== null,
+        'gameweeks' => array_values($byGameweek),
+    ]);
 }
 
 function handleOwnership(Database $db, FplClient $fplClient, array $config, int $gameweek): void

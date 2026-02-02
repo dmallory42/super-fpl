@@ -3,6 +3,10 @@ import { useLeagueAnalysis } from '../hooks/useLeagueAnalysis'
 import { usePlayers } from '../hooks/usePlayers'
 import { RiskMeter } from '../components/comparator/RiskMeter'
 import { OwnershipMatrix } from '../components/comparator/OwnershipMatrix'
+import { BroadcastCard } from '../components/ui/BroadcastCard'
+import { EmptyState, UsersIcon } from '../components/ui/EmptyState'
+import { SkeletonCard, SkeletonTable } from '../components/ui/SkeletonLoader'
+import { GradientText } from '../components/ui/GradientText'
 import { getPositionName } from '../types'
 
 export function LeagueAnalyzer() {
@@ -42,38 +46,40 @@ export function LeagueAnalyzer() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white mb-2">League Analyzer</h2>
-        <p className="text-gray-400 text-sm">
+      {/* Header */}
+      <div className="animate-fade-in-up">
+        <h2 className="font-display text-2xl font-bold tracking-wider text-foreground mb-2">
+          League Analyzer
+        </h2>
+        <p className="text-foreground-muted text-sm">
           Analyze your mini-league to find differentials, compare ownership, and assess risk.
         </p>
       </div>
 
-      {/* League search */}
-      <form onSubmit={handleSubmit} className="flex gap-2 max-w-md">
+      {/* League Search */}
+      <form onSubmit={handleSubmit} className="flex gap-2 max-w-md animate-fade-in-up animation-delay-100">
         <input
           type="text"
           value={leagueInput}
           onChange={(e) => setLeagueInput(e.target.value)}
           placeholder="Enter League ID"
-          className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+          className="input-broadcast flex-1"
         />
-        <button
-          type="submit"
-          className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium"
-        >
+        <button type="submit" className="btn-primary">
           Analyze
         </button>
       </form>
 
-      {/* Gameweek selector */}
+      {/* Gameweek Selector */}
       {leagueId && (
-        <div className="flex items-center gap-4">
-          <label className="text-gray-300">Gameweek:</label>
+        <div className="flex items-center gap-4 animate-fade-in-up animation-delay-200">
+          <label className="text-foreground-muted font-display text-sm uppercase tracking-wider">
+            Gameweek:
+          </label>
           <select
             value={gameweek || ''}
             onChange={(e) => setGameweek(e.target.value ? parseInt(e.target.value, 10) : undefined)}
-            className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500"
+            className="input-broadcast w-32"
           >
             <option value="">Current</option>
             {Array.from({ length: 38 }, (_, i) => i + 1).map(gw => (
@@ -83,68 +89,87 @@ export function LeagueAnalyzer() {
         </div>
       )}
 
+      {/* Loading State */}
       {isLoading && (
-        <div className="text-center py-12 text-gray-400">
-          Loading league analysis...
+        <div className="space-y-6">
+          <SkeletonCard />
+          <SkeletonTable rows={6} cols={6} />
         </div>
       )}
 
+      {/* Error State */}
       {error && (
-        <div className="p-4 bg-red-900/50 border border-red-500/30 rounded-lg text-red-400">
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
           {error.message || 'Failed to load league data'}
         </div>
       )}
 
+      {/* Analysis Results */}
       {analysisData && (
         <div className="space-y-6">
-          {/* League header */}
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <h3 className="text-xl font-bold text-white">{analysisData.league.name}</h3>
-            <p className="text-gray-400">
-              Analyzing top {analysisData.managers.length} managers | GW{analysisData.gameweek}
-            </p>
-          </div>
+          {/* League Header Banner */}
+          <BroadcastCard animationDelay={0}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-display text-2xl font-bold tracking-wider">
+                  <GradientText>{analysisData.league.name}</GradientText>
+                </h3>
+                <p className="text-foreground-muted text-sm">
+                  Analyzing top {analysisData.managers.length} managers
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="font-display text-xl font-bold text-foreground tracking-wider">
+                  GW{analysisData.gameweek}
+                </div>
+              </div>
+            </div>
+          </BroadcastCard>
 
-          {/* Standings with risk */}
-          <div className="bg-gray-800 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-white">
-                <thead className="bg-gray-700">
+          {/* Standings with Risk */}
+          <BroadcastCard title="League Standings" animationDelay={100}>
+            <div className="overflow-x-auto -mx-4">
+              <table className="table-broadcast min-w-[700px]">
+                <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Rank</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Manager</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Team</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">Points</th>
-                    <th className="px-4 py-3 text-center text-sm font-medium">Risk</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">Key Differentials</th>
+                    <th>Rank</th>
+                    <th>Manager</th>
+                    <th>Team</th>
+                    <th className="text-right">Points</th>
+                    <th className="text-center">Risk</th>
+                    <th>Key Differentials</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {analysisData.managers.map((manager) => {
+                  {analysisData.managers.map((manager, idx) => {
                     const risk = analysisData.comparison.risk_scores[manager.id]
                     const diffs = analysisData.comparison.differentials[manager.id] || []
 
                     return (
-                      <tr key={manager.id} className="border-t border-gray-700 hover:bg-gray-700/50">
-                        <td className="px-4 py-3 text-gray-400">{manager.rank}</td>
-                        <td className="px-4 py-3 font-medium">{manager.name}</td>
-                        <td className="px-4 py-3 text-gray-400">{manager.team_name}</td>
-                        <td className="px-4 py-3 text-right font-bold">{manager.total}</td>
-                        <td className="px-4 py-3">
+                      <tr
+                        key={manager.id}
+                        className="animate-fade-in-up opacity-0"
+                        style={{ animationDelay: `${150 + idx * 50}ms` }}
+                      >
+                        <td className="font-mono text-foreground-muted">{manager.rank}</td>
+                        <td className="font-medium text-foreground">{manager.name}</td>
+                        <td className="text-foreground-muted">{manager.team_name}</td>
+                        <td className="text-right font-mono font-bold text-fpl-green">{manager.total}</td>
+                        <td>
                           {risk && (
                             <div className="flex justify-center">
                               <RiskMeter riskScore={risk} compact />
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td>
                           <div className="flex gap-1 flex-wrap">
                             {diffs.slice(0, 3).map((d) => {
                               const player = analysisData.comparison.players[d.player_id]
                               return (
                                 <span
                                   key={d.player_id}
-                                  className="bg-green-600/30 text-green-400 px-2 py-0.5 rounded text-xs"
+                                  className="px-2 py-0.5 rounded text-xs font-medium border bg-fpl-green/20 text-fpl-green border-fpl-green/30"
                                 >
                                   {player?.web_name || d.player_id}
                                 </span>
@@ -158,49 +183,52 @@ export function LeagueAnalyzer() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </BroadcastCard>
 
           {/* Risk Analysis Grid */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-3">Risk Analysis</h3>
+          <BroadcastCard title="Risk Analysis" accentColor="highlight" animationDelay={200}>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {analysisData.managers.slice(0, 10).map(manager => (
-                <RiskMeter
-                  key={manager.id}
-                  managerName={manager.team_name}
-                  riskScore={analysisData.comparison.risk_scores[manager.id]}
-                />
+              {analysisData.managers.slice(0, 10).map((manager, idx) => (
+                <div key={manager.id} style={{ animationDelay: `${250 + idx * 50}ms` }}>
+                  <RiskMeter
+                    managerName={manager.team_name}
+                    riskScore={analysisData.comparison.risk_scores[manager.id]}
+                  />
+                </div>
               ))}
             </div>
-          </div>
+          </BroadcastCard>
 
           {/* Differentials Detail */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-3">Key Differentials</h3>
+          <BroadcastCard title="Key Differentials" accentColor="purple" animationDelay={300}>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {analysisData.managers.slice(0, 6).map(manager => {
+              {analysisData.managers.slice(0, 6).map((manager, idx) => {
                 const diffs = analysisData.comparison.differentials[manager.id] || []
                 return (
-                  <div key={manager.id} className="p-4 bg-gray-800 rounded-lg">
-                    <div className="font-medium text-white mb-2 truncate">
+                  <div
+                    key={manager.id}
+                    className="p-4 bg-surface-elevated rounded-lg animate-fade-in-up opacity-0"
+                    style={{ animationDelay: `${350 + idx * 50}ms` }}
+                  >
+                    <div className="font-display text-sm uppercase tracking-wider text-foreground mb-3 truncate">
                       {manager.team_name}
                     </div>
                     {diffs.length === 0 ? (
-                      <p className="text-sm text-gray-500">No major differentials</p>
+                      <p className="text-sm text-foreground-dim">No major differentials</p>
                     ) : (
-                      <ul className="space-y-1">
+                      <ul className="space-y-2">
                         {diffs.slice(0, 5).map(diff => {
                           const player = analysisData.comparison.players[diff.player_id]
                           return (
                             <li key={diff.player_id} className="flex items-center gap-2 text-sm">
-                              <span className="text-gray-400 w-8">
+                              <span className="font-mono text-xs w-8 text-foreground-muted">
                                 {player ? getPositionName(player.position) : ''}
                               </span>
-                              <span className="text-white flex-1 truncate">
+                              <span className="text-foreground flex-1 truncate">
                                 {player?.web_name || diff.player_id}
                               </span>
-                              <span className="text-green-400 text-xs">
-                                {diff.eo.toFixed(0)}% EO
+                              <span className="text-fpl-green text-xs font-mono">
+                                {diff.eo.toFixed(0)}%
                               </span>
                               {diff.is_captain && (
                                 <span className="text-yellow-400 text-xs font-bold">C</span>
@@ -214,29 +242,29 @@ export function LeagueAnalyzer() {
                 )
               })}
             </div>
-          </div>
+          </BroadcastCard>
 
           {/* Ownership Matrix */}
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-3">Ownership Matrix</h3>
-            <div className="bg-gray-800 rounded-lg p-4 overflow-hidden">
-              <OwnershipMatrix
-                effectiveOwnership={analysisData.comparison.effective_ownership}
-                ownershipMatrix={analysisData.comparison.ownership_matrix}
-                players={analysisData.comparison.players}
-                managerIds={managerIds}
-                managerNames={managerNames}
-                teams={teamsMap}
-              />
-            </div>
-          </div>
+          <BroadcastCard title="Ownership Matrix" animationDelay={400}>
+            <OwnershipMatrix
+              effectiveOwnership={analysisData.comparison.effective_ownership}
+              ownershipMatrix={analysisData.comparison.ownership_matrix}
+              players={analysisData.comparison.players}
+              managerIds={managerIds}
+              managerNames={managerNames}
+              teams={teamsMap}
+            />
+          </BroadcastCard>
         </div>
       )}
 
+      {/* Empty State */}
       {!leagueId && !isLoading && (
-        <div className="text-center py-12 text-gray-500">
-          Enter a league ID to analyze your mini-league
-        </div>
+        <EmptyState
+          icon={<UsersIcon size={64} />}
+          title="Enter Your League ID"
+          description="Analyze your mini-league to find differentials, compare ownership, and assess risk against your rivals."
+        />
       )}
     </div>
   )

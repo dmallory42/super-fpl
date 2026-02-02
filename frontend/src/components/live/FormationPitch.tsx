@@ -33,13 +33,6 @@ interface FormationPitchProps {
   showEffectiveOwnership?: boolean
 }
 
-const positionColors: Record<number, string> = {
-  1: 'bg-yellow-500', // GK
-  2: 'bg-green-500',  // DEF
-  3: 'bg-blue-500',   // MID
-  4: 'bg-red-500',    // FWD
-}
-
 export function FormationPitch({ players, teams, showEffectiveOwnership = false }: FormationPitchProps) {
   const { starting, bench } = useMemo(() => {
     const sorted = [...players].sort((a, b) => a.position - b.position)
@@ -58,40 +51,56 @@ export function FormationPitch({ players, teams, showEffectiveOwnership = false 
 
   const rows = [gk, def, mid, fwd]
 
+  let animationIndex = 0
+
   return (
-    <div className="bg-gradient-to-b from-green-800 to-green-600 rounded-lg p-4 relative overflow-hidden">
+    <div className="pitch-texture rounded-lg p-4 relative overflow-hidden">
       {/* Pitch markings */}
       <div className="absolute inset-4 border-2 border-white/20 rounded pointer-events-none" />
-      <div className="absolute left-1/2 top-4 bottom-4 w-px bg-white/20 pointer-events-none" />
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/20 rounded-full pointer-events-none" />
+      <div className="absolute left-1/2 top-4 bottom-4 w-px bg-white/10 pointer-events-none" />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/10 rounded-full pointer-events-none" />
+
+      {/* Goal area */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-32 h-12 border-t-2 border-x-2 border-white/10 rounded-t-lg pointer-events-none" />
 
       {/* Formation display */}
       <div className="relative z-10 flex flex-col gap-6 py-4">
         {rows.map((row, rowIndex) => (
           <div key={rowIndex} className="flex justify-center gap-2 md:gap-4">
-            {row.map((player) => (
-              <PlayerCard
-                key={player.player_id}
-                player={player}
-                teams={teams}
-                showEO={showEffectiveOwnership}
-              />
-            ))}
+            {row.map((player) => {
+              const delay = animationIndex++ * 50
+              return (
+                <PlayerCard
+                  key={player.player_id}
+                  player={player}
+                  teams={teams}
+                  showEO={showEffectiveOwnership}
+                  animationDelay={delay}
+                />
+              )
+            })}
           </div>
         ))}
       </div>
 
       {/* Bench */}
-      <div className="mt-6 pt-4 border-t border-white/30">
-        <div className="text-white/60 text-xs mb-3 text-center uppercase tracking-wider">Bench</div>
-        <div className="flex justify-center gap-2 md:gap-4">
-          {bench.map((player) => (
+      <div className="mt-6 pt-4 border-t-2 border-white/20">
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/20" />
+          <span className="font-display text-xs uppercase tracking-wider text-white/60 px-3">
+            Bench
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20" />
+        </div>
+        <div className="flex justify-center gap-2 md:gap-4 bg-surface/30 rounded-lg py-3 px-4">
+          {bench.map((player, idx) => (
             <PlayerCard
               key={player.player_id}
               player={player}
               teams={teams}
               showEO={showEffectiveOwnership}
               isBench
+              animationDelay={(animationIndex + idx) * 50}
             />
           ))}
         </div>
@@ -105,33 +114,47 @@ interface PlayerCardProps {
   teams: Record<number, Team>
   showEO?: boolean
   isBench?: boolean
+  animationDelay?: number
 }
 
-function PlayerCard({ player, teams, showEO = false, isBench = false }: PlayerCardProps) {
+function PlayerCard({ player, teams, showEO = false, isBench = false, animationDelay = 0 }: PlayerCardProps) {
   const points = player.stats?.total_points ?? player.points ?? 0
   const displayPoints = player.effective_points ?? (points * player.multiplier)
   const teamName = player.team ? teams[player.team]?.short_name ?? '???' : '???'
-  const posColor = positionColors[player.element_type ?? 3] || 'bg-gray-500'
 
   return (
-    <div className={`flex flex-col items-center ${isBench ? 'opacity-60' : ''}`}>
-      {/* Jersey/avatar with points */}
-      <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center text-white font-bold relative ${posColor}`}>
-        <span className="text-lg">{displayPoints}</span>
+    <div
+      className={`flex flex-col items-center ${isBench ? 'opacity-60' : ''} animate-fade-in-up opacity-0`}
+      style={{ animationDelay: `${animationDelay}ms` }}
+    >
+      {/* Jersey with points - unified green color */}
+      <div className="relative group">
+        <div
+          className={`
+            w-12 h-12 md:w-14 md:h-14 rounded-lg bg-gradient-to-b from-fpl-green to-emerald-600
+            flex items-center justify-center text-white font-mono font-bold shadow-lg
+            transform transition-transform duration-200 group-hover:scale-110
+            ${player.is_captain ? 'animate-pulse-glow' : ''}
+          `}
+        >
+          <span className="text-lg">{displayPoints}</span>
+        </div>
+
+        {/* Captain badge */}
         {player.is_captain && (
-          <span className="absolute -top-1 -right-1 bg-yellow-400 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow">
+          <span className="absolute -top-1 -right-1 bg-gradient-to-br from-yellow-400 to-yellow-600 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow-lg ring-2 ring-yellow-400/50">
             C
           </span>
         )}
         {player.is_vice_captain && !player.is_captain && (
-          <span className="absolute -top-1 -right-1 bg-gray-300 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow">
+          <span className="absolute -top-1 -right-1 bg-gradient-to-br from-gray-300 to-gray-500 text-black rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow">
             V
           </span>
         )}
       </div>
 
       {/* Player name */}
-      <div className="bg-white text-black text-xs px-2 py-0.5 rounded mt-1 max-w-[70px] truncate font-medium">
+      <div className="bg-surface/90 backdrop-blur-sm text-foreground text-xs px-2 py-0.5 rounded mt-1.5 max-w-[70px] truncate font-medium">
         {player.web_name || `P${player.player_id}`}
       </div>
 
@@ -140,9 +163,11 @@ function PlayerCard({ player, teams, showEO = false, isBench = false }: PlayerCa
 
       {/* Effective ownership */}
       {showEO && player.effective_ownership && (
-        <div className={`text-xs mt-0.5 font-medium ${
-          player.effective_ownership.points_swing > 0 ? 'text-red-300' : 'text-emerald-300'
-        }`}>
+        <div
+          className={`text-xs mt-0.5 font-mono font-medium ${
+            player.effective_ownership.points_swing > 0 ? 'text-destructive' : 'text-fpl-green'
+          }`}
+        >
           EO: {player.effective_ownership.effective_ownership.toFixed(0)}%
         </div>
       )}

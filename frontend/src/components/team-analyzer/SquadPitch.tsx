@@ -12,13 +12,17 @@ interface PlayerSlotProps {
   pick: Pick
   player: Player | undefined
   teamName: string
+  animationDelay?: number
 }
 
-function PlayerSlot({ pick, player, teamName }: PlayerSlotProps) {
+function PlayerSlot({ pick, player, teamName, animationDelay = 0 }: PlayerSlotProps) {
   if (!player) {
     return (
-      <div className="w-20 h-24 flex flex-col items-center justify-center text-gray-500">
-        <div className="w-12 h-12 rounded-full bg-gray-700 border-2 border-gray-600" />
+      <div
+        className="w-20 h-24 flex flex-col items-center justify-center text-foreground-dim animate-fade-in-up opacity-0"
+        style={{ animationDelay: `${animationDelay}ms` }}
+      >
+        <div className="w-12 h-12 rounded-full bg-surface border-2 border-border" />
         <div className="text-xs mt-1">Unknown</div>
       </div>
     )
@@ -28,24 +32,46 @@ function PlayerSlot({ pick, player, teamName }: PlayerSlotProps) {
   const isViceCaptain = pick.is_vice_captain
 
   return (
-    <div className="w-20 flex flex-col items-center">
-      <div className="relative">
-        <div className="w-12 h-12 rounded-full bg-emerald-600 shadow-lg"></div>
+    <div
+      className="w-20 flex flex-col items-center animate-fade-in-up opacity-0"
+      style={{ animationDelay: `${animationDelay}ms` }}
+    >
+      <div className="relative group">
+        {/* Jersey shape - unified green color */}
+        <div
+          className={`
+            w-12 h-12 rounded-lg bg-gradient-to-b from-fpl-green to-emerald-600
+            shadow-lg transform transition-transform duration-200
+            group-hover:scale-110
+            ${isCaptain ? 'animate-pulse-glow' : ''}
+          `}
+        >
+          {/* Jersey details */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-6 h-0.5 bg-white/30 rounded-full" />
+          </div>
+        </div>
+
+        {/* Captain badge */}
         {isCaptain && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-bold text-black shadow">
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center text-xs font-bold text-black shadow-lg ring-2 ring-yellow-400/50">
             C
           </div>
         )}
-        {isViceCaptain && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gray-300 rounded-full flex items-center justify-center text-xs font-bold text-black shadow">
+        {isViceCaptain && !isCaptain && (
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center text-xs font-bold text-black shadow">
             V
           </div>
         )}
       </div>
-      <div className="mt-1 text-center">
-        <div className="text-xs font-semibold text-white truncate max-w-[80px]">{player.web_name}</div>
-        <div className="text-xs text-gray-400">{teamName}</div>
-        <div className="text-xs text-gray-500">£{formatPrice(player.now_cost)}m</div>
+
+      {/* Player info */}
+      <div className="mt-1.5 text-center">
+        <div className="bg-surface/90 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold text-foreground truncate max-w-[80px]">
+          {player.web_name}
+        </div>
+        <div className="text-xs text-white/70 mt-0.5">{teamName}</div>
+        <div className="text-xs text-white/50 font-mono">£{formatPrice(player.now_cost)}m</div>
       </div>
     </div>
   )
@@ -59,7 +85,6 @@ export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
   }, [picks])
 
   const rows = useMemo(() => {
-    // Group by position type
     const gk: Pick[] = []
     const def: Pick[] = []
     const mid: Pick[] = []
@@ -86,40 +111,59 @@ export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
     return teams.get(player.team) || ''
   }
 
+  let delayCounter = 0
+
   return (
-    <div className="bg-gradient-to-b from-green-800 to-green-900 rounded-lg p-4 shadow-xl">
+    <div className="pitch-texture rounded-lg p-4 shadow-xl overflow-hidden">
       {/* Pitch markings */}
-      <div className="relative border-2 border-white/30 rounded-lg p-4">
+      <div className="relative border-2 border-white/20 rounded-lg p-4">
         {/* Center circle */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border border-white/20 rounded-full" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border-2 border-white/10 rounded-full" />
+
+        {/* Center line */}
+        <div className="absolute top-4 bottom-4 left-1/2 w-px bg-white/10" />
+
+        {/* Penalty area (top) */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-48 h-16 border-b-2 border-x-2 border-white/10 rounded-b-lg" />
 
         {/* Starting XI */}
-        <div className="space-y-4">
+        <div className="space-y-6 relative z-10">
           {rows.map((row, idx) => (
             <div key={idx} className="flex justify-center gap-2">
-              {row.map(pick => (
-                <PlayerSlot
-                  key={pick.element}
-                  pick={pick}
-                  player={players.get(pick.element)}
-                  teamName={getTeamName(pick.element)}
-                />
-              ))}
+              {row.map((pick) => {
+                const delay = delayCounter++ * 50
+                return (
+                  <PlayerSlot
+                    key={pick.element}
+                    pick={pick}
+                    player={players.get(pick.element)}
+                    teamName={getTeamName(pick.element)}
+                    animationDelay={delay}
+                  />
+                )
+              })}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Bench */}
-      <div className="mt-4 pt-4 border-t border-white/20">
-        <div className="text-xs text-white/60 mb-2 text-center">BENCH</div>
-        <div className="flex justify-center gap-2">
-          {bench.map(pick => (
+      {/* Bench - Dugout style */}
+      <div className="mt-4 pt-4 border-t-2 border-white/20">
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/20" />
+          <span className="text-xs font-display uppercase tracking-wider text-white/60 px-3">
+            Bench
+          </span>
+          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20" />
+        </div>
+        <div className="flex justify-center gap-2 bg-surface/30 rounded-lg py-3 px-4">
+          {bench.map((pick, idx) => (
             <PlayerSlot
               key={pick.element}
               pick={pick}
               player={players.get(pick.element)}
               teamName={getTeamName(pick.element)}
+              animationDelay={(delayCounter + idx) * 50}
             />
           ))}
         </div>

@@ -207,6 +207,8 @@ export interface LiveManagerResponse {
   total_points: number
   bench_points: number
   players: LiveManagerPlayer[]
+  overall_rank: number | null
+  pre_gw_rank: number | null
   updated_at: string
   error?: string
 }
@@ -233,6 +235,61 @@ export async function fetchLiveManager(gameweek: number, managerId: number): Pro
 
 export async function fetchLiveBonus(gameweek: number): Promise<LiveBonusResponse> {
   return fetchApi<LiveBonusResponse>(`/live/${gameweek}/bonus`)
+}
+
+// Live samples/EO types
+export interface TierSampleData {
+  avg_points: number
+  sample_size: number
+  effective_ownership: Record<number, number>
+  estimated?: boolean // True if using FPL average estimates instead of real samples
+}
+
+export interface LiveSamplesResponse {
+  gameweek: number
+  samples: {
+    top_10k?: TierSampleData
+    top_100k?: TierSampleData
+    top_1m?: TierSampleData
+    overall?: TierSampleData
+  }
+  is_estimated?: boolean // True if no real samples exist
+  updated_at: string
+}
+
+export async function fetchLiveSamples(gameweek: number): Promise<LiveSamplesResponse> {
+  return fetchApi<LiveSamplesResponse>(`/live/${gameweek}/samples`)
+}
+
+// Fixtures status types
+export interface GameweekFixtureStatus {
+  gameweek: number
+  fixtures: Array<{
+    id: number
+    kickoff_time: string
+    started: boolean
+    finished: boolean
+    minutes: number
+    home_club_id: number
+    away_club_id: number
+    home_score: number | null
+    away_score: number | null
+  }>
+  total: number
+  started: number
+  finished: number
+  first_kickoff: string
+  last_kickoff: string
+}
+
+export interface FixturesStatusResponse {
+  current_gameweek: number
+  is_live: boolean
+  gameweeks: GameweekFixtureStatus[]
+}
+
+export async function fetchFixturesStatus(): Promise<FixturesStatusResponse> {
+  return fetchApi<FixturesStatusResponse>('/fixtures/status')
 }
 
 // Transfer planner types

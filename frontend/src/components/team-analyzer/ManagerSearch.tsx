@@ -36,17 +36,26 @@ export function ManagerSearch({ onSearch, isLoading }: ManagerSearchProps) {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Enter FPL Manager ID (e.g., 12345)"
-          className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+          className="input-broadcast"
           disabled={isLoading}
         />
-        {error && <p className="text-red-400 text-sm mt-1">{error}</p>}
+        {error && (
+          <p className="text-destructive text-sm mt-1 animate-fade-in-up">{error}</p>
+        )}
       </div>
       <button
         type="submit"
         disabled={isLoading}
-        className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+        className="btn-primary"
       >
-        {isLoading ? 'Loading...' : 'Analyze'}
+        {isLoading ? (
+          <span className="flex items-center gap-2">
+            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            Loading
+          </span>
+        ) : (
+          'Analyze'
+        )}
       </button>
     </form>
   )

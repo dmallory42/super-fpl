@@ -105,12 +105,34 @@ class LiveService
         // Sort by position
         usort($playerPoints, fn($a, $b) => $a['position'] <=> $b['position']);
 
+        // Get manager's current overall rank and pre-GW rank
+        $overallRank = null;
+        $preGwRank = null;
+        try {
+            $entry = $this->fplClient->entry($managerId)->getRaw();
+            $overallRank = $entry['summary_overall_rank'] ?? null;
+
+            // Get history to find pre-GW rank (rank after previous GW)
+            $history = $this->fplClient->entry($managerId)->history();
+            $currentHistory = $history['current'] ?? [];
+            foreach ($currentHistory as $gw) {
+                if (($gw['event'] ?? 0) === $gameweek - 1) {
+                    $preGwRank = $gw['overall_rank'] ?? null;
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore - ranks will be null
+        }
+
         return [
             'manager_id' => $managerId,
             'gameweek' => $gameweek,
             'total_points' => $totalPoints,
             'bench_points' => $benchPoints,
             'players' => $playerPoints,
+            'overall_rank' => $overallRank,
+            'pre_gw_rank' => $preGwRank,
             'updated_at' => date('c'),
         ];
     }

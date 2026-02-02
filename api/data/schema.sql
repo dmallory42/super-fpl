@@ -177,6 +177,20 @@ CREATE TABLE league_members (
     PRIMARY KEY (league_id, manager_id)
 );
 
+-- Sample picks for EO calculations
+CREATE TABLE sample_picks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    gameweek INTEGER NOT NULL,
+    tier TEXT NOT NULL,  -- 'top_10k', 'top_100k', 'top_1m', 'overall'
+    manager_id INTEGER NOT NULL,
+    player_id INTEGER NOT NULL,
+    multiplier INTEGER NOT NULL DEFAULT 1,  -- 1=normal, 2=captain, 3=triple_captain
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(gameweek, tier, manager_id, player_id)
+);
+
+CREATE INDEX idx_sample_picks_gw_tier ON sample_picks(gameweek, tier);
+
 -- Indexes for common queries
 CREATE INDEX idx_players_club ON players(club_id);
 CREATE INDEX idx_players_position ON players(position);
