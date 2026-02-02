@@ -349,3 +349,85 @@ export async function fetchTransferTargets(
   const query = params.toString()
   return fetchApi<TransferTargetsResponse>(`/transfers/targets${query ? `?${query}` : ''}`)
 }
+
+// League Analysis
+export interface LeagueAnalysisManager {
+  id: number
+  name: string
+  team_name: string
+  rank: number
+  total: number
+}
+
+export interface LeagueAnalysisResponse {
+  league: {
+    id: number
+    name: string
+  }
+  gameweek: number
+  managers: LeagueAnalysisManager[]
+  comparison: ComparisonResponse
+}
+
+export async function fetchLeagueAnalysis(leagueId: number, gameweek?: number): Promise<LeagueAnalysisResponse> {
+  const gwParam = gameweek ? `?gw=${gameweek}` : ''
+  return fetchApi<LeagueAnalysisResponse>(`/leagues/${leagueId}/analysis${gwParam}`)
+}
+
+// Planner Optimization
+export interface ChipPlan {
+  wildcard?: number
+  bench_boost?: number
+  free_hit?: number
+  triple_captain?: number
+}
+
+export interface TransferRecommendation {
+  out: { id: number; web_name: string; team: number; price: number; total_predicted: number }
+  in: { id: number; web_name: string; team: number; price: number; total_predicted: number }
+  predicted_gain: number
+  is_free: boolean
+  hit_cost: number
+  net_gain: number
+  recommended: boolean
+}
+
+export interface ChipSuggestion {
+  gameweek: number
+  estimated_value: number
+  has_dgw: boolean
+  reason?: string
+}
+
+export interface PlannerOptimizeResponse {
+  current_gameweek: number
+  planning_horizon: number[]
+  current_squad: {
+    player_ids: number[]
+    bank: number
+    squad_value: number
+    free_transfers: number
+    predicted_points: Record<number | 'total', number>
+  }
+  dgw_teams: Record<number, number[]>
+  recommendations: TransferRecommendation[]
+  chip_suggestions: Record<string, ChipSuggestion>
+  chip_plan: ChipPlan
+}
+
+export async function fetchPlannerOptimize(
+  managerId: number,
+  freeTransfers: number = 1,
+  chipPlan: ChipPlan = {}
+): Promise<PlannerOptimizeResponse> {
+  const params = new URLSearchParams()
+  params.set('manager', String(managerId))
+  params.set('ft', String(freeTransfers))
+
+  if (chipPlan.wildcard) params.set('wildcard_gw', String(chipPlan.wildcard))
+  if (chipPlan.bench_boost) params.set('bench_boost_gw', String(chipPlan.bench_boost))
+  if (chipPlan.free_hit) params.set('free_hit_gw', String(chipPlan.free_hit))
+  if (chipPlan.triple_captain) params.set('triple_captain_gw', String(chipPlan.triple_captain))
+
+  return fetchApi<PlannerOptimizeResponse>(`/planner/optimize?${params.toString()}`)
+}

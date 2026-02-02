@@ -90,6 +90,7 @@ try {
         $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
         $uri === '/transfers/simulate' => handleTransferSimulate($db, $fplClient),
         $uri === '/transfers/targets' => handleTransferTargets($db, $fplClient),
+        $uri === '/planner/optimize' => handlePlannerOptimize($db, $fplClient),
         default => handleNotFound(),
     };
 } catch (Throwable $e) {
@@ -603,6 +604,53 @@ function handleTransferTargets(Database $db, FplClient $fplClient): void
         'gameweek' => $gameweek,
         'targets' => $targets,
     ]);
+}
+
+function handlePlannerOptimize(Database $db, FplClient $fplClient): void
+{
+    $managerId = isset($_GET['manager']) ? (int) $_GET['manager'] : null;
+    $freeTransfers = isset($_GET['ft']) ? (int) $_GET['ft'] : 1;
+
+    // Parse chip plan from query params
+    $chipPlan = [];
+    if (isset($_GET['wildcard_gw'])) {
+        $chipPlan['wildcard'] = (int) $_GET['wildcard_gw'];
+    }
+    if (isset($_GET['bench_boost_gw'])) {
+        $chipPlan['bench_boost'] = (int) $_GET['bench_boost_gw'];
+    }
+    if (isset($_GET['free_hit_gw'])) {
+        $chipPlan['free_hit'] = (int) $_GET['free_hit_gw'];
+    }
+    if (isset($_GET['triple_captain_gw'])) {
+        $chipPlan['triple_captain'] = (int) $_GET['triple_captain_gw'];
+    }
+
+    if ($managerId === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing manager parameter']);
+        return;
+    }
+
+    $predictionService = new PredictionService($db);
+    $gameweekService = new \SuperFPL\Api\Services\GameweekService($db);
+
+    $optimizer = new \SuperFPL\Api\Services\TransferOptimizerService(
+        $db,
+        $fplClient,
+        $predictionService,
+        $gameweekService
+    );
+
+    try {
+        $plan = $optimizer->getOptimalPlan($managerId, $chipPlan, $freeTransfers);
+        echo json_encode($plan);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => $e->getMessage(),
+        ]);
+    }
 }
 
 function handleNotFound(): void

@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Home } from './pages/Home'
 import { TeamAnalyzer } from './pages/TeamAnalyzer'
-import { Predictor } from './pages/Predictor'
-import { Compare } from './pages/Compare'
+import { LeagueAnalyzer } from './pages/LeagueAnalyzer'
 import { Live } from './pages/Live'
 import { Planner } from './pages/Planner'
 import './index.css'
@@ -17,10 +15,10 @@ const queryClient = new QueryClient({
   },
 })
 
-type Page = 'home' | 'team-analyzer' | 'predictor' | 'compare' | 'live' | 'planner'
+type Page = 'team-analyzer' | 'league-analyzer' | 'live' | 'planner'
 
 function App() {
-  const [page, setPage] = useState<Page>('home')
+  const [page, setPage] = useState<Page>('team-analyzer')
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -34,16 +32,6 @@ function App() {
               </div>
               <nav className="flex gap-2">
                 <button
-                  onClick={() => setPage('home')}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    page === 'home'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  }`}
-                >
-                  Players
-                </button>
-                <button
                   onClick={() => setPage('team-analyzer')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
                     page === 'team-analyzer'
@@ -54,24 +42,14 @@ function App() {
                   Team Analyzer
                 </button>
                 <button
-                  onClick={() => setPage('predictor')}
+                  onClick={() => setPage('league-analyzer')}
                   className={`px-4 py-2 rounded-lg transition-colors ${
-                    page === 'predictor'
+                    page === 'league-analyzer'
                       ? 'bg-green-600 text-white'
                       : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                   }`}
                 >
-                  Predictor
-                </button>
-                <button
-                  onClick={() => setPage('compare')}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    page === 'compare'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  }`}
-                >
-                  Compare
+                  League Analyzer
                 </button>
                 <button
                   onClick={() => setPage('live')}
@@ -98,10 +76,8 @@ function App() {
           </div>
         </header>
         <main className="container mx-auto px-4 py-8">
-          {page === 'home' && <Home />}
           {page === 'team-analyzer' && <TeamAnalyzer />}
-          {page === 'predictor' && <Predictor />}
-          {page === 'compare' && <Compare />}
+          {page === 'league-analyzer' && <LeagueAnalyzer />}
           {page === 'live' && <Live />}
           {page === 'planner' && <Planner />}
         </main>
