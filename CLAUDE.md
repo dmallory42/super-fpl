@@ -60,12 +60,52 @@ php -l api/src/Services/SomeService.php
 
 ## Testing
 
+**IMPORTANT: Use Test-Driven Development (TDD) for all new features.**
+
+1. Write tests BEFORE implementing new functionality
+2. Run tests to verify they fail (red)
+3. Implement the minimum code to pass tests (green)
+4. Refactor while keeping tests green
+
+For bug fixes, write a failing test that reproduces the bug first, then fix it.
+
+### Running Tests
+
 ```bash
 # Backend tests (PHPUnit)
 cd api && ./vendor/bin/phpunit
 
-# Frontend tests
+# Frontend tests (Vitest)
 cd frontend && npm test
+
+# Run specific test file
+cd api && ./vendor/bin/phpunit tests/Services/GameweekServiceTest.php
+cd frontend && npm test -- src/hooks/useLive.test.tsx
+```
+
+### Test Coverage Requirements
+
+- **New API endpoints**: Add service tests in `api/tests/Services/`
+- **New React components**: Add component tests with `@testing-library/react`
+- **New hooks**: Test conditional fetching and data transformation
+- **Utility functions**: Unit test all pure functions
+
+### Test Structure
+
+```php
+// Backend: api/tests/Services/ExampleServiceTest.php
+class ExampleServiceTest extends TestCase {
+    protected function setUp(): void {
+        $this->db = new Database(':memory:');
+        // Create schema and test data
+    }
+}
+```
+
+```typescript
+// Frontend: src/components/Example.test.tsx
+import { render, screen } from '../test/utils'
+// Use custom render with QueryClientProvider
 ```
 
 ## Key Features
