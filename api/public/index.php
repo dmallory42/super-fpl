@@ -65,6 +65,7 @@ try {
         $uri === '/players' => handlePlayers($db),
         $uri === '/players/enhanced' => handlePlayersEnhanced($db),
         $uri === '/fixtures' => handleFixtures($db),
+        $uri === '/gameweek/current' => handleCurrentGameweek($db),
         $uri === '/teams' => handleTeams($db),
         $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
         $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
@@ -253,13 +254,58 @@ function handleSyncManagers(Database $db, FplClient $fplClient): void
 
 function handlePredictions(Database $db, int $gameweek): void
 {
+    $gwService = new \SuperFPL\Api\Services\GameweekService($db);
+    $currentGw = $gwService->getCurrentGameweek();
+
+    // Don't predict for past gameweeks
+    if ($gameweek < $currentGw) {
+        http_response_code(400);
+        echo json_encode([
+            'error' => 'Cannot predict for past gameweeks',
+            'requested_gameweek' => $gameweek,
+            'current_gameweek' => $currentGw,
+        ]);
+        return;
+    }
+
     $service = new PredictionService($db);
     $predictions = $service->getPredictions($gameweek);
 
     echo json_encode([
         'gameweek' => $gameweek,
+        'current_gameweek' => $currentGw,
         'predictions' => $predictions,
         'generated_at' => date('c'),
+    ]);
+}
+
+function handleCurrentGameweek(Database $db): void
+{
+    $service = new \SuperFPL\Api\Services\GameweekService($db);
+    $current = $service->getCurrentGameweek();
+    $upcoming = $service->getUpcomingGameweeks(6);
+    $fixtureCounts = $service->getFixtureCounts($upcoming);
+
+    // Find DGW and BGW teams
+    $dgwTeams = [];
+    $bgwTeams = [];
+    foreach ($upcoming as $gw) {
+        $dgw = $service->getDoubleGameweekTeams($gw);
+        $bgw = $service->getBlankGameweekTeams($gw);
+        if (!empty($dgw)) {
+            $dgwTeams[$gw] = $dgw;
+        }
+        if (!empty($bgw)) {
+            $bgwTeams[$gw] = $bgw;
+        }
+    }
+
+    echo json_encode([
+        'current_gameweek' => $current,
+        'upcoming_gameweeks' => $upcoming,
+        'fixture_counts' => $fixtureCounts,
+        'double_gameweek_teams' => $dgwTeams,
+        'blank_gameweek_teams' => $bgwTeams,
     ]);
 }
 
