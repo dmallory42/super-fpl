@@ -6,6 +6,7 @@ namespace SuperFPL\Api\Services;
 
 use SuperFPL\Api\Database;
 use SuperFPL\FplClient\FplClient;
+use SuperFPL\FplClient\ParallelHttpClient;
 
 /**
  * Service for sampling managers and calculating effective ownership across tiers.
@@ -20,13 +21,17 @@ class SampleService
     ];
 
     private const SAMPLE_SIZE = 2000;
-    private const CACHE_TTL = 300; // 5 minutes for computed data
+    private const PARALLEL_BATCH_SIZE = 50;
+
+    private ParallelHttpClient $parallelClient;
 
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient,
         private readonly string $cacheDir
-    ) {}
+    ) {
+        $this->parallelClient = new ParallelHttpClient('https://fantasy.premierleague.com/api');
+    }
 
     /**
      * Get sample data for a gameweek including EO and average points.
@@ -138,24 +143,26 @@ class SampleService
 
     /**
      * Sample managers for a gameweek and store their picks.
-     * Should be called 75 minutes after GW deadline.
+     * Uses parallel fetching for speed.
      */
     public function sampleManagersForGameweek(int $gameweek): array
     {
         $results = [];
 
         foreach (self::TIERS as $tier => $rankRange) {
-            $count = $this->sampleTier($gameweek, $tier, $rankRange);
+            echo "Sampling {$tier}...\n";
+            $count = $this->sampleTierParallel($gameweek, $tier, $rankRange);
             $results[$tier] = $count;
+            echo "  Sampled {$count} managers for {$tier}\n";
         }
 
         return $results;
     }
 
     /**
-     * Sample managers for a specific tier using the overall standings API.
+     * Sample managers for a specific tier using parallel fetching.
      */
-    private function sampleTier(int $gameweek, string $tier, array $rankRange): int
+    private function sampleTierParallel(int $gameweek, string $tier, array $rankRange): int
     {
         // Clear existing samples for this tier/gameweek
         $this->db->query(
@@ -166,27 +173,39 @@ class SampleService
         $minRank = $rankRange['min_rank'];
         $maxRank = $rankRange['max_rank'];
 
-        // Get manager IDs from overall standings at random pages within rank range
+        // Get manager IDs from overall standings
         $managerIds = $this->getManagerIdsByRank($minRank, $maxRank, self::SAMPLE_SIZE);
+        echo "  Found " . count($managerIds) . " manager IDs\n";
 
-        $sampled = 0;
+        if (empty($managerIds)) {
+            return 0;
+        }
+
+        // Build endpoints for parallel fetch
+        $endpoints = [];
         foreach ($managerIds as $entryId) {
-            try {
-                $picks = $this->fplClient->entry($entryId)->picks($gameweek);
+            $endpoints[$entryId] = "/entry/{$entryId}/event/{$gameweek}/picks/";
+        }
 
-                if (!empty($picks['picks'])) {
-                    $this->storeManagerPicks($gameweek, $tier, $entryId, $picks['picks']);
-                    $sampled++;
-                }
-            } catch (\Throwable $e) {
-                // Entry doesn't exist or API error, continue
+        // Fetch all picks in parallel batches
+        $responses = $this->parallelClient->getBatch(array_values($endpoints));
+
+        // Process responses and store picks
+        $sampled = 0;
+        $endpointToManager = array_flip($endpoints);
+
+        foreach ($responses as $endpoint => $data) {
+            if ($data === null || empty($data['picks'])) {
                 continue;
             }
 
-            // Rate limiting - be gentle with FPL API
-            if ($sampled % 50 === 0) {
-                usleep(200000); // 200ms pause every 50 requests
+            $managerId = $endpointToManager[$endpoint] ?? null;
+            if ($managerId === null) {
+                continue;
             }
+
+            $this->storeManagerPicks($gameweek, $tier, (int) $managerId, $data['picks']);
+            $sampled++;
         }
 
         return $sampled;
@@ -207,42 +226,52 @@ class SampleService
         $startPage = (int) ceil($minRank / $pageSize);
         $endPage = (int) ceil($maxRank / $pageSize);
 
-        // Sample random pages within the range to get diverse managers
-        $pagesToSample = min($count / 10, $endPage - $startPage + 1); // ~10 managers per page sample
-        $sampledPages = [];
+        // For large ranges, sample random pages
+        $totalPages = $endPage - $startPage + 1;
+        $pagesToSample = min((int) ceil($count / 10), $totalPages, 100); // Cap at 100 pages
 
-        for ($i = 0; $i < $pagesToSample && count($managerIds) < $count; $i++) {
-            // Pick a random page in range
-            $page = random_int($startPage, $endPage);
-
-            // Avoid re-sampling same page
-            if (in_array($page, $sampledPages)) {
-                continue;
-            }
-            $sampledPages[] = $page;
-
-            try {
-                // Use overall league standings (league 314 is the overall FPL league)
-                $standings = $this->fplClient->league(314)->standings($page);
-                $results = $standings['standings']['results'] ?? [];
-
-                foreach ($results as $result) {
-                    $rank = $result['rank'] ?? 0;
-                    if ($rank >= $minRank && $rank <= $maxRank) {
-                        $managerIds[] = $result['entry'];
-                    }
-
-                    if (count($managerIds) >= $count) {
-                        break 2;
-                    }
+        // Generate random unique page numbers
+        $pages = [];
+        if ($totalPages <= $pagesToSample) {
+            $pages = range($startPage, $endPage);
+        } else {
+            while (count($pages) < $pagesToSample) {
+                $page = random_int($startPage, $endPage);
+                if (!in_array($page, $pages)) {
+                    $pages[] = $page;
                 }
-            } catch (\Throwable $e) {
-                // API error, continue with other pages
+            }
+        }
+
+        // Build endpoints for parallel fetch
+        $endpoints = [];
+        foreach ($pages as $page) {
+            $endpoints[$page] = "/leagues-classic/314/standings/?page_standings={$page}";
+        }
+
+        echo "  Fetching " . count($endpoints) . " standing pages in parallel...\n";
+
+        // Fetch all pages in parallel
+        $responses = $this->parallelClient->getBatch(array_values($endpoints));
+
+        // Extract manager IDs from responses
+        $endpointToPage = array_flip($endpoints);
+        foreach ($responses as $endpoint => $data) {
+            if ($data === null) {
                 continue;
             }
 
-            // Rate limit standings requests
-            usleep(100000); // 100ms between page requests
+            $results = $data['standings']['results'] ?? [];
+            foreach ($results as $result) {
+                $rank = $result['rank'] ?? 0;
+                if ($rank >= $minRank && $rank <= $maxRank) {
+                    $managerIds[] = $result['entry'];
+                }
+
+                if (count($managerIds) >= $count) {
+                    break 2;
+                }
+            }
         }
 
         // Shuffle to randomize order
