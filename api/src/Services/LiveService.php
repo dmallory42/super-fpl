@@ -116,6 +116,97 @@ class LiveService
     }
 
     /**
+     * Get manager live data with real effective ownership from sampled data.
+     *
+     * @return array<string, mixed>
+     */
+    public function getManagerLivePointsEnhanced(
+        int $managerId,
+        int $gameweek,
+        OwnershipService $ownershipService
+    ): array {
+        $baseData = $this->getManagerLivePoints($managerId, $gameweek);
+
+        if (isset($baseData['error'])) {
+            return $baseData;
+        }
+
+        // Get real EO data
+        $eoData = $ownershipService->getEffectiveOwnership($gameweek, 100);
+        $effectiveOwnership = $eoData['effective_ownership'] ?? [];
+
+        // Get player info for enrichment
+        $players = $this->db->fetchAll("SELECT id, web_name, club_id as team, position as element_type FROM players");
+        $playerMap = [];
+        foreach ($players as $p) {
+            $playerMap[(int)$p['id']] = $p;
+        }
+
+        // Enrich each player with EO data
+        foreach ($baseData['players'] as &$player) {
+            $playerId = (int) $player['player_id'];
+            $playerInfo = $playerMap[$playerId] ?? null;
+
+            // Add player info
+            if ($playerInfo) {
+                $player['web_name'] = $playerInfo['web_name'];
+                $player['team'] = (int) $playerInfo['team'];
+                $player['element_type'] = (int) $playerInfo['element_type'];
+            }
+
+            // Add EO data
+            $eo = $effectiveOwnership[$playerId] ?? null;
+            if ($eo) {
+                $player['effective_ownership'] = [
+                    'ownership_percent' => $eo['ownership_percent'],
+                    'captain_percent' => $eo['captain_percent'],
+                    'effective_ownership' => $eo['effective_ownership'],
+                ];
+
+                // Calculate points swing (positive = hurts your rank, negative = helps)
+                $points = $player['effective_points'] ?? 0;
+                $player['effective_ownership']['points_swing'] = round(
+                    $points * ($eo['effective_ownership'] / 100),
+                    2
+                );
+            } else {
+                $player['effective_ownership'] = [
+                    'ownership_percent' => 0,
+                    'captain_percent' => 0,
+                    'effective_ownership' => 0,
+                    'points_swing' => 0,
+                ];
+            }
+        }
+
+        // Calculate rank impact summary
+        $totalSwing = 0;
+        $differentialPoints = 0;
+
+        foreach ($baseData['players'] as $player) {
+            if ($player['is_playing'] ?? false) {
+                $eo = $player['effective_ownership'];
+                $totalSwing += $eo['points_swing'] ?? 0;
+
+                // Differential = points from players with <10% EO
+                if (($eo['effective_ownership'] ?? 0) < 10) {
+                    $differentialPoints += $player['effective_points'] ?? 0;
+                }
+            }
+        }
+
+        $baseData['rank_impact'] = [
+            'total_points_swing' => round($totalSwing, 1),
+            'differential_points' => $differentialPoints,
+            'template_score' => $baseData['total_points'] - $differentialPoints,
+        ];
+
+        $baseData['eo_sample_size'] = $eoData['sample_size'] ?? 0;
+
+        return $baseData;
+    }
+
+    /**
      * Get bonus point predictions based on BPS.
      *
      * @return array<int, array{player_id: int, bps: int, predicted_bonus: int}>
