@@ -7,11 +7,27 @@ Fantasy Premier League analytics application with a PHP backend API and React/Ty
 ## Quick Start
 
 ```bash
-# Start all services
-cd /Users/mal/projects/super-fpl
-docker-compose up -d        # API at http://localhost:8080
-cd frontend && npm run dev  # Frontend at http://localhost:5173
+cd /Users/mal/projects/personal/superfpl
+
+# First time setup
+npm install                    # Install all deps (frontend via workspaces)
+npm run up:build               # Build containers, install PHP deps, start dev server
+
+# Daily development
+npm run up                     # Start API + frontend dev server
+npm run down                   # Stop API containers
 ```
+
+| Command | Description |
+|---------|-------------|
+| `npm run up` | Start API containers + frontend dev server |
+| `npm run up:build` | Rebuild containers + start (use after Dockerfile changes) |
+| `npm run down` | Stop API containers |
+| `npm run api` | Start only API containers |
+| `npm run api:logs` | Tail API container logs |
+| `npm run dev` | Start only frontend dev server |
+
+The Docker entrypoint automatically runs `composer install` if the vendor directory is missing.
 
 ## Project Structure
 
@@ -33,6 +49,79 @@ super-fpl/
 │   └── fpl-client/         # FPL API client library
 └── deploy/                 # Docker/nginx configs
 ```
+
+## Visual Identity
+
+The frontend uses a **sports broadcast aesthetic** inspired by Sky Sports MNF and ESPN analysis graphics. Maintain this identity in all UI work.
+
+### Design Principles
+- **Bold & Athletic**: Condensed uppercase typography, angular elements, confident layouts
+- **Vibrant & Dynamic**: FPL green accents, gradient highlights, animated reveals
+- **Broadcast-Style**: Cards with accent bars, stat panels, layered depth
+
+### Typography
+```css
+--font-display: 'Oswald'      /* Headlines, labels - UPPERCASE, tracking-wider */
+--font-body: 'Source Sans 3'  /* Body text, descriptions */
+--font-mono: 'JetBrains Mono' /* Stats, numbers, prices */
+```
+
+### Color Palette
+| Variable | Value | Usage |
+|----------|-------|-------|
+| `--fpl-green` | `#00FF87` | Primary accent, highlights, success states, player cards |
+| `--fpl-purple` | Purple 280° | Secondary accent, chips, special features |
+| `--highlight` | Hot pink 340° | Emphasis, warnings |
+| `yellow-400` | Yellow | Captain badges |
+
+**Note:** All player cards use unified FPL green styling regardless of position. This creates a cohesive brand look rather than position-based color coding.
+
+### UI Components (`frontend/src/components/ui/`)
+- `StatPanel` - Angular stat display with accent bar, use for key metrics
+- `BroadcastCard` - Card with gradient header bar, use for sections
+- `GradientText` - Gradient-filled text for headlines
+- `LiveIndicator` - Animated red dot for live features
+- `TabNav` - Broadcast-style navigation tabs
+- `EmptyState` - Illustrated empty states with icons
+- `SkeletonLoader` - Shimmer loading placeholders
+
+### Animation Guidelines
+- Entry animations: `animate-fade-in-up` with staggered `animation-delay-*` classes
+- Captain badges: `animate-pulse-glow` for emphasis
+- Live elements: `animate-pulse-dot` for indicators
+- Loading: `animate-shimmer` for skeleton states
+- Use 50-100ms delays between staggered elements
+
+### Styling Patterns
+```tsx
+// Headlines - always uppercase with tracking
+<h2 className="font-display text-2xl font-bold tracking-wider uppercase">
+
+// Stats - mono font, gradient for highlights
+<span className="font-mono text-2xl font-bold">
+<GradientText>{value}</GradientText>
+
+// Inputs
+<input className="input-broadcast" />
+
+// Buttons
+<button className="btn-primary">  // Green gradient, uppercase
+<button className="btn-secondary"> // Surface with border
+
+// Cards with sections
+<BroadcastCard title="Section Title" accentColor="green">
+
+// Player cards - unified green styling
+<div className="bg-gradient-to-b from-fpl-green to-emerald-600">
+// Captain badges use yellow-400
+```
+
+### Don'ts
+- Don't use rounded-full for cards (use rounded-lg)
+- Don't use muted grays for primary actions
+- Don't skip entry animations on data-heavy sections
+- Don't mix font families within a single element
+- Don't use generic green (#22c55e) - use `fpl-green` for brand consistency
 
 ## Code Conventions
 

@@ -7,6 +7,11 @@
     "frontend"
   ],
   "scripts": {
+    "up": "docker-compose up -d && npm run dev",
+    "up:build": "docker-compose up -d --build && npm run dev",
+    "down": "docker-compose down",
+    "api": "docker-compose up -d",
+    "api:logs": "docker-compose logs -f",
     "dev": "cd frontend && npm run dev",
     "build": "cd frontend && npm run build",
     "preview": "cd frontend && npm run preview",
