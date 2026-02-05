@@ -24,7 +24,8 @@ class TransferService
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
-    ) {}
+    ) {
+    }
 
     /**
      * Get transfer suggestions for a manager.
@@ -194,7 +195,9 @@ class TransferService
 
         foreach ($predictions as $pred) {
             $player = $this->getPlayerInfo($pred['player_id']);
-            if (!$player) continue;
+            if (!$player) {
+                continue;
+            }
 
             // Apply position filter
             if ($position !== null && $player['position'] !== $position) {

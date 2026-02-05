@@ -1,5 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchTransferSuggestions, fetchTransferTargets, fetchTransferSimulate } from '../api/client'
+import {
+  fetchTransferSuggestions,
+  fetchTransferTargets,
+  fetchTransferSimulate,
+} from '../api/client'
 
 export function useTransferSuggestions(managerId: number | null, gameweek?: number, transfers = 1) {
   return useQuery({

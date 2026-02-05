@@ -12,14 +12,17 @@ class FixtureSync
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
-    ) {}
+    ) {
+    }
 
     /**
      * Sync fixtures from FPL API.
+     * Always bypasses cache to get fresh data.
      */
     public function sync(): int
     {
-        $fixtures = $this->fplClient->fixtures()->getRaw();
+        // Bypass cache to always get fresh fixture data
+        $fixtures = $this->fplClient->fixtures()->getRaw(gameweek: null, useCache: false);
         $count = 0;
 
         foreach ($fixtures as $fixture) {

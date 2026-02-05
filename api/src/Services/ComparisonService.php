@@ -16,7 +16,8 @@ class ComparisonService
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
-    ) {}
+    ) {
+    }
 
     /**
      * Compare multiple managers for a specific gameweek.

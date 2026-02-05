@@ -10,7 +10,8 @@ class TeamService
 {
     public function __construct(
         private readonly Database $db
-    ) {}
+    ) {
+    }
 
     /**
      * Get all teams/clubs.

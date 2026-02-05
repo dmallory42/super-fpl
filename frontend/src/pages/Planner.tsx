@@ -37,21 +37,25 @@ export function Planner() {
   const [chipPlan, setChipPlan] = useState<ChipPlan>({})
 
   const { data: playersData } = usePlayers()
-  const { data: suggestions, isLoading: isLoadingSuggestions, error: suggestionsError } = useTransferSuggestions(
-    managerId,
+  const {
+    data: suggestions,
+    isLoading: isLoadingSuggestions,
+    error: suggestionsError,
+  } = useTransferSuggestions(managerId, gameweek, transferCount)
+  const { data: targets, isLoading: isLoadingTargets } = useTransferTargets(
     gameweek,
-    transferCount
+    positionFilter,
+    maxPriceFilter
   )
-  const { data: targets, isLoading: isLoadingTargets } = useTransferTargets(gameweek, positionFilter, maxPriceFilter)
-  const { data: optimizeData, isLoading: isLoadingOptimize, error: optimizeError } = usePlannerOptimize(
-    managerId,
-    freeTransfers,
-    chipPlan
-  )
+  const {
+    data: optimizeData,
+    isLoading: isLoadingOptimize,
+    error: optimizeError,
+  } = usePlannerOptimize(managerId, freeTransfers, chipPlan)
 
   const teamsMap = useMemo(() => {
     if (!playersData?.teams) return new Map<number, string>()
-    return new Map(playersData.teams.map(t => [t.id, t.short_name]))
+    return new Map(playersData.teams.map((t) => [t.id, t.short_name]))
   }, [playersData?.teams])
 
   const handleLoadManager = () => {
@@ -62,7 +66,7 @@ export function Planner() {
   }
 
   const setChipWeek = (chip: keyof ChipPlan, gw: number | undefined) => {
-    setChipPlan(prev => {
+    setChipPlan((prev) => {
       const next = { ...prev }
       if (gw === undefined) {
         delete next[chip]
@@ -81,7 +85,8 @@ export function Planner() {
           Transfer Planner
         </h2>
         <p className="text-foreground-muted text-sm mb-4">
-          Get multi-week transfer optimization, chip timing suggestions, and transfer recommendations.
+          Get multi-week transfer optimization, chip timing suggestions, and transfer
+          recommendations.
         </p>
       </div>
 
@@ -115,8 +120,10 @@ export function Planner() {
             onChange={(e) => setFreeTransfers(parseInt(e.target.value, 10))}
             className="input-broadcast"
           >
-            {[1, 2, 3, 4, 5].map(n => (
-              <option key={n} value={n}>{n} FT</option>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n} FT
+              </option>
             ))}
           </select>
         </div>
@@ -163,11 +170,7 @@ export function Planner() {
                   value={`£${optimizeData.current_squad.bank.toFixed(1)}m`}
                   animationDelay={50}
                 />
-                <StatPanel
-                  label="Free Transfers"
-                  value={freeTransfers}
-                  animationDelay={100}
-                />
+                <StatPanel label="Free Transfers" value={freeTransfers} animationDelay={100} />
                 <StatPanel
                   label={`Predicted (Next ${optimizeData.planning_horizon.length} GWs)`}
                   value={`${optimizeData.current_squad.predicted_points.total} pts`}
@@ -192,7 +195,8 @@ export function Planner() {
                         style={{ animationDelay: `${250 + idx * 50}ms` }}
                       >
                         <div className="text-xs text-foreground-muted font-display uppercase">
-                          GW{gw}{hasDgw && ' (DGW)'}
+                          GW{gw}
+                          {hasDgw && ' (DGW)'}
                         </div>
                         <div className="text-xl font-mono font-bold text-foreground">{pts}</div>
                       </div>
@@ -204,40 +208,48 @@ export function Planner() {
               {/* Chip Planning */}
               <BroadcastCard title="Chip Planning" accentColor="purple" animationDelay={300}>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {(['wildcard', 'bench_boost', 'free_hit', 'triple_captain'] as const).map((chip, idx) => {
-                    const suggestion = optimizeData.chip_suggestions[chip]
-                    const fixedGw = chipPlan[chip]
+                  {(['wildcard', 'bench_boost', 'free_hit', 'triple_captain'] as const).map(
+                    (chip, idx) => {
+                      const suggestion = optimizeData.chip_suggestions[chip]
+                      const fixedGw = chipPlan[chip]
 
-                    return (
-                      <div
-                        key={chip}
-                        className="space-y-2 animate-fade-in-up opacity-0"
-                        style={{ animationDelay: `${350 + idx * 50}ms` }}
-                      >
-                        <label className="font-display text-xs uppercase tracking-wider text-foreground">
-                          {chipLabels[chip]}
-                        </label>
-                        <select
-                          value={fixedGw ?? ''}
-                          onChange={(e) => setChipWeek(chip, e.target.value ? parseInt(e.target.value, 10) : undefined)}
-                          className="input-broadcast"
+                      return (
+                        <div
+                          key={chip}
+                          className="space-y-2 animate-fade-in-up opacity-0"
+                          style={{ animationDelay: `${350 + idx * 50}ms` }}
                         >
-                          <option value="">Not planned</option>
-                          {optimizeData.planning_horizon.map(gw => (
-                            <option key={gw} value={gw}>
-                              GW{gw} {suggestion?.gameweek === gw ? '(Suggested)' : ''}
-                            </option>
-                          ))}
-                        </select>
-                        {suggestion && !fixedGw && (
-                          <div className="text-xs text-fpl-green">
-                            Suggested: GW{suggestion.gameweek} (+{suggestion.estimated_value.toFixed(1)} pts)
-                            {suggestion.has_dgw && ' - DGW'}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                          <label className="font-display text-xs uppercase tracking-wider text-foreground">
+                            {chipLabels[chip]}
+                          </label>
+                          <select
+                            value={fixedGw ?? ''}
+                            onChange={(e) =>
+                              setChipWeek(
+                                chip,
+                                e.target.value ? parseInt(e.target.value, 10) : undefined
+                              )
+                            }
+                            className="input-broadcast"
+                          >
+                            <option value="">Not planned</option>
+                            {optimizeData.planning_horizon.map((gw) => (
+                              <option key={gw} value={gw}>
+                                GW{gw} {suggestion?.gameweek === gw ? '(Suggested)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                          {suggestion && !fixedGw && (
+                            <div className="text-xs text-fpl-green">
+                              Suggested: GW{suggestion.gameweek} (+
+                              {suggestion.estimated_value.toFixed(1)} pts)
+                              {suggestion.has_dgw && ' - DGW'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+                  )}
                 </div>
               </BroadcastCard>
 
@@ -249,9 +261,10 @@ export function Planner() {
                       key={idx}
                       className={`
                         p-4 rounded-lg border animate-fade-in-up opacity-0
-                        ${rec.recommended
-                          ? 'border-fpl-green/30 bg-fpl-green/5'
-                          : 'border-border bg-surface-elevated'
+                        ${
+                          rec.recommended
+                            ? 'border-fpl-green/30 bg-fpl-green/5'
+                            : 'border-border bg-surface-elevated'
                         }
                       `}
                       style={{ animationDelay: `${450 + idx * 50}ms` }}
@@ -260,9 +273,13 @@ export function Planner() {
                         <div className="flex items-center gap-4 flex-1">
                           {/* Out player */}
                           <div className="text-center min-w-[100px]">
-                            <div className="text-xs text-destructive font-display uppercase tracking-wider mb-1">Out</div>
+                            <div className="text-xs text-destructive font-display uppercase tracking-wider mb-1">
+                              Out
+                            </div>
                             <div className="text-foreground font-bold">{rec.out.web_name}</div>
-                            <div className="text-foreground-muted text-sm">{teamsMap.get(rec.out.team)}</div>
+                            <div className="text-foreground-muted text-sm">
+                              {teamsMap.get(rec.out.team)}
+                            </div>
                             <div className="text-foreground-dim text-xs font-mono">
                               £{rec.out.price.toFixed(1)}m · {rec.out.total_predicted} pts
                             </div>
@@ -272,9 +289,13 @@ export function Planner() {
 
                           {/* In player */}
                           <div className="text-center min-w-[100px]">
-                            <div className="text-xs text-fpl-green font-display uppercase tracking-wider mb-1">In</div>
+                            <div className="text-xs text-fpl-green font-display uppercase tracking-wider mb-1">
+                              In
+                            </div>
                             <div className="text-foreground font-bold">{rec.in.web_name}</div>
-                            <div className="text-foreground-muted text-sm">{teamsMap.get(rec.in.team)}</div>
+                            <div className="text-foreground-muted text-sm">
+                              {teamsMap.get(rec.in.team)}
+                            </div>
                             <div className="text-foreground-dim text-xs font-mono">
                               £{rec.in.price.toFixed(1)}m · {rec.in.total_predicted} pts
                             </div>
@@ -283,8 +304,11 @@ export function Planner() {
 
                         {/* Gain summary */}
                         <div className="text-right">
-                          <div className={`text-2xl font-mono font-bold ${rec.net_gain > 0 ? 'text-fpl-green' : 'text-destructive'}`}>
-                            {rec.net_gain > 0 ? '+' : ''}{rec.net_gain} pts
+                          <div
+                            className={`text-2xl font-mono font-bold ${rec.net_gain > 0 ? 'text-fpl-green' : 'text-destructive'}`}
+                          >
+                            {rec.net_gain > 0 ? '+' : ''}
+                            {rec.net_gain} pts
                           </div>
                           <div className="text-xs text-foreground-muted">
                             {rec.is_free ? 'Free transfer' : `${rec.hit_cost} pt hit`}
@@ -321,12 +345,16 @@ export function Planner() {
               </label>
               <select
                 value={gameweek || ''}
-                onChange={(e) => setGameweek(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                onChange={(e) =>
+                  setGameweek(e.target.value ? parseInt(e.target.value, 10) : undefined)
+                }
                 className="input-broadcast"
               >
                 <option value="">Current</option>
-                {Array.from({ length: 38 }, (_, i) => i + 1).map(gw => (
-                  <option key={gw} value={gw}>GW{gw}</option>
+                {Array.from({ length: 38 }, (_, i) => i + 1).map((gw) => (
+                  <option key={gw} value={gw}>
+                    GW{gw}
+                  </option>
                 ))}
               </select>
             </div>
@@ -404,9 +432,12 @@ export function Planner() {
                             <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
                               <div className="flex items-center justify-between">
                                 <div>
-                                  <div className="text-foreground font-medium">{suggestion.out.web_name}</div>
+                                  <div className="text-foreground font-medium">
+                                    {suggestion.out.web_name}
+                                  </div>
                                   <div className="text-xs text-foreground-muted">
-                                    {teamsMap.get(suggestion.out.team)} · {getPositionName(suggestion.out.position)}
+                                    {teamsMap.get(suggestion.out.team)} ·{' '}
+                                    {getPositionName(suggestion.out.position)}
                                   </div>
                                 </div>
                                 <div className="text-right">
@@ -441,7 +472,9 @@ export function Planner() {
                                   className="p-3 bg-fpl-green/10 border border-fpl-green/30 rounded-lg flex items-center justify-between"
                                 >
                                   <div>
-                                    <div className="text-foreground font-medium">{player.web_name}</div>
+                                    <div className="text-foreground font-medium">
+                                      {player.web_name}
+                                    </div>
                                     <div className="text-xs text-foreground-muted">
                                       {teamsMap.get(player.team)} · Form: {player.form.toFixed(1)}
                                     </div>
@@ -507,7 +540,9 @@ export function Planner() {
           <div className="flex gap-4 animate-fade-in-up animation-delay-200">
             <select
               value={positionFilter || ''}
-              onChange={(e) => setPositionFilter(e.target.value ? parseInt(e.target.value, 10) : undefined)}
+              onChange={(e) =>
+                setPositionFilter(e.target.value ? parseInt(e.target.value, 10) : undefined)
+              }
               className="input-broadcast w-auto"
             >
               <option value="">All Positions</option>
@@ -519,7 +554,9 @@ export function Planner() {
 
             <select
               value={maxPriceFilter || ''}
-              onChange={(e) => setMaxPriceFilter(e.target.value ? parseFloat(e.target.value) : undefined)}
+              onChange={(e) =>
+                setMaxPriceFilter(e.target.value ? parseFloat(e.target.value) : undefined)
+              }
               className="input-broadcast w-auto"
             >
               <option value="">Any Price</option>
@@ -556,7 +593,9 @@ export function Planner() {
                       >
                         <td>
                           <div className="text-foreground">{target.web_name}</div>
-                          <div className="text-xs text-foreground-dim">{teamsMap.get(target.team)}</div>
+                          <div className="text-xs text-foreground-dim">
+                            {teamsMap.get(target.team)}
+                          </div>
                         </td>
                         <td className="text-center text-foreground-muted font-mono">
                           {getPositionName(target.position)}

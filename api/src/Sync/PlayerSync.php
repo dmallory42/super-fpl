@@ -12,7 +12,8 @@ class PlayerSync
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
-    ) {}
+    ) {
+    }
 
     /**
      * Sync players and teams from FPL API.
@@ -92,6 +93,9 @@ class PlayerSync
                 'starts' => $player['starts'] ?? 0,
                 'chance_of_playing' => $player['chance_of_playing_next_round'],
                 'news' => $player['news'] ?? '',
+                'defensive_contribution' => $player['defensive_contribution'] ?? 0,
+                'defensive_contribution_per_90' => $this->calculatePer90($player['defensive_contribution'] ?? 0, $player['minutes'] ?? 0),
+                'saves' => $player['saves'] ?? 0,
                 'updated_at' => date('Y-m-d H:i:s'),
             ], ['id']);
 
@@ -99,5 +103,16 @@ class PlayerSync
         }
 
         return $count;
+    }
+
+    /**
+     * Calculate a stat per 90 minutes.
+     */
+    private function calculatePer90(int|float $stat, int $minutes): float
+    {
+        if ($minutes <= 0) {
+            return 0.0;
+        }
+        return round(($stat / $minutes) * 90, 2);
     }
 }

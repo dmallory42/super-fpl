@@ -3,7 +3,11 @@ import { render, screen } from '../../test/utils'
 import { RiskMeter } from './RiskMeter'
 import type { RiskScore } from '../../api/client'
 
-const createRiskScore = (score: number, level: 'low' | 'medium' | 'high', captainRisk: number): RiskScore => ({
+const createRiskScore = (
+  score: number,
+  level: 'low' | 'medium' | 'high',
+  captainRisk: number
+): RiskScore => ({
   score,
   level,
   breakdown: {

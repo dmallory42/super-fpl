@@ -18,7 +18,8 @@ class LiveService
         private readonly Database $db,
         private readonly FplClient $fplClient,
         private readonly string $cacheDir
-    ) {}
+    ) {
+    }
 
     /**
      * Get live data for a gameweek.

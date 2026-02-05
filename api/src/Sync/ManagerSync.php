@@ -12,7 +12,8 @@ class ManagerSync
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
-    ) {}
+    ) {
+    }
 
     /**
      * Sync a single manager's data including current GW picks.

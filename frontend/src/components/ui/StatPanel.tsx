@@ -59,17 +59,13 @@ export function StatPanel({
             {value}
           </span>
           {trend && (
-            <span className={`text-xs font-medium ${trendColors[trend]}`}>
-              {trendIcons[trend]}
-            </span>
+            <span className={`text-xs font-medium ${trendColors[trend]}`}>{trendIcons[trend]}</span>
           )}
         </div>
         <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mt-1">
           {label}
         </div>
-        {subValue && (
-          <div className="text-xs text-foreground-dim mt-0.5">{subValue}</div>
-        )}
+        {subValue && <div className="text-xs text-foreground-dim mt-0.5">{subValue}</div>}
       </div>
     </div>
   )
@@ -81,9 +77,5 @@ interface StatPanelGridProps {
 }
 
 export function StatPanelGrid({ children, className = '' }: StatPanelGridProps) {
-  return (
-    <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 ${className}`}>
-      {children}
-    </div>
-  )
+  return <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 ${className}`}>{children}</div>
 }

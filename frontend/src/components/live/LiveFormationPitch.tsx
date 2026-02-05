@@ -21,8 +21,8 @@ export function LiveFormationPitch({
   const { starting, bench } = useMemo(() => {
     const sorted = [...players].sort((a, b) => a.position - b.position)
     return {
-      starting: sorted.filter(p => p.position <= 11),
-      bench: sorted.filter(p => p.position > 11),
+      starting: sorted.filter((p) => p.position <= 11),
+      bench: sorted.filter((p) => p.position > 11),
     }
   }, [players])
 
@@ -38,15 +38,23 @@ export function LiveFormationPitch({
       const elementType = info?.element_type ?? 3
 
       switch (elementType) {
-        case 1: gk.push(player); break
-        case 2: def.push(player); break
-        case 3: mid.push(player); break
-        case 4: fwd.push(player); break
+        case 1:
+          gk.push(player)
+          break
+        case 2:
+          def.push(player)
+          break
+        case 3:
+          mid.push(player)
+          break
+        case 4:
+          fwd.push(player)
+          break
       }
     }
 
-    // Order: FWD at top (attacking end), then MID, DEF, GK at bottom
-    return [fwd, mid, def, gk]
+    // Order: GK at top, then DEF, MID, FWD at bottom
+    return [gk, def, mid, fwd]
   }, [starting, playersInfo])
 
   // Get player's fixture status
@@ -56,7 +64,7 @@ export function LiveFormationPitch({
 
     const teamId = info.team
     const fixture = fixtureData.fixtures.find(
-      f => f.home_club_id === teamId || f.away_club_id === teamId
+      (f) => f.home_club_id === teamId || f.away_club_id === teamId
     )
 
     if (!fixture) return { status: 'unknown' }
@@ -74,8 +82,8 @@ export function LiveFormationPitch({
       <div className="absolute left-1/2 top-4 bottom-4 w-px bg-white/10 pointer-events-none" />
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/10 rounded-full pointer-events-none" />
 
-      {/* Goal area at bottom */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-32 h-12 border-t-2 border-x-2 border-white/10 rounded-t-lg pointer-events-none" />
+      {/* Goal area at top */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-12 border-b-2 border-x-2 border-white/10 rounded-b-lg pointer-events-none" />
 
       {/* Formation display */}
       <div className="relative z-10 flex flex-col gap-6 py-4">
@@ -83,7 +91,7 @@ export function LiveFormationPitch({
           <div key={rowIndex} className="flex justify-center gap-2 md:gap-4">
             {row.map((player) => {
               const info = playersInfo.get(player.player_id)
-              const teamName = info?.team ? teamsInfo.get(info.team) ?? '???' : '???'
+              const teamName = info?.team ? (teamsInfo.get(info.team) ?? '???') : '???'
               const { status, minutes } = getPlayerStatus(player.player_id)
               const delay = animationIndex++ * 50
 
@@ -121,7 +129,7 @@ export function LiveFormationPitch({
         <div className="flex justify-center gap-2 md:gap-4 bg-surface/30 rounded-lg py-3 px-4">
           {bench.map((player, idx) => {
             const info = playersInfo.get(player.player_id)
-            const teamName = info?.team ? teamsInfo.get(info.team) ?? '???' : '???'
+            const teamName = info?.team ? (teamsInfo.get(info.team) ?? '???') : '???'
             const { status, minutes } = getPlayerStatus(player.player_id)
 
             return (

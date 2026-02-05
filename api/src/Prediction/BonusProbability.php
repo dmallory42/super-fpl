@@ -23,13 +23,13 @@ class BonusProbability
         $minutes = (int) ($player['minutes'] ?? 0);
         $position = (int) ($player['position'] ?? $player['element_type'] ?? 3);
 
-        if ($minutes < 90) {
+        if ($minutes < 95) {
             // Not enough data
             return $this->estimateFromPosition($position);
         }
 
-        // Calculate BPS per 90
-        $bpsPer90 = ($bps / $minutes) * 90;
+        // Calculate BPS per 95 (full match with injury time)
+        $bpsPer95 = ($bps / $minutes) * 95;
 
         // Calculate historical bonus per appearance
         $appearances = max(1, floor($minutes / 60));
@@ -37,7 +37,7 @@ class BonusProbability
 
         // Weight towards actual bonus history but use BPS to estimate future
         // Higher BPS indicates more likely to get bonus
-        $expectedBonus = $this->bpsToExpectedBonus($bpsPer90, $position);
+        $expectedBonus = $this->bpsToExpectedBonus($bpsPer95, $position);
 
         // Blend with historical
         return round(($expectedBonus * 0.6) + ($bonusPerGame * 0.4), 2);

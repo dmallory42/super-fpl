@@ -10,7 +10,8 @@ class FixtureService
 {
     public function __construct(
         private readonly Database $db
-    ) {}
+    ) {
+    }
 
     /**
      * Get all fixtures, optionally filtered by gameweek.

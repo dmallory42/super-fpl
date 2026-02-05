@@ -25,7 +25,7 @@ export function useCurrentGameweek() {
     }
   }
 
-  const currentGw = data.gameweeks.find(gw => gw.gameweek === data.current_gameweek)
+  const currentGw = data.gameweeks.find((gw) => gw.gameweek === data.current_gameweek)
 
   const result: CurrentGameweekData = {
     gameweek: data.current_gameweek,
@@ -55,7 +55,7 @@ export function usePlayerFixtureStatus(
   if (!teamId || !gameweekData) return 'unknown'
 
   const fixture = gameweekData.fixtures.find(
-    f => f.home_club_id === teamId || f.away_club_id === teamId
+    (f) => f.home_club_id === teamId || f.away_club_id === teamId
   )
 
   if (!fixture) return 'unknown'

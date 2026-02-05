@@ -10,7 +10,8 @@ class PlayerService
 {
     public function __construct(
         private readonly Database $db
-    ) {}
+    ) {
+    }
 
     /**
      * Get all players with optional filters.

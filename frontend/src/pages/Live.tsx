@@ -1,15 +1,27 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useLiveManager, useLiveBonus } from '../hooks/useLive'
+import { useLiveData, useLiveManager, useLiveBonus } from '../hooks/useLive'
 import { usePlayers } from '../hooks/usePlayers'
 import { useCurrentGameweek } from '../hooks/useCurrentGameweek'
 import { useLiveSamples, calculateComparisons } from '../hooks/useLiveSamples'
+import { usePredictions } from '../hooks/usePredictions'
 import { StatPanel, StatPanelGrid } from '../components/ui/StatPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { LiveIndicator } from '../components/ui/LiveIndicator'
 import { EmptyState, CalendarIcon } from '../components/ui/EmptyState'
-import { SkeletonStatGrid, SkeletonTable, SkeletonPitch } from '../components/ui/SkeletonLoader'
+import { SkeletonStatGrid, SkeletonPitch } from '../components/ui/SkeletonLoader'
 import { LiveFormationPitch } from '../components/live/LiveFormationPitch'
-import { ComparisonBars } from '../components/live/ComparisonBars'
+import {
+  ComparisonBars,
+  type PlayerImpact,
+  type ComparisonTier,
+} from '../components/live/ComparisonBars'
+import { FixtureScores } from '../components/live/FixtureScores'
+import { CaptainBattle } from '../components/live/CaptainBattle'
+import { PlayersRemaining } from '../components/live/PlayersRemaining'
+import { RankProjection } from '../components/live/RankProjection'
+import { VarianceAnalysis } from '../components/live/VarianceAnalysis'
+import { FixtureThreatIndex } from '../components/live/FixtureThreatIndex'
+import { DifferentialAnalysis } from '../components/live/DifferentialAnalysis'
 import type { LiveManagerPlayer } from '../api/client'
 import type { GameweekFixtureStatus } from '../api/client'
 
@@ -33,11 +45,16 @@ function applyAutoSubs(
   players: LiveManagerPlayer[],
   playersInfo: Map<number, PlayerInfo>,
   fixtureData: GameweekFixtureStatus | undefined
-): { players: LiveManagerPlayer[]; totalPoints: number; benchPoints: number; autoSubs: Array<{ out: number; in: number }> } {
+): {
+  players: LiveManagerPlayer[]
+  totalPoints: number
+  benchPoints: number
+  autoSubs: Array<{ out: number; in: number }>
+} {
   if (!fixtureData) {
     // Can't determine match status, return original
-    const starting = players.filter(p => p.position <= 11)
-    const bench = players.filter(p => p.position > 11)
+    const starting = players.filter((p) => p.position <= 11)
+    const bench = players.filter((p) => p.position > 11)
     return {
       players,
       totalPoints: starting.reduce((sum, p) => sum + p.effective_points, 0),
@@ -52,7 +69,7 @@ function applyAutoSubs(
     if (!info) return false
     const teamId = info.team
     const fixture = fixtureData.fixtures.find(
-      f => f.home_club_id === teamId || f.away_club_id === teamId
+      (f) => f.home_club_id === teamId || f.away_club_id === teamId
     )
     return fixture?.finished ?? false
   }
@@ -64,11 +81,11 @@ function applyAutoSubs(
   }
 
   // Clone players array
-  const result = players.map(p => ({ ...p }))
+  const result = players.map((p) => ({ ...p }))
 
   // Separate starting XI and bench
-  const starting = result.filter(p => p.position <= 11)
-  const bench = result.filter(p => p.position > 11).sort((a, b) => a.position - b.position)
+  const starting = result.filter((p) => p.position <= 11)
+  const bench = result.filter((p) => p.position > 11).sort((a, b) => a.position - b.position)
 
   // Track auto-subs made
   const autoSubs: Array<{ out: number; in: number }> = []
@@ -89,30 +106,52 @@ function applyAutoSubs(
     }
 
     // Count formation excluding the player going out
-    const activeStarting = starting.filter(p => !didNotPlay(p) && p.player_id !== outPlayer.player_id)
+    const activeStarting = starting.filter(
+      (p) => !didNotPlay(p) && p.player_id !== outPlayer.player_id
+    )
     const counts = { gk: 0, def: 0, mid: 0, fwd: 0 }
     for (const p of activeStarting) {
       const info = playersInfo.get(p.player_id)
       if (!info) continue
       switch (info.element_type) {
-        case 1: counts.gk++; break
-        case 2: counts.def++; break
-        case 3: counts.mid++; break
-        case 4: counts.fwd++; break
+        case 1:
+          counts.gk++
+          break
+        case 2:
+          counts.def++
+          break
+        case 3:
+          counts.mid++
+          break
+        case 4:
+          counts.fwd++
+          break
       }
     }
 
     // Add the incoming player
     switch (subInfo.element_type) {
-      case 2: counts.def++; break
-      case 3: counts.mid++; break
-      case 4: counts.fwd++; break
+      case 2:
+        counts.def++
+        break
+      case 3:
+        counts.mid++
+        break
+      case 4:
+        counts.fwd++
+        break
     }
 
     // Check constraints: min 3 DEF, min 2 MID, min 1 FWD
     // Also max 5 DEF, max 5 MID, max 3 FWD (11 - 1 GK = 10 outfield)
-    return counts.def >= 3 && counts.mid >= 2 && counts.fwd >= 1 &&
-           counts.def <= 5 && counts.mid <= 5 && counts.fwd <= 3
+    return (
+      counts.def >= 3 &&
+      counts.mid >= 2 &&
+      counts.fwd >= 1 &&
+      counts.def <= 5 &&
+      counts.mid <= 5 &&
+      counts.fwd <= 3
+    )
   }
 
   // Process auto-subs
@@ -148,8 +187,8 @@ function applyAutoSubs(
   }
 
   // Recalculate points after subs
-  const finalStarting = result.filter(p => p.position <= 11)
-  const finalBench = result.filter(p => p.position > 11)
+  const finalStarting = result.filter((p) => p.position <= 11)
+  const finalBench = result.filter((p) => p.position > 11)
 
   const totalPoints = finalStarting.reduce((sum, p) => sum + p.effective_points, 0)
   const benchPoints = finalBench.reduce((sum, p) => sum + p.points, 0)
@@ -194,6 +233,7 @@ export function Live() {
   const initial = getInitialManagerId()
   const [managerId, setManagerId] = useState<number | null>(initial.id)
   const [managerInput, setManagerInput] = useState(initial.input)
+  const [comparisonTier, setComparisonTier] = useState<ComparisonTier>('top_10k')
 
   // Auto-detect current gameweek
   const { data: gwData, isLoading: isLoadingGw, gameweekData } = useCurrentGameweek()
@@ -201,23 +241,34 @@ export function Live() {
   const gameweek = gwData?.gameweek ?? null
 
   const { data: playersData } = usePlayers()
-  const { data: liveManager, isLoading: isLoadingManager, error: managerError } = useLiveManager(gameweek, managerId)
-  const { data: bonusData, isLoading: isLoadingBonus } = useLiveBonus(gameweek)
+  const {
+    data: liveManager,
+    isLoading: isLoadingManager,
+    error: managerError,
+  } = useLiveManager(gameweek, managerId)
   const { data: samplesData } = useLiveSamples(gameweek)
+  const { data: liveData } = useLiveData(gameweek)
+  const { data: bonusData } = useLiveBonus(gameweek)
+  const { data: predictionsData } = usePredictions(gameweek)
 
   // Build player info maps
   const playersMap = useMemo(() => {
     if (!playersData?.players) return new Map()
-    return new Map(playersData.players.map(p => [p.id, {
-      web_name: p.web_name,
-      team: p.team,
-      element_type: p.element_type,
-    }]))
+    return new Map(
+      playersData.players.map((p) => [
+        p.id,
+        {
+          web_name: p.web_name,
+          team: p.team,
+          element_type: p.element_type,
+        },
+      ])
+    )
   }, [playersData?.players])
 
   const teamsMap = useMemo(() => {
     if (!playersData?.teams) return new Map()
-    return new Map(playersData.teams.map(t => [t.id, t.short_name]))
+    return new Map(playersData.teams.map((t) => [t.id, t.short_name]))
   }, [playersData?.teams])
 
   // Apply auto-subs based on FPL rules
@@ -232,7 +283,9 @@ export function Live() {
     return calculateComparisons(processedSquad.totalPoints, samplesData)
   }, [processedSquad, samplesData])
 
-  // Get top 10k EO for display
+  // Get EO for selected comparison tier
+  const tierEO = samplesData?.samples?.[comparisonTier]?.effective_ownership
+  // Also keep top 10k EO for pitch display
   const top10kEO = samplesData?.samples?.top_10k?.effective_ownership
 
   // Calculate rank movement
@@ -246,9 +299,234 @@ export function Live() {
       current,
       previous,
       movement,
-      direction: movement > 0 ? 'up' as const : movement < 0 ? 'down' as const : 'none' as const,
+      direction:
+        movement > 0 ? ('up' as const) : movement < 0 ? ('down' as const) : ('none' as const),
     }
   }, [liveManager?.overall_rank, liveManager?.pre_gw_rank])
+
+  // Calculate player impacts on rank (differentials)
+  // Impact = your points from player - average tier points from player
+  // Owned: impact = effective_points * (1 - EO / (100 * multiplier))
+  // Not owned: impact = -points * EO / 100 (you got 0, others got points * EO%)
+  const playerImpacts = useMemo((): PlayerImpact[] => {
+    if (!processedSquad || !tierEO || !playersMap) return []
+
+    const ownedPlayerIds = new Set(processedSquad.players.map((p) => p.player_id))
+    const ownedImpacts: PlayerImpact[] = []
+    const notOwnedImpacts: PlayerImpact[] = []
+
+    // Calculate impact for owned players (in starting XI only)
+    for (const player of processedSquad.players.filter((p) => p.position <= 11)) {
+      const info = playersMap.get(player.player_id)
+      if (!info) continue
+
+      const eo = tierEO[player.player_id] ?? 0
+      const multiplier = player.multiplier || 1 // 1 = normal, 2 = captain, 3 = triple captain
+      const yourExposure = multiplier * 100 // 100% normal, 200% captain, 300% TC
+      const relativeEO = yourExposure - eo // positive = you have more exposure than field
+
+      // Impact formula accounts for captaincy:
+      // If you captain (2x) a player with 100% EO, you still gain vs field
+      // If you captain (2x) a player with 200% EO, you're even with field
+      const impact = player.effective_points * (1 - eo / (100 * multiplier))
+
+      ownedImpacts.push({
+        playerId: player.player_id,
+        name: info.web_name,
+        points: player.effective_points,
+        eo,
+        relativeEO,
+        impact,
+        owned: true,
+      })
+    }
+
+    // Calculate impact for NOT owned players with high EO (these hurt your rank)
+    if (liveData?.elements) {
+      for (const element of liveData.elements) {
+        if (ownedPlayerIds.has(element.id)) continue // Skip owned players
+
+        const eo = tierEO[element.id]
+        if (!eo || eo < 15) continue // Only care about reasonably popular players
+
+        const points = element.stats?.total_points ?? 0
+        if (points <= 2) continue // Only care about players who actually scored
+
+        const info = playersMap.get(element.id)
+        if (!info) continue
+
+        // You got 0 from this player, others in tier got points * EO/100
+        const impact = -((points * eo) / 100)
+        const relativeEO = -eo // 0% yours - eo% theirs = negative
+
+        notOwnedImpacts.push({
+          playerId: element.id,
+          name: info.web_name,
+          points,
+          eo,
+          relativeEO,
+          impact,
+          owned: false,
+        })
+      }
+    }
+
+    // Sort by impact
+    const gainers = ownedImpacts
+      .filter((p) => p.impact > 0.5)
+      .sort((a, b) => b.impact - a.impact)
+      .slice(0, 5)
+    // For losers, combine owned (negative impact) and not owned (all negative)
+    const allLosers = [...ownedImpacts.filter((p) => p.impact < -0.5), ...notOwnedImpacts]
+      .sort((a, b) => a.impact - b.impact)
+      .slice(0, 5)
+
+    return [...gainers, ...allLosers]
+  }, [processedSquad, tierEO, playersMap, liveData])
+
+  // Get user's captain info
+  const userCaptain = useMemo(() => {
+    if (!processedSquad) return null
+    const captain = processedSquad.players.find((p) => p.is_captain)
+    if (!captain) return null
+    return {
+      playerId: captain.player_id,
+      points: captain.effective_points, // Already doubled
+    }
+  }, [processedSquad])
+
+  // Build predictions map for variance analysis
+  const predictionsMap = useMemo(() => {
+    if (!predictionsData?.predictions) return new Map<number, number>()
+    return new Map(predictionsData.predictions.map((p) => [p.player_id, p.predicted_points]))
+  }, [predictionsData?.predictions])
+
+  // Calculate variance analysis data
+  const varianceData = useMemo(() => {
+    if (!processedSquad || predictionsMap.size === 0) return null
+
+    const startingXI = processedSquad.players.filter((p) => p.position <= 11)
+    const players: Array<{ playerId: number; name: string; predicted: number; actual: number }> = []
+
+    let totalPredicted = 0
+    let totalActual = 0
+
+    for (const player of startingXI) {
+      const info = playersMap.get(player.player_id)
+      const predicted = predictionsMap.get(player.player_id) ?? 0
+      const actual = player.effective_points
+
+      // Adjust prediction for captaincy multiplier
+      const adjustedPredicted = predicted * (player.multiplier || 1)
+
+      totalPredicted += adjustedPredicted
+      totalActual += actual
+
+      players.push({
+        playerId: player.player_id,
+        name: info?.web_name ?? 'Unknown',
+        predicted: Math.round(adjustedPredicted * 10) / 10,
+        actual,
+      })
+    }
+
+    return {
+      players,
+      totalPredicted: Math.round(totalPredicted),
+      totalActual,
+    }
+  }, [processedSquad, predictionsMap, playersMap])
+
+  // Calculate fixture impacts for threat index (user points vs tier avg per fixture)
+  const fixtureImpacts = useMemo(() => {
+    if (!gameweekData || !processedSquad || !tierEO || !liveData?.elements) return []
+
+    const startingXI = processedSquad.players.filter((p) => p.position <= 11)
+
+    return gameweekData.fixtures.map((fixture) => {
+      const homeTeam = teamsMap.get(fixture.home_club_id) ?? '???'
+      const awayTeam = teamsMap.get(fixture.away_club_id) ?? '???'
+
+      // Calculate user's points from this fixture
+      let userPoints = 0
+      let hasUserPlayer = false
+      for (const player of startingXI) {
+        const info = playersMap.get(player.player_id)
+        if (!info) continue
+        if (info.team === fixture.home_club_id || info.team === fixture.away_club_id) {
+          userPoints += player.effective_points
+          hasUserPlayer = true
+        }
+      }
+
+      // Calculate tier average points from this fixture
+      let tierAvgPoints = 0
+      for (const element of liveData.elements) {
+        const info = playersMap.get(element.id)
+        if (!info) continue
+        if (info.team === fixture.home_club_id || info.team === fixture.away_club_id) {
+          const eo = tierEO[element.id] ?? 0
+          const points = element.stats?.total_points ?? 0
+          tierAvgPoints += (points * eo) / 100
+        }
+      }
+
+      return {
+        fixtureId: fixture.id,
+        homeTeam,
+        awayTeam,
+        userPoints,
+        tierAvgPoints,
+        impact: userPoints - tierAvgPoints,
+        isLive: fixture.started && !fixture.finished,
+        isFinished: fixture.finished,
+        hasUserPlayer,
+      }
+    })
+  }, [gameweekData, processedSquad, tierEO, liveData, playersMap, teamsMap])
+
+  // Calculate differential analysis data
+  const differentialData = useMemo(() => {
+    if (!processedSquad || !tierEO) return []
+
+    const startingXI = processedSquad.players.filter((p) => p.position <= 11)
+    const players: Array<{
+      playerId: number
+      name: string
+      points: number
+      eo: number
+      impact: number
+      multiplier: number
+    }> = []
+
+    for (const player of startingXI) {
+      const info = playersMap.get(player.player_id)
+      if (!info) continue
+
+      const eo = tierEO[player.player_id] ?? 0
+      const multiplier = player.multiplier || 1
+      const impact = player.effective_points * (1 - eo / (100 * multiplier))
+
+      players.push({
+        playerId: player.player_id,
+        name: info.web_name,
+        points: player.effective_points,
+        eo,
+        impact,
+        multiplier,
+      })
+    }
+
+    return players
+  }, [processedSquad, tierEO, playersMap])
+
+  // Get tier label for differential analysis
+  const tierLabels: Record<ComparisonTier, string> = {
+    top_10k: '10K',
+    top_100k: '100K',
+    top_1m: '1M',
+    overall: 'All',
+  }
 
   const handleLoadManager = (id?: number) => {
     const managerId = id ?? parseInt(managerInput, 10)
@@ -361,14 +639,22 @@ export function Live() {
               <StatPanel
                 label="Live Rank"
                 value={formatRank(rankMovement.current)}
-                trend={rankMovement.direction === 'up' ? 'up' : rankMovement.direction === 'down' ? 'down' : undefined}
-                subValue={rankMovement.previous ? (
+                trend={
                   rankMovement.direction === 'up'
-                    ? `↑ ${formatRank(Math.abs(rankMovement.movement))} from ${formatRank(rankMovement.previous)}`
+                    ? 'up'
                     : rankMovement.direction === 'down'
-                    ? `↓ ${formatRank(Math.abs(rankMovement.movement))} from ${formatRank(rankMovement.previous)}`
-                    : `from ${formatRank(rankMovement.previous)}`
-                ) : undefined}
+                      ? 'down'
+                      : undefined
+                }
+                subValue={
+                  rankMovement.previous
+                    ? rankMovement.direction === 'up'
+                      ? `↑ ${formatRank(Math.abs(rankMovement.movement))} from ${formatRank(rankMovement.previous)}`
+                      : rankMovement.direction === 'down'
+                        ? `↓ ${formatRank(Math.abs(rankMovement.movement))} from ${formatRank(rankMovement.previous)}`
+                        : `from ${formatRank(rankMovement.previous)}`
+                    : undefined
+                }
                 animationDelay={150}
               />
             )}
@@ -378,7 +664,10 @@ export function Live() {
           {processedSquad.autoSubs.length > 0 && (
             <div className="flex items-center gap-2 text-sm text-foreground-muted animate-fade-in-up">
               <span className="text-fpl-green">↓↑</span>
-              <span>{processedSquad.autoSubs.length} auto-sub{processedSquad.autoSubs.length > 1 ? 's' : ''} applied</span>
+              <span>
+                {processedSquad.autoSubs.length} auto-sub
+                {processedSquad.autoSubs.length > 1 ? 's' : ''} applied
+              </span>
             </div>
           )}
 
@@ -393,66 +682,97 @@ export function Live() {
             />
           </BroadcastCard>
 
-          {/* Bottom Section: Comparisons + Bonus */}
+          {/* Bottom Section: Stats Grid */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Comparison Bars */}
             <BroadcastCard title="vs Sample Averages" animationDelay={300}>
               <ComparisonBars
                 userPoints={processedSquad.totalPoints}
                 comparisons={comparisons}
+                playerImpacts={playerImpacts}
+                selectedTier={comparisonTier}
+                onTierChange={setComparisonTier}
                 animationDelay={350}
               />
             </BroadcastCard>
 
-            {/* Bonus Predictions */}
-            <BroadcastCard title="Bonus Predictions" accentColor="purple" animationDelay={350}>
-              {isLoadingBonus ? (
-                <SkeletonTable rows={5} cols={3} />
-              ) : bonusData?.bonus_predictions?.length ? (
-                <div className="space-y-2">
-                  {bonusData.bonus_predictions.slice(0, 10).map((bp, idx) => {
-                    const player = playersData?.players.find(p => p.id === bp.player_id)
-                    const teamName = player ? teamsMap.get(player.team) : ''
-
-                    return (
-                      <div
-                        key={`${bp.player_id}-${bp.fixture_id}`}
-                        className="flex items-center justify-between p-2 rounded bg-surface-elevated animate-fade-in-up opacity-0"
-                        style={{ animationDelay: `${400 + idx * 30}ms` }}
-                      >
-                        <div>
-                          <span className="text-foreground font-medium">
-                            {player?.web_name || `Player ${bp.player_id}`}
-                          </span>
-                          <span className="text-xs text-foreground-dim ml-2">{teamName}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-foreground-muted font-mono">{bp.bps} BPS</span>
-                          <span
-                            className={`
-                              inline-flex items-center justify-center w-7 h-7 rounded-lg font-mono font-bold text-sm
-                              ${
-                                bp.predicted_bonus === 3
-                                  ? 'bg-fpl-green/20 text-fpl-green'
-                                  : bp.predicted_bonus === 2
-                                  ? 'bg-foreground/10 text-foreground'
-                                  : 'bg-orange-500/20 text-orange-400'
-                              }
-                            `}
-                          >
-                            +{bp.predicted_bonus}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <div className="py-4 text-center text-foreground-muted text-sm">
-                  No bonus predictions available
-                </div>
-              )}
+            {/* Captain Battle */}
+            <BroadcastCard title="Captain Battle" accentColor="purple" animationDelay={350}>
+              <CaptainBattle
+                userCaptainId={userCaptain?.playerId}
+                samples={samplesData?.samples}
+                playersMap={playersMap}
+              />
             </BroadcastCard>
+
+            {/* Players Remaining */}
+            <BroadcastCard title="Players Left" animationDelay={400}>
+              <PlayersRemaining
+                players={processedSquad.players}
+                playersMap={playersMap}
+                fixtureData={gameweekData}
+                effectiveOwnership={top10kEO}
+              />
+            </BroadcastCard>
+
+            {/* Fixture Scores */}
+            <BroadcastCard title="Fixtures" accentColor="purple" animationDelay={450}>
+              <FixtureScores
+                fixtureData={gameweekData}
+                teamsMap={teamsMap}
+                liveElements={liveData?.elements}
+                playersMap={playersMap}
+                bonusPredictions={bonusData?.bonus_predictions}
+              />
+            </BroadcastCard>
+          </div>
+
+          {/* Advanced Analytics Section */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Rank Projection */}
+            {rankMovement && gwData && (
+              <BroadcastCard title="Rank Projection" animationDelay={500}>
+                <RankProjection
+                  currentRank={rankMovement.current}
+                  previousRank={rankMovement.previous ?? rankMovement.current}
+                  currentPoints={processedSquad.totalPoints}
+                  tierAvgPoints={samplesData?.samples?.top_10k?.avg_points ?? 0}
+                  fixturesFinished={gwData.matchesPlayed}
+                  fixturesTotal={gwData.totalMatches}
+                />
+              </BroadcastCard>
+            )}
+
+            {/* Variance Analysis */}
+            {varianceData && (
+              <BroadcastCard title="Luck Analysis" accentColor="purple" animationDelay={550}>
+                <VarianceAnalysis
+                  players={varianceData.players}
+                  totalPredicted={varianceData.totalPredicted}
+                  totalActual={varianceData.totalActual}
+                />
+              </BroadcastCard>
+            )}
+
+            {/* Fixture Impact Analysis */}
+            <BroadcastCard title="Fixture Impact" animationDelay={600}>
+              <FixtureThreatIndex
+                fixtureData={gameweekData}
+                fixtureImpacts={fixtureImpacts}
+                selectedTier={comparisonTier}
+                onTierChange={setComparisonTier}
+              />
+            </BroadcastCard>
+
+            {/* Differential Analysis */}
+            {differentialData.length > 0 && (
+              <BroadcastCard title="Differentials" accentColor="purple" animationDelay={650}>
+                <DifferentialAnalysis
+                  players={differentialData}
+                  tierLabel={tierLabels[comparisonTier]}
+                />
+              </BroadcastCard>
+            )}
           </div>
 
           {/* Change Manager Link */}

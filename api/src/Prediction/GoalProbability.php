@@ -24,14 +24,16 @@ class GoalProbability
      * Calculate goal probability for a player in a fixture.
      *
      * @param array<string, mixed> $player Player data
-     * @param array<string, mixed>|null $fixture Fixture data with odds
+     * @param array<string, mixed>|null $fixture Fixture data
      * @param array<string, mixed>|null $goalscorerOdds Anytime scorer odds if available
+     * @param array<string, mixed>|null $fixtureOdds Fixture odds with win probabilities
      * @return array{prob: float, expected_goals: float}
      */
     public function calculate(
         array $player,
         ?array $fixture = null,
-        ?array $goalscorerOdds = null
+        ?array $goalscorerOdds = null,
+        ?array $fixtureOdds = null
     ): array {
         $position = (int) ($player['position'] ?? $player['element_type'] ?? 3);
         $xg = (float) ($player['expected_goals'] ?? 0);
@@ -41,29 +43,33 @@ class GoalProbability
         // Method 1: Use bookmaker odds if available (most accurate)
         if ($goalscorerOdds !== null && isset($goalscorerOdds['anytime_scorer_prob'])) {
             $oddsProb = (float) $goalscorerOdds['anytime_scorer_prob'];
-            // Blend with xG for stability
-            $xgProb = $this->xgToProb($xg, $minutes);
+
+            // Calculate xG per 95 for blending (95 mins = full match with injury time)
+            $xgPer95 = ($minutes > 0 && $xg > 0) ? ($xg / $minutes) * 95 : 0;
+            $xgProb = $this->xgToProb($xgPer95);
+
+            // Blend: 60% bookmaker odds, 40% xG-based
             $prob = ($oddsProb * 0.6) + ($xgProb * 0.4);
 
             return [
                 'prob' => round($prob, 4),
-                'expected_goals' => round($prob * 1.2, 4), // Slight uplift for multi-goal potential
+                'expected_goals' => round($xgPer95, 4),
             ];
         }
 
-        // Method 2: Use xG per 90 (primary statistical approach)
+        // Method 2: Use xG per 95 (primary statistical approach, 95 mins = full match)
         if ($minutes > 0 && $xg > 0) {
-            $xgPer90 = ($xg / $minutes) * 90;
-            $prob = $this->xgToProb($xgPer90, 90);
+            $xgPer95 = ($xg / $minutes) * 95;
+            $prob = $this->xgToProb($xgPer95);
 
-            // Adjust for fixture difficulty if available
+            // Adjust for fixture using odds if available
             if ($fixture !== null) {
-                $prob = $this->adjustForFixture($prob, $player, $fixture);
+                $prob = $this->adjustForFixture($prob, $player, $fixture, $fixtureOdds);
             }
 
             return [
                 'prob' => round($prob, 4),
-                'expected_goals' => round($xgPer90, 4),
+                'expected_goals' => round($xgPer95, 4),
             ];
         }
 
@@ -81,46 +87,58 @@ class GoalProbability
     }
 
     /**
-     * Convert xG to probability using Poisson distribution.
+     * Convert xG per match to probability using Poisson distribution.
      * P(goals >= 1) = 1 - P(goals = 0) = 1 - e^(-xG)
+     *
+     * Note: We use full per-match rate (95 mins) since minutes probability
+     * already accounts for whether the player will play. A nailed starter
+     * with 0.8 xG/95 should have ~55% goal probability per game.
      */
-    private function xgToProb(float $xg, int $minutes): float
+    private function xgToProb(float $xgPerMatch): float
     {
-        if ($xg <= 0 || $minutes <= 0) {
+        if ($xgPerMatch <= 0) {
             return 0;
         }
 
-        // Scale xG to per-match (assuming ~70 mins average playing time)
-        $scaledXg = ($xg / max(1, $minutes)) * 70;
-
         // Poisson: P(X >= 1) = 1 - e^(-lambda)
-        return 1 - exp(-$scaledXg);
+        return 1 - exp(-$xgPerMatch);
     }
 
     /**
-     * Adjust goal probability based on fixture difficulty.
+     * Adjust goal probability based on fixture odds.
+     *
+     * Uses bookmaker win probability to derive attack multiplier.
+     * Falls back to neutral multiplier when no odds available.
+     *
+     * @param array<string, mixed>|null $fixtureOdds Fixture odds data
      */
-    private function adjustForFixture(float $baseProb, array $player, array $fixture): float
-    {
+    private function adjustForFixture(
+        float $baseProb,
+        array $player,
+        array $fixture,
+        ?array $fixtureOdds = null
+    ): float {
         $clubId = $player['club_id'] ?? $player['team'] ?? 0;
         $isHome = ($fixture['home_club_id'] ?? 0) === $clubId;
 
-        // Home advantage
-        $homeBoost = $isHome ? 1.1 : 0.95;
+        $attackMultiplier = 1.0;
 
-        // Fixture difficulty (1-5 scale, 2 = easy, 5 = hard)
-        $difficulty = $isHome
-            ? ($fixture['home_difficulty'] ?? 3)
-            : ($fixture['away_difficulty'] ?? 3);
+        // Use odds-based multiplier if available
+        if ($fixtureOdds !== null) {
+            $winProb = $isHome
+                ? (float) ($fixtureOdds['home_win_prob'] ?? 0.33)
+                : (float) ($fixtureOdds['away_win_prob'] ?? 0.33);
 
-        $difficultyMultiplier = match ((int) $difficulty) {
-            1, 2 => 1.2,  // Easy fixture
-            3 => 1.0,     // Medium
-            4 => 0.85,    // Hard
-            5 => 0.7,     // Very hard
-            default => 1.0,
-        };
+            // Win prob ranges ~0.15 (weak vs strong) to ~0.65 (strong vs weak)
+            // Map to multiplier range 0.75 - 1.25
+            $attackMultiplier = 0.75 + ($winProb * 0.77);
+        }
 
-        return min(0.8, $baseProb * $homeBoost * $difficultyMultiplier);
+        // Home advantage (+10%)
+        if ($isHome) {
+            $attackMultiplier *= 1.1;
+        }
+
+        return min(0.8, $baseProb * $attackMultiplier);
     }
 }

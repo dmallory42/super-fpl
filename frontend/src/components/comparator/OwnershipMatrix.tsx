@@ -42,7 +42,7 @@ export function OwnershipMatrix({
             <th className="text-center p-3 font-display text-xs uppercase tracking-wider text-foreground-muted">
               EO%
             </th>
-            {managerIds.map(id => (
+            {managerIds.map((id) => (
               <th
                 key={id}
                 className="text-center p-3 font-display text-xs uppercase tracking-wider text-foreground-muted max-w-[100px]"
@@ -83,14 +83,14 @@ export function OwnershipMatrix({
                       eo >= 80
                         ? 'text-fpl-green'
                         : eo >= 50
-                        ? 'text-yellow-400'
-                        : 'text-foreground-muted'
+                          ? 'text-yellow-400'
+                          : 'text-foreground-muted'
                     }`}
                   >
                     {eo.toFixed(0)}%
                   </span>
                 </td>
-                {managerIds.map(managerId => {
+                {managerIds.map((managerId) => {
                   const multiplier = ownership[managerId] || 0
                   return (
                     <td key={managerId} className="text-center p-3">
@@ -102,7 +102,13 @@ export function OwnershipMatrix({
                           ${multiplierStyles[multiplier] || 'bg-surface text-foreground-dim'}
                         `}
                       >
-                        {multiplier === 0 ? '-' : multiplier === 2 ? 'C' : multiplier === 3 ? 'TC' : '\u2713'}
+                        {multiplier === 0
+                          ? '-'
+                          : multiplier === 2
+                            ? 'C'
+                            : multiplier === 3
+                              ? 'TC'
+                              : '\u2713'}
                       </span>
                     </td>
                   )

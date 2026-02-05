@@ -19,6 +19,8 @@ services:
       - ./packages:/var/www/html/packages
       - ./api:/var/www/html/api
     working_dir: /var/www/html/api
+    environment:
+      - ODDS_API_KEY=2582cba89d202784679a5a7c26914d60
 
 volumes:
   db-data:

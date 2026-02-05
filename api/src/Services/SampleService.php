@@ -113,10 +113,14 @@ class SampleService
 
         // Calculate EO percentages
         $effectiveOwnership = [];
+        $captainPercent = [];
         foreach ($playerOwnership as $playerId => $count) {
             $ownershipPct = ($count / $sampleSize) * 100;
             $captainPct = (($playerCaptaincy[$playerId] ?? 0) / $sampleSize) * 100;
             $effectiveOwnership[$playerId] = round($ownershipPct + $captainPct, 1);
+            if ($captainPct > 0) {
+                $captainPercent[$playerId] = round($captainPct, 1);
+            }
         }
 
         // Calculate average points
@@ -138,6 +142,7 @@ class SampleService
             'avg_points' => $avgPoints,
             'sample_size' => $sampleSize,
             'effective_ownership' => $effectiveOwnership,
+            'captain_percent' => $captainPercent,
         ];
     }
 

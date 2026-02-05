@@ -48,9 +48,7 @@ export function BroadcastCard({
             border-b ${accentBorders[accentColor]}
           `}
         >
-          <h3 className="font-display text-sm uppercase tracking-wider text-foreground">
-            {title}
-          </h3>
+          <h3 className="font-display text-sm uppercase tracking-wider text-foreground">{title}</h3>
           {headerAction && <div>{headerAction}</div>}
         </div>
       )}

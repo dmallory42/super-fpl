@@ -12,7 +12,8 @@ class ManagerService
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
-    ) {}
+    ) {
+    }
 
     /**
      * Get manager by ID. Fetches from FPL API and caches in DB.

@@ -9,24 +9,27 @@ export function ManagerSearch({ onSearch, isLoading }: ManagerSearchProps) {
   const [inputValue, setInputValue] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+      setError(null)
 
-    const trimmed = inputValue.trim()
-    if (!trimmed) {
-      setError('Please enter a manager ID')
-      return
-    }
+      const trimmed = inputValue.trim()
+      if (!trimmed) {
+        setError('Please enter a manager ID')
+        return
+      }
 
-    const id = parseInt(trimmed, 10)
-    if (isNaN(id) || id <= 0) {
-      setError('Please enter a valid manager ID (positive number)')
-      return
-    }
+      const id = parseInt(trimmed, 10)
+      if (isNaN(id) || id <= 0) {
+        setError('Please enter a valid manager ID (positive number)')
+        return
+      }
 
-    onSearch(id)
-  }, [inputValue, onSearch])
+      onSearch(id)
+    },
+    [inputValue, onSearch]
+  )
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
@@ -39,15 +42,9 @@ export function ManagerSearch({ onSearch, isLoading }: ManagerSearchProps) {
           className="input-broadcast"
           disabled={isLoading}
         />
-        {error && (
-          <p className="text-destructive text-sm mt-1 animate-fade-in-up">{error}</p>
-        )}
+        {error && <p className="text-destructive text-sm mt-1 animate-fade-in-up">{error}</p>}
       </div>
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="btn-primary"
-      >
+      <button type="submit" disabled={isLoading} className="btn-primary">
         {isLoading ? (
           <span className="flex items-center gap-2">
             <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />

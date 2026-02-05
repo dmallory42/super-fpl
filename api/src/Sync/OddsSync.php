@@ -5,17 +5,56 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Sync;
 
 use SuperFPL\Api\Database;
-use SuperFPL\Api\Clients\OddscheckerScraper;
+use SuperFPL\Api\Clients\OddsApiClient;
 
 /**
- * Syncs odds data from Oddschecker to the database.
+ * Syncs odds data from The Odds API to the database.
  */
 class OddsSync
 {
+    /**
+     * Team name aliases for matching API names to FPL names.
+     */
+    private const TEAM_ALIASES = [
+        'tottenham' => 'spurs',
+        'tottenhamhotspur' => 'spurs',
+        'wolverhampton' => 'wolves',
+        'wolverhamptonwanderers' => 'wolves',
+        'manchester' => 'manutd',
+        'manchesterunited' => 'manutd',
+        'manchestercity' => 'mancity',
+        'nottingham' => 'nottmforest',
+        'nottinghamforest' => 'nottmforest',
+        'brightonandhovealbion' => 'brighton',
+        'westhamunited' => 'westham',
+        'westham' => 'westham',
+        'newcastleunited' => 'newcastle',
+        'crystalpalace' => 'crystalpalace',
+        'astonvilla' => 'astonvilla',
+        'leeds' => 'leeds',
+        'leedsunited' => 'leeds',
+    ];
+
+    /**
+     * Player name aliases (bookmaker name => FPL web_name).
+     */
+    private const PLAYER_ALIASES = [
+        'Francisco Evanilson de Lima Barbosa' => 'Evanilson',
+        'Joao Pedro Junqueira de Jesus' => 'João Pedro',
+        'Igor Thiago Nascimento Rodrigues' => 'Igor Thiago',
+        'Norberto Bercique Gomes Betuncal' => 'Beto',
+        'Erling Braut Haaland' => 'Haaland',
+        'Dominic Calvert-Lewin' => 'Calvert-Lewin',
+        'Trent Alexander-Arnold' => 'Alexander-Arnold',
+        'Ben Chilwell' => 'Chilwell',
+        'Benjamin Sesko' => 'Šeško',
+    ];
+
     public function __construct(
         private readonly Database $db,
-        private readonly OddscheckerScraper $scraper
-    ) {}
+        private readonly OddsApiClient $client
+    ) {
+    }
 
     /**
      * Sync match odds for upcoming fixtures.
@@ -24,7 +63,7 @@ class OddsSync
      */
     public function syncMatchOdds(): array
     {
-        $matchOdds = $this->scraper->getMatchOdds();
+        $matchOdds = $this->client->getMatchOdds();
         $fixtures = $this->getUpcomingFixtures();
 
         $matched = 0;
@@ -56,76 +95,55 @@ class OddsSync
     }
 
     /**
-     * Sync goalscorer odds for a specific fixture.
-     *
-     * @return int Number of players with odds
-     */
-    public function syncGoalscorerOdds(int $fixtureId): int
-    {
-        $fixture = $this->db->fetchOne('SELECT * FROM fixtures WHERE id = ?', [$fixtureId]);
-        if ($fixture === null) {
-            return 0;
-        }
-
-        // Get team names
-        $homeTeam = $this->db->fetchOne('SELECT name FROM clubs WHERE id = ?', [$fixture['home_club_id']]);
-        $awayTeam = $this->db->fetchOne('SELECT name FROM clubs WHERE id = ?', [$fixture['away_club_id']]);
-
-        if ($homeTeam === null || $awayTeam === null) {
-            return 0;
-        }
-
-        $odds = $this->scraper->getGoalscorerOdds($homeTeam['name'], $awayTeam['name']);
-
-        $count = 0;
-        foreach ($odds as $playerName => $prob) {
-            // Try to match player by name
-            $player = $this->matchPlayerByName($playerName);
-            if ($player === null) {
-                continue;
-            }
-
-            $this->db->upsert('player_goalscorer_odds', [
-                'player_id' => $player['id'],
-                'fixture_id' => $fixtureId,
-                'anytime_scorer_prob' => $prob,
-                'updated_at' => date('Y-m-d H:i:s'),
-            ], ['player_id', 'fixture_id']);
-
-            $count++;
-        }
-
-        return $count;
-    }
-
-    /**
-     * Sync goalscorer odds for all upcoming fixtures in a gameweek.
+     * Sync all anytime goalscorer odds.
      *
      * @return array{fixtures: int, players: int}
      */
-    public function syncGoalscorerOddsForGameweek(int $gameweek): array
+    public function syncAllGoalscorerOdds(): array
     {
-        $fixtures = $this->db->fetchAll(
-            'SELECT id FROM fixtures WHERE gameweek = ? AND finished = 0',
-            [$gameweek]
-        );
+        $goalscorerData = $this->client->getGoalscorerOdds();
+        $fixtures = $this->getUpcomingFixtures();
 
         $totalPlayers = 0;
-        foreach ($fixtures as $fixture) {
-            $totalPlayers += $this->syncGoalscorerOdds((int) $fixture['id']);
-            // Be respectful with rate limiting
-            sleep(3);
+        $matchedFixtures = 0;
+
+        foreach ($goalscorerData as $event) {
+            $fixture = $this->matchFixture(
+                $event['home_team'],
+                $event['away_team'],
+                $fixtures
+            );
+
+            if ($fixture === null) {
+                continue;
+            }
+
+            $matchedFixtures++;
+
+            foreach ($event['players'] as $playerName => $prob) {
+                $player = $this->matchPlayerByName($playerName);
+                if ($player === null) {
+                    continue;
+                }
+
+                $this->db->upsert('player_goalscorer_odds', [
+                    'player_id' => $player['id'],
+                    'fixture_id' => $fixture['id'],
+                    'anytime_scorer_prob' => $prob,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ], ['player_id', 'fixture_id']);
+
+                $totalPlayers++;
+            }
         }
 
         return [
-            'fixtures' => count($fixtures),
+            'fixtures' => $matchedFixtures,
             'players' => $totalPlayers,
         ];
     }
 
     /**
-     * Get upcoming fixtures (not finished).
-     *
      * @return array<int, array<string, mixed>>
      */
     private function getUpcomingFixtures(): array
@@ -141,8 +159,6 @@ class OddsSync
     }
 
     /**
-     * Match odds data to a fixture by team names.
-     *
      * @param array<int, array<string, mixed>> $fixtures
      * @return array<string, mixed>|null
      */
@@ -163,72 +179,110 @@ class OddsSync
         return null;
     }
 
-    /**
-     * Normalize team name for matching.
-     */
     private function normalizeTeamName(string $name): string
     {
         $name = strtolower($name);
-        // Remove common suffixes
-        $name = preg_replace('/\s*(fc|afc|city|united|town|wanderers|rovers|albion)$/i', '', $name);
-        // Remove special characters
         $name = preg_replace('/[^a-z0-9]/', '', $name);
-        return trim($name);
+
+        if (isset(self::TEAM_ALIASES[$name])) {
+            return self::TEAM_ALIASES[$name];
+        }
+
+        $simplified = preg_replace('/(fc|afc|city|united|town|wanderers|rovers|albion|hotspur)$/', '', $name);
+
+        if (isset(self::TEAM_ALIASES[$simplified])) {
+            return self::TEAM_ALIASES[$simplified];
+        }
+
+        return $simplified ?: $name;
     }
 
-    /**
-     * Check if two team names match.
-     */
     private function teamsMatch(string $name1, string $name2): bool
     {
-        // Exact match
         if ($name1 === $name2) {
             return true;
         }
 
-        // One contains the other
         if (str_contains($name1, $name2) || str_contains($name2, $name1)) {
             return true;
         }
 
-        // Levenshtein distance for fuzzy matching
         $distance = levenshtein($name1, $name2);
         $maxLen = max(strlen($name1), strlen($name2));
         return $maxLen > 0 && ($distance / $maxLen) < 0.3;
     }
 
     /**
-     * Match a player by name (fuzzy).
-     *
      * @return array<string, mixed>|null
      */
     private function matchPlayerByName(string $name): ?array
     {
-        // Try exact web_name match first
+        // Check known aliases first
+        if (isset(self::PLAYER_ALIASES[$name])) {
+            $player = $this->db->fetchOne(
+                'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
+                [self::PLAYER_ALIASES[$name]]
+            );
+            if ($player !== null) {
+                return $player;
+            }
+        }
+
+        // Try exact web_name match
         $player = $this->db->fetchOne(
             'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
             [$name]
         );
+        if ($player !== null) {
+            return $player;
+        }
 
+        // Try last part of name
+        $parts = explode(' ', $name);
+        $lastName = end($parts);
+
+        $player = $this->db->fetchOne(
+            'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
+            [$lastName]
+        );
         if ($player !== null) {
             return $player;
         }
 
         // Try second_name match
-        $parts = explode(' ', $name);
-        $lastName = end($parts);
-
         $player = $this->db->fetchOne(
             'SELECT id FROM players WHERE LOWER(second_name) = LOWER(?)',
             [$lastName]
         );
+        if ($player !== null) {
+            return $player;
+        }
 
-        return $player;
+        // Try fuzzy matching with LIKE
+        $player = $this->db->fetchOne(
+            'SELECT id FROM players WHERE LOWER(web_name) LIKE LOWER(?)',
+            ['%' . $lastName . '%']
+        );
+        if ($player !== null) {
+            return $player;
+        }
+
+        // Try first + last name combination
+        if (count($parts) >= 2) {
+            $firstName = $parts[0];
+            $player = $this->db->fetchOne(
+                'SELECT id FROM players WHERE LOWER(first_name) = LOWER(?) AND LOWER(second_name) = LOWER(?)',
+                [$firstName, $lastName]
+            );
+            if ($player !== null) {
+                return $player;
+            }
+        }
+
+        return null;
     }
 
     /**
-     * Estimate clean sheet probability from match odds.
-     *
      * @param array<string, mixed> $odds
      */
     private function estimateCleanSheetProb(array $odds, bool $isHome): float
@@ -236,8 +290,6 @@ class OddsSync
         $winProb = $isHome ? ($odds['home_win_prob'] ?? 0.33) : ($odds['away_win_prob'] ?? 0.33);
         $drawProb = $odds['draw_prob'] ?? 0.25;
 
-        // CS probability correlates with win/draw probability and low opponent attack
-        // Rough estimate: base 25% CS rate, adjusted by team strength
         $baseCs = 0.25;
         $adjustment = $winProb * 0.3 + $drawProb * 0.5;
 

@@ -15,14 +15,17 @@ export function Skeleton({ className = '' }: SkeletonProps) {
   )
 }
 
-export function SkeletonText({ lines = 1, className = '' }: { lines?: number; className?: string }) {
+export function SkeletonText({
+  lines = 1,
+  className = '',
+}: {
+  lines?: number
+  className?: string
+}) {
   return (
     <div className={`space-y-2 ${className}`}>
       {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton
-          key={i}
-          className={`h-4 ${i === lines - 1 && lines > 1 ? 'w-3/4' : 'w-full'}`}
-        />
+        <Skeleton key={i} className={`h-4 ${i === lines - 1 && lines > 1 ? 'w-3/4' : 'w-full'}`} />
       ))}
     </div>
   )
@@ -113,10 +116,7 @@ export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
         {Array.from({ length: rows }).map((_, rowIdx) => (
           <div key={rowIdx} className="flex items-center gap-4 px-4 py-3">
             {Array.from({ length: cols }).map((_, colIdx) => (
-              <Skeleton
-                key={colIdx}
-                className={`h-4 ${colIdx === 0 ? 'w-24' : 'w-16'}`}
-              />
+              <Skeleton key={colIdx} className={`h-4 ${colIdx === 0 ? 'w-24' : 'w-16'}`} />
             ))}
           </div>
         ))}

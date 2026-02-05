@@ -31,7 +31,7 @@ function formatRank(rank: number | null): string {
 function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
   if (gameweeks.length === 0) return null
 
-  const ranks = gameweeks.map(gw => gw.overall_rank)
+  const ranks = gameweeks.map((gw) => gw.overall_rank)
   const maxRank = Math.max(...ranks)
   const minRank = Math.min(...ranks)
   const range = maxRank - minRank || 1
@@ -61,14 +61,33 @@ function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
       </defs>
 
       {/* Grid lines */}
-      <line x1={padding.left} y1={padding.top} x2={padding.left} y2={height - padding.bottom} className="stroke-border" />
-      <line x1={padding.left} y1={height - padding.bottom} x2={width - padding.right} y2={height - padding.bottom} className="stroke-border" />
+      <line
+        x1={padding.left}
+        y1={padding.top}
+        x2={padding.left}
+        y2={height - padding.bottom}
+        className="stroke-border"
+      />
+      <line
+        x1={padding.left}
+        y1={height - padding.bottom}
+        x2={width - padding.right}
+        y2={height - padding.bottom}
+        className="stroke-border"
+      />
 
       {/* Gradient fill */}
       <path d={fillPath} fill="url(#rankGradient)" />
 
       {/* Line */}
-      <path d={pathData} fill="none" className="stroke-fpl-green" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={pathData}
+        fill="none"
+        className="stroke-fpl-green"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
       {/* Points */}
       {points.map((p, i) => (
@@ -79,18 +98,38 @@ function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
       ))}
 
       {/* Y-axis labels */}
-      <text x={padding.left - 10} y={padding.top + 4} textAnchor="end" className="fill-foreground-muted text-xs font-mono">
+      <text
+        x={padding.left - 10}
+        y={padding.top + 4}
+        textAnchor="end"
+        className="fill-foreground-muted text-xs font-mono"
+      >
         {formatRank(minRank)}
       </text>
-      <text x={padding.left - 10} y={height - padding.bottom} textAnchor="end" className="fill-foreground-muted text-xs font-mono">
+      <text
+        x={padding.left - 10}
+        y={height - padding.bottom}
+        textAnchor="end"
+        className="fill-foreground-muted text-xs font-mono"
+      >
         {formatRank(maxRank)}
       </text>
 
       {/* X-axis labels */}
-      <text x={padding.left} y={height - 8} textAnchor="middle" className="fill-foreground-muted text-xs font-mono">
+      <text
+        x={padding.left}
+        y={height - 8}
+        textAnchor="middle"
+        className="fill-foreground-muted text-xs font-mono"
+      >
         1
       </text>
-      <text x={width - padding.right} y={height - 8} textAnchor="middle" className="fill-foreground-muted text-xs font-mono">
+      <text
+        x={width - padding.right}
+        y={height - 8}
+        textAnchor="middle"
+        className="fill-foreground-muted text-xs font-mono"
+      >
         {gameweeks.length}
       </text>
     </svg>
@@ -100,7 +139,7 @@ function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
 function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
   if (gameweeks.length === 0) return null
 
-  const points = gameweeks.map(gw => gw.points)
+  const points = gameweeks.map((gw) => gw.points)
   const maxPoints = Math.max(...points)
   const minPoints = Math.min(...points)
   const avgPoints = points.reduce((a, b) => a + b, 0) / points.length
@@ -131,12 +170,38 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
       </defs>
 
       {/* Grid */}
-      <line x1={padding.left} y1={padding.top} x2={padding.left} y2={height - padding.bottom} className="stroke-border" />
-      <line x1={padding.left} y1={height - padding.bottom} x2={width - padding.right} y2={height - padding.bottom} className="stroke-border" />
+      <line
+        x1={padding.left}
+        y1={padding.top}
+        x2={padding.left}
+        y2={height - padding.bottom}
+        className="stroke-border"
+      />
+      <line
+        x1={padding.left}
+        y1={height - padding.bottom}
+        x2={width - padding.right}
+        y2={height - padding.bottom}
+        className="stroke-border"
+      />
 
       {/* Average line */}
-      <line x1={padding.left} y1={avgY} x2={width - padding.right} y2={avgY} className="stroke-foreground-dim" strokeDasharray="4 4" strokeWidth="1" />
-      <text x={width - padding.right + 5} y={avgY + 4} className="fill-foreground-dim text-xs font-mono">avg</text>
+      <line
+        x1={padding.left}
+        y1={avgY}
+        x2={width - padding.right}
+        y2={avgY}
+        className="stroke-foreground-dim"
+        strokeDasharray="4 4"
+        strokeWidth="1"
+      />
+      <text
+        x={width - padding.right + 5}
+        y={avgY + 4}
+        className="fill-foreground-dim text-xs font-mono"
+      >
+        avg
+      </text>
 
       {/* Area fill */}
       <path
@@ -145,7 +210,14 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
       />
 
       {/* Line */}
-      <path d={pathData} fill="none" className="stroke-fpl-green" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={pathData}
+        fill="none"
+        className="stroke-fpl-green"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
       {/* Points - highlight max and min */}
       {chartPoints.map((p, i) => {
@@ -153,9 +225,19 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         const isMin = p.points === minPoints
         return (
           <g key={i}>
-            <circle cx={p.x} cy={p.y} r={isMax || isMin ? 5 : 3} className={isMax ? 'fill-fpl-green' : isMin ? 'fill-destructive' : 'fill-fpl-green'} />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={isMax || isMin ? 5 : 3}
+              className={isMax ? 'fill-fpl-green' : isMin ? 'fill-destructive' : 'fill-fpl-green'}
+            />
             {(isMax || isMin) && (
-              <text x={p.x} y={p.y - 10} textAnchor="middle" className={`text-xs font-mono ${isMax ? 'fill-fpl-green' : 'fill-destructive'}`}>
+              <text
+                x={p.x}
+                y={p.y - 10}
+                textAnchor="middle"
+                className={`text-xs font-mono ${isMax ? 'fill-fpl-green' : 'fill-destructive'}`}
+              >
                 {p.points}
               </text>
             )}
@@ -164,16 +246,40 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
       })}
 
       {/* Y-axis labels */}
-      <text x={padding.left - 10} y={padding.top + 4} textAnchor="end" className="fill-foreground-muted text-xs font-mono">
+      <text
+        x={padding.left - 10}
+        y={padding.top + 4}
+        textAnchor="end"
+        className="fill-foreground-muted text-xs font-mono"
+      >
         {maxPoints}
       </text>
-      <text x={padding.left - 10} y={height - padding.bottom} textAnchor="end" className="fill-foreground-muted text-xs font-mono">
+      <text
+        x={padding.left - 10}
+        y={height - padding.bottom}
+        textAnchor="end"
+        className="fill-foreground-muted text-xs font-mono"
+      >
         {minPoints}
       </text>
 
       {/* X-axis */}
-      <text x={padding.left} y={height - 8} textAnchor="middle" className="fill-foreground-muted text-xs font-mono">1</text>
-      <text x={width - padding.right} y={height - 8} textAnchor="middle" className="fill-foreground-muted text-xs font-mono">{gameweeks.length}</text>
+      <text
+        x={padding.left}
+        y={height - 8}
+        textAnchor="middle"
+        className="fill-foreground-muted text-xs font-mono"
+      >
+        1
+      </text>
+      <text
+        x={width - padding.right}
+        y={height - 8}
+        textAnchor="middle"
+        className="fill-foreground-muted text-xs font-mono"
+      >
+        {gameweeks.length}
+      </text>
     </svg>
   )
 }
@@ -182,7 +288,7 @@ function SeasonStats({ gameweeks }: { gameweeks: EntryHistory[] }) {
   const stats = useMemo(() => {
     if (gameweeks.length === 0) return null
 
-    const points = gameweeks.map(gw => gw.points)
+    const points = gameweeks.map((gw) => gw.points)
     const lastGW = gameweeks[gameweeks.length - 1]
     const firstGW = gameweeks[0]
 
@@ -192,8 +298,8 @@ function SeasonStats({ gameweeks }: { gameweeks: EntryHistory[] }) {
     const worstGW = Math.min(...points)
     const avgPoints = points.reduce((a, b) => a + b, 0) / points.length
 
-    const bestGWEvent = gameweeks.find(gw => gw.points === bestGW)?.event
-    const worstGWEvent = gameweeks.find(gw => gw.points === worstGW)?.event
+    const bestGWEvent = gameweeks.find((gw) => gw.points === bestGW)?.event
+    const worstGWEvent = gameweeks.find((gw) => gw.points === worstGW)?.event
 
     const totalTransfers = gameweeks.reduce((sum, gw) => sum + gw.event_transfers, 0)
     const totalHits = gameweeks.reduce((sum, gw) => sum + gw.event_transfers_cost, 0)
@@ -223,11 +329,27 @@ function SeasonStats({ gameweeks }: { gameweeks: EntryHistory[] }) {
     <StatPanelGrid className="grid-cols-2 md:grid-cols-4">
       <StatPanel label="Total Points" value={stats.totalPoints} highlight animationDelay={0} />
       <StatPanel label="Overall Rank" value={formatRank(stats.overallRank)} animationDelay={50} />
-      <StatPanel label="Best GW" value={stats.bestGW} trend="up" subValue={`GW${stats.bestGWEvent}`} animationDelay={100} />
-      <StatPanel label="Worst GW" value={stats.worstGW} trend="down" subValue={`GW${stats.worstGWEvent}`} animationDelay={150} />
+      <StatPanel
+        label="Best GW"
+        value={stats.bestGW}
+        trend="up"
+        subValue={`GW${stats.bestGWEvent}`}
+        animationDelay={100}
+      />
+      <StatPanel
+        label="Worst GW"
+        value={stats.worstGW}
+        trend="down"
+        subValue={`GW${stats.worstGWEvent}`}
+        animationDelay={150}
+      />
       <StatPanel label="Avg Per GW" value={stats.avgPoints.toFixed(1)} animationDelay={200} />
       <StatPanel label="Total Transfers" value={stats.totalTransfers} animationDelay={250} />
-      <StatPanel label="Hit Points" value={stats.totalHits > 0 ? `-${stats.totalHits}` : '0'} animationDelay={300} />
+      <StatPanel
+        label="Hit Points"
+        value={stats.totalHits > 0 ? `-${stats.totalHits}` : '0'}
+        animationDelay={300}
+      />
       <StatPanel label="Bench Points" value={stats.totalBenchPoints} animationDelay={350} />
     </StatPanelGrid>
   )
@@ -239,7 +361,7 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
 
     const firstGW = gameweeks[0]
     const lastGW = gameweeks[gameweeks.length - 1]
-    const points = gameweeks.map(gw => gw.points)
+    const points = gameweeks.map((gw) => gw.points)
     const avgPoints = points.reduce((a, b) => a + b, 0) / points.length
 
     // Rank movement
@@ -250,7 +372,14 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
     // Consistency (standard deviation)
     const variance = points.reduce((sum, p) => sum + Math.pow(p - avgPoints, 2), 0) / points.length
     const stdDev = Math.sqrt(variance)
-    const consistencyLabel = stdDev < 10 ? 'Very Consistent' : stdDev < 15 ? 'Consistent' : stdDev < 20 ? 'Variable' : 'Unpredictable'
+    const consistencyLabel =
+      stdDev < 10
+        ? 'Very Consistent'
+        : stdDev < 15
+          ? 'Consistent'
+          : stdDev < 20
+            ? 'Variable'
+            : 'Unpredictable'
 
     // Value change
     const valueChange = (lastGW.value - firstGW.value) / 10
@@ -261,12 +390,12 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
     const hitsPerTransfer = totalTransfers > 0 ? (totalHits / totalTransfers).toFixed(1) : '0'
 
     // Bench management
-    const benchPoints = gameweeks.map(gw => gw.points_on_bench)
+    const benchPoints = gameweeks.map((gw) => gw.points_on_bench)
     const avgBenchPoints = benchPoints.reduce((a, b) => a + b, 0) / benchPoints.length
-    const highBenchWeeks = gameweeks.filter(gw => gw.points_on_bench >= 10).length
+    const highBenchWeeks = gameweeks.filter((gw) => gw.points_on_bench >= 10).length
 
     // Best/worst rank achieved
-    const ranks = gameweeks.map(gw => gw.overall_rank)
+    const ranks = gameweeks.map((gw) => gw.overall_rank)
     const bestRank = Math.min(...ranks)
     const worstRank = Math.max(...ranks)
 
@@ -294,9 +423,13 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Rank Movement */}
         <div className="p-4 bg-surface-elevated rounded-lg">
-          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">Rank Movement</div>
+          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">
+            Rank Movement
+          </div>
           <div className="flex items-baseline gap-2">
-            <span className={`text-2xl font-mono font-bold ${insights.rankImproved ? 'text-fpl-green' : 'text-destructive'}`}>
+            <span
+              className={`text-2xl font-mono font-bold ${insights.rankImproved ? 'text-fpl-green' : 'text-destructive'}`}
+            >
               {insights.rankImproved ? '↑' : '↓'} {Math.abs(Number(insights.rankChangePercent))}%
             </span>
           </div>
@@ -307,25 +440,33 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
 
         {/* Consistency */}
         <div className="p-4 bg-surface-elevated rounded-lg">
-          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">Consistency</div>
-          <div className="text-lg font-bold text-foreground">{insights.consistencyLabel}</div>
-          <div className="text-xs text-foreground-dim mt-1">
-            σ = {insights.stdDev} pts
+          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">
+            Consistency
           </div>
+          <div className="text-lg font-bold text-foreground">{insights.consistencyLabel}</div>
+          <div className="text-xs text-foreground-dim mt-1">σ = {insights.stdDev} pts</div>
         </div>
 
         {/* Team Value */}
         <div className="p-4 bg-surface-elevated rounded-lg">
-          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">Value Change</div>
-          <div className={`text-2xl font-mono font-bold ${insights.valueChange >= 0 ? 'text-fpl-green' : 'text-destructive'}`}>
+          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">
+            Value Change
+          </div>
+          <div
+            className={`text-2xl font-mono font-bold ${insights.valueChange >= 0 ? 'text-fpl-green' : 'text-destructive'}`}
+          >
             {insights.valueChange >= 0 ? '+' : ''}£{insights.valueChange.toFixed(1)}m
           </div>
         </div>
 
         {/* Bench Management */}
         <div className="p-4 bg-surface-elevated rounded-lg">
-          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">Bench Management</div>
-          <div className="text-lg font-mono font-bold text-foreground">{insights.avgBenchPoints} avg</div>
+          <div className="text-xs font-display uppercase tracking-wider text-foreground-muted mb-2">
+            Bench Management
+          </div>
+          <div className="text-lg font-mono font-bold text-foreground">
+            {insights.avgBenchPoints} avg
+          </div>
           <div className="text-xs text-foreground-dim mt-1">
             {insights.highBenchWeeks} weeks with 10+ pts
           </div>
@@ -340,11 +481,15 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
         </div>
         <div className="text-center">
           <div className="text-xs text-foreground-muted">Worst Rank</div>
-          <div className="font-mono font-bold text-foreground-muted">{formatRank(insights.worstRank)}</div>
+          <div className="font-mono font-bold text-foreground-muted">
+            {formatRank(insights.worstRank)}
+          </div>
         </div>
         <div className="text-center">
           <div className="text-xs text-foreground-muted">Hit Rate</div>
-          <div className="font-mono font-bold text-foreground">{insights.hitsPerTransfer} pts/transfer</div>
+          <div className="font-mono font-bold text-foreground">
+            {insights.hitsPerTransfer} pts/transfer
+          </div>
         </div>
         <div className="text-center">
           <div className="text-xs text-foreground-muted">High Bench Weeks</div>
@@ -380,7 +525,7 @@ function GameweekTable({ gameweeks }: { gameweeks: EntryHistory[] }) {
             </tr>
           </thead>
           <tbody>
-            {[...gwWithMovement].reverse().map(gw => {
+            {[...gwWithMovement].reverse().map((gw) => {
               const hasHit = gw.event_transfers_cost > 0
               const highBench = gw.points_on_bench >= 10
 
@@ -392,17 +537,25 @@ function GameweekTable({ gameweeks }: { gameweeks: EntryHistory[] }) {
                   <td className="font-display text-foreground">GW{gw.event}</td>
                   <td className="text-center font-mono text-fpl-green font-medium">{gw.points}</td>
                   <td className="text-center font-mono text-foreground-muted">{gw.total_points}</td>
-                  <td className="text-center font-mono text-foreground-muted">{formatRank(gw.overall_rank)}</td>
+                  <td className="text-center font-mono text-foreground-muted">
+                    {formatRank(gw.overall_rank)}
+                  </td>
                   <td className="text-center font-mono text-sm">
                     {gw.rankMovement > 0 && <span className="text-fpl-green">↑</span>}
                     {gw.rankMovement < 0 && <span className="text-destructive">↓</span>}
-                    {gw.rankMovement === 0 && gw.prevRank !== null && <span className="text-foreground-dim">-</span>}
+                    {gw.rankMovement === 0 && gw.prevRank !== null && (
+                      <span className="text-foreground-dim">-</span>
+                    )}
                   </td>
-                  <td className="text-center font-mono text-foreground-muted">{gw.event_transfers}</td>
+                  <td className="text-center font-mono text-foreground-muted">
+                    {gw.event_transfers}
+                  </td>
                   <td className="text-center font-mono text-destructive">
                     {gw.event_transfers_cost > 0 ? `-${gw.event_transfers_cost}` : '-'}
                   </td>
-                  <td className={`text-center font-mono ${highBench ? 'text-fpl-green font-medium' : 'text-foreground-muted'}`}>
+                  <td
+                    className={`text-center font-mono ${highBench ? 'text-fpl-green font-medium' : 'text-foreground-muted'}`}
+                  >
                     {gw.points_on_bench}
                   </td>
                 </tr>
@@ -442,7 +595,7 @@ function ChipsTimeline({ chips }: { chips: ChipInfo[] }) {
 export function SeasonReview({ history }: SeasonReviewProps) {
   const processedChips: ChipInfo[] = useMemo(() => {
     if (!history?.chips) return []
-    return history.chips.map(chip => ({
+    return history.chips.map((chip) => ({
       name: chip.name,
       displayName: chipDisplayNames[chip.name] || chip.name,
       event: chip.event,

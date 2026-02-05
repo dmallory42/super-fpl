@@ -18,6 +18,8 @@ use SuperFPL\Api\Services\TransferService;
 use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
+use SuperFPL\Api\Sync\OddsSync;
+use SuperFPL\Api\Clients\OddsApiClient;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\Cache\FileCache;
 
@@ -70,6 +72,7 @@ try {
         $uri === '/teams' => handleTeams($db),
         $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
         $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
+        $uri === '/sync/odds' => handleSyncOdds($db, $config),
         preg_match('#^/players/(\d+)$#', $uri, $m) === 1 => handlePlayer($db, (int) $m[1]),
         preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, (int) $m[1]),
         preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, (int) $m[1], (int) $m[2]),
@@ -89,7 +92,7 @@ try {
         preg_match('#^/live/(\d+)/bonus$#', $uri, $m) === 1 => handleLiveBonus($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/live/(\d+)/samples$#', $uri, $m) === 1 => handleLiveSamples($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/admin/sample/(\d+)$#', $uri, $m) === 1 => handleAdminSample($db, $fplClient, $config, (int) $m[1]),
-        $uri === '/fixtures/status' => handleFixturesStatus($db),
+        $uri === '/fixtures/status' => handleFixturesStatus($db, $fplClient, $config),
         preg_match('#^/ownership/(\d+)$#', $uri, $m) === 1 => handleOwnership($db, $fplClient, $config, (int) $m[1]),
         $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
         $uri === '/transfers/simulate' => handleTransferSimulate($db, $fplClient),
@@ -204,6 +207,43 @@ function handleSyncFixtures(Database $db, FplClient $fplClient): void
     echo json_encode([
         'success' => true,
         'fixtures_synced' => $count,
+    ]);
+}
+
+function handleSyncOdds(Database $db, array $config): void
+{
+    $oddsConfig = $config['odds_api'] ?? [];
+    $apiKey = $oddsConfig['api_key'] ?? '';
+
+    if (empty($apiKey)) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => 'ODDS_API_KEY not configured',
+            'note' => 'Set ODDS_API_KEY env var for odds data',
+        ]);
+        return;
+    }
+
+    $client = new OddsApiClient($apiKey, $config['cache']['path'] . '/odds');
+    $sync = new OddsSync($db, $client);
+
+    // Sync match odds (h2h, totals)
+    $matchResult = $sync->syncMatchOdds();
+
+    // Sync goalscorer odds (anytime scorer)
+    $goalscorerResult = $sync->syncAllGoalscorerOdds();
+
+    echo json_encode([
+        'success' => true,
+        'match_odds' => [
+            'fixtures_found' => $matchResult['fixtures'],
+            'fixtures_matched' => $matchResult['matched'],
+        ],
+        'goalscorer_odds' => [
+            'fixtures_matched' => $goalscorerResult['fixtures'],
+            'players_synced' => $goalscorerResult['players'],
+        ],
+        'api_quota' => $client->getQuota(),
     ]);
 }
 
@@ -561,8 +601,24 @@ function handleAdminSample(Database $db, FplClient $fplClient, array $config, in
     ]);
 }
 
-function handleFixturesStatus(Database $db): void
+function handleFixturesStatus(Database $db, FplClient $fplClient, array $config): void
 {
+    // Auto-sync fixtures if data is stale (older than 5 minutes)
+    // This ensures live scores stay fresh without needing a cron job
+    $cachePath = $config['cache']['path'] ?? __DIR__ . '/../cache';
+    $syncTimestampFile = $cachePath . '/fixtures_last_sync.txt';
+    $syncInterval = 300; // 5 minutes
+
+    $lastSync = file_exists($syncTimestampFile) ? (int)file_get_contents($syncTimestampFile) : 0;
+    $now = time();
+
+    if ($now - $lastSync > $syncInterval) {
+        // Sync fixtures from FPL API
+        $fixtureSync = new \SuperFPL\Api\Sync\FixtureSync($db, $fplClient);
+        $fixtureSync->sync();
+        file_put_contents($syncTimestampFile, (string)$now);
+    }
+
     // Get fixture status for current/active gameweek detection
     $fixtures = $db->fetchAll(
         'SELECT id, gameweek, kickoff_time, finished, home_score, away_score,

@@ -37,11 +37,7 @@ export function SquadStats({ picks, players, entryHistory }: SquadStatsProps) {
         value={`£${formatPrice(stats.totalValue)}m`}
         animationDelay={0}
       />
-      <StatPanel
-        label="In the Bank"
-        value={`£${formatPrice(stats.bank)}m`}
-        animationDelay={50}
-      />
+      <StatPanel label="In the Bank" value={`£${formatPrice(stats.bank)}m`} animationDelay={50} />
       <StatPanel
         label="Total Value"
         value={`£${formatPrice(stats.totalValue + stats.bank)}m`}

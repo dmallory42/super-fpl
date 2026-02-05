@@ -16,6 +16,24 @@
     "build": "cd frontend && npm run build",
     "preview": "cd frontend && npm run preview",
     "test:frontend": "cd frontend && npm test",
-    "test:e2e": "cd frontend && npm run test:e2e"
+    "test:e2e": "cd frontend && npm run test:e2e",
+    "sync:samples": "docker-compose exec -T php php cron/sample-sync.php",
+    "format": "prettier --write \"frontend/src/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"frontend/src/**/*.{ts,tsx}\"",
+    "lint:php": "docker-compose exec -T php vendor/bin/phpcs --standard=PSR12 src/",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "frontend/src/**/*.{ts,tsx}": [
+      "prettier --write"
+    ],
+    "api/src/**/*.php": [
+      "php -l"
+    ]
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1"
   }
 }

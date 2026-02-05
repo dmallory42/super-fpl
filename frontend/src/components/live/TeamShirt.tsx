@@ -1,14 +1,14 @@
 // Premier League team colors mapped to actual FPL API team IDs
 const TEAM_COLORS: Record<number, { primary: string; secondary: string }> = {
-  1:  { primary: '#EF0107', secondary: '#FFFFFF' }, // Arsenal - Red/White
-  2:  { primary: '#670E36', secondary: '#95BFE5' }, // Aston Villa - Claret/Blue
-  3:  { primary: '#6C1D45', secondary: '#99D6EA' }, // Burnley - Claret/Blue
-  4:  { primary: '#DA291C', secondary: '#000000' }, // Bournemouth - Red/Black
-  5:  { primary: '#E30613', secondary: '#FFFFFF' }, // Brentford - Red/White
-  6:  { primary: '#0057B8', secondary: '#FFFFFF' }, // Brighton - Blue/White
-  7:  { primary: '#034694', secondary: '#FFFFFF' }, // Chelsea - Blue/White
-  8:  { primary: '#1B458F', secondary: '#C4122E' }, // Crystal Palace - Blue/Red
-  9:  { primary: '#003399', secondary: '#FFFFFF' }, // Everton - Blue/White
+  1: { primary: '#EF0107', secondary: '#FFFFFF' }, // Arsenal - Red/White
+  2: { primary: '#670E36', secondary: '#95BFE5' }, // Aston Villa - Claret/Blue
+  3: { primary: '#6C1D45', secondary: '#99D6EA' }, // Burnley - Claret/Blue
+  4: { primary: '#DA291C', secondary: '#000000' }, // Bournemouth - Red/Black
+  5: { primary: '#E30613', secondary: '#FFFFFF' }, // Brentford - Red/White
+  6: { primary: '#0057B8', secondary: '#FFFFFF' }, // Brighton - Blue/White
+  7: { primary: '#034694', secondary: '#FFFFFF' }, // Chelsea - Blue/White
+  8: { primary: '#1B458F', secondary: '#C4122E' }, // Crystal Palace - Blue/Red
+  9: { primary: '#003399', secondary: '#FFFFFF' }, // Everton - Blue/White
   10: { primary: '#FFFFFF', secondary: '#000000' }, // Fulham - White/Black
   11: { primary: '#FFCD00', secondary: '#1D428A' }, // Leeds - Yellow/Blue
   12: { primary: '#C8102E', secondary: '#FFFFFF' }, // Liverpool - Red/White
@@ -51,24 +51,11 @@ export function TeamShirt({ teamId, className = '', size = 56 }: TeamShirtProps)
         strokeWidth="2"
       />
       {/* Collar */}
-      <path
-        d="M24 16 C28 20 36 20 40 16"
-        stroke={colors.secondary}
-        strokeWidth="2"
-        fill="none"
-      />
+      <path d="M24 16 C28 20 36 20 40 16" stroke={colors.secondary} strokeWidth="2" fill="none" />
       {/* Left sleeve trim */}
-      <path
-        d="M12 26 L8 28"
-        stroke={colors.secondary}
-        strokeWidth="2"
-      />
+      <path d="M12 26 L8 28" stroke={colors.secondary} strokeWidth="2" />
       {/* Right sleeve trim */}
-      <path
-        d="M52 26 L56 28"
-        stroke={colors.secondary}
-        strokeWidth="2"
-      />
+      <path d="M52 26 L56 28" stroke={colors.secondary} strokeWidth="2" />
     </svg>
   )
 }

@@ -34,7 +34,15 @@ describe('FormationPitch', () => {
       createPlayer({ player_id: 7, web_name: 'Palmer', element_type: 3, team: 2, position: 7 }),
       createPlayer({ player_id: 8, web_name: 'Rice', element_type: 3, team: 1, position: 8 }),
       createPlayer({ player_id: 9, web_name: 'Salah', element_type: 3, team: 10, position: 9 }),
-      createPlayer({ player_id: 10, web_name: 'Haaland', element_type: 4, team: 1, position: 10, multiplier: 2, is_captain: true }),
+      createPlayer({
+        player_id: 10,
+        web_name: 'Haaland',
+        element_type: 4,
+        team: 1,
+        position: 10,
+        multiplier: 2,
+        is_captain: true,
+      }),
       createPlayer({ player_id: 11, web_name: 'Watkins', element_type: 4, team: 1, position: 11 }),
     ]
 
@@ -59,7 +67,13 @@ describe('FormationPitch', () => {
 
   it('shows captain badge for captains', () => {
     const players = [
-      createPlayer({ player_id: 1, web_name: 'Captain', position: 1, multiplier: 2, is_captain: true }),
+      createPlayer({
+        player_id: 1,
+        web_name: 'Captain',
+        position: 1,
+        multiplier: 2,
+        is_captain: true,
+      }),
     ]
 
     render(<FormationPitch players={players} teams={mockTeams} />)
@@ -78,9 +92,7 @@ describe('FormationPitch', () => {
   })
 
   it('shows team short name', () => {
-    const players = [
-      createPlayer({ player_id: 1, web_name: 'Salah', team: 10, position: 1 }),
-    ]
+    const players = [createPlayer({ player_id: 1, web_name: 'Salah', team: 10, position: 1 })]
 
     render(<FormationPitch players={players} teams={mockTeams} />)
 
@@ -89,7 +101,14 @@ describe('FormationPitch', () => {
 
   it('shows effective points', () => {
     const players = [
-      createPlayer({ player_id: 1, web_name: 'Player', position: 1, points: 8, effective_points: 16, multiplier: 2 }),
+      createPlayer({
+        player_id: 1,
+        web_name: 'Player',
+        position: 1,
+        points: 8,
+        effective_points: 16,
+        multiplier: 2,
+      }),
     ]
 
     render(<FormationPitch players={players} teams={mockTeams} />)
@@ -98,9 +117,7 @@ describe('FormationPitch', () => {
   })
 
   it('falls back to ??? for unknown team', () => {
-    const players = [
-      createPlayer({ player_id: 1, web_name: 'Player', team: 999, position: 1 }),
-    ]
+    const players = [createPlayer({ player_id: 1, web_name: 'Player', team: 999, position: 1 })]
 
     render(<FormationPitch players={players} teams={mockTeams} />)
 
@@ -108,9 +125,7 @@ describe('FormationPitch', () => {
   })
 
   it('shows player ID when web_name is missing', () => {
-    const players = [
-      createPlayer({ player_id: 123, web_name: undefined, position: 1 }),
-    ]
+    const players = [createPlayer({ player_id: 123, web_name: undefined, position: 1 })]
 
     render(<FormationPitch players={players} teams={mockTeams} />)
 

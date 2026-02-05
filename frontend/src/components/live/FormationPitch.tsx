@@ -34,21 +34,25 @@ interface FormationPitchProps {
   showEffectiveOwnership?: boolean
 }
 
-export function FormationPitch({ players, teams, showEffectiveOwnership = false }: FormationPitchProps) {
+export function FormationPitch({
+  players,
+  teams,
+  showEffectiveOwnership = false,
+}: FormationPitchProps) {
   const { starting, bench } = useMemo(() => {
     const sorted = [...players].sort((a, b) => a.position - b.position)
 
-    const starting = sorted.filter(p => p.position <= 11)
-    const bench = sorted.filter(p => p.position > 11)
+    const starting = sorted.filter((p) => p.position <= 11)
+    const bench = sorted.filter((p) => p.position > 11)
 
     return { starting, bench }
   }, [players])
 
   // Group starting players by position type
-  const gk = starting.filter(p => p.element_type === 1)
-  const def = starting.filter(p => p.element_type === 2)
-  const mid = starting.filter(p => p.element_type === 3)
-  const fwd = starting.filter(p => p.element_type === 4)
+  const gk = starting.filter((p) => p.element_type === 1)
+  const def = starting.filter((p) => p.element_type === 2)
+  const mid = starting.filter((p) => p.element_type === 3)
+  const fwd = starting.filter((p) => p.element_type === 4)
 
   const rows = [gk, def, mid, fwd]
 
@@ -118,10 +122,16 @@ interface PlayerCardProps {
   animationDelay?: number
 }
 
-function PlayerCard({ player, teams, showEO = false, isBench = false, animationDelay = 0 }: PlayerCardProps) {
+function PlayerCard({
+  player,
+  teams,
+  showEO = false,
+  isBench = false,
+  animationDelay = 0,
+}: PlayerCardProps) {
   const points = player.stats?.total_points ?? player.points ?? 0
-  const displayPoints = player.effective_points ?? (points * player.multiplier)
-  const teamName = player.team ? teams[player.team]?.short_name ?? '???' : '???'
+  const displayPoints = player.effective_points ?? points * player.multiplier
+  const teamName = player.team ? (teams[player.team]?.short_name ?? '???') : '???'
   const teamId = player.team ?? 0
 
   return (

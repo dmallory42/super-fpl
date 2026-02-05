@@ -19,7 +19,7 @@ export function LeagueAnalyzer() {
 
   const teamsMap = useMemo(() => {
     if (!playersData?.teams) return new Map<number, string>()
-    return new Map(playersData.teams.map(t => [t.id, t.short_name]))
+    return new Map(playersData.teams.map((t) => [t.id, t.short_name]))
   }, [playersData?.teams])
 
   const managerNames = useMemo(() => {
@@ -33,7 +33,7 @@ export function LeagueAnalyzer() {
   }, [analysisData?.managers])
 
   const managerIds = useMemo(() => {
-    return analysisData?.managers.map(m => m.id) || []
+    return analysisData?.managers.map((m) => m.id) || []
   }, [analysisData?.managers])
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -57,7 +57,10 @@ export function LeagueAnalyzer() {
       </div>
 
       {/* League Search */}
-      <form onSubmit={handleSubmit} className="flex gap-2 max-w-md animate-fade-in-up animation-delay-100">
+      <form
+        onSubmit={handleSubmit}
+        className="flex gap-2 max-w-md animate-fade-in-up animation-delay-100"
+      >
         <input
           type="text"
           value={leagueInput}
@@ -82,8 +85,10 @@ export function LeagueAnalyzer() {
             className="input-broadcast w-32"
           >
             <option value="">Current</option>
-            {Array.from({ length: 38 }, (_, i) => i + 1).map(gw => (
-              <option key={gw} value={gw}>GW{gw}</option>
+            {Array.from({ length: 38 }, (_, i) => i + 1).map((gw) => (
+              <option key={gw} value={gw}>
+                GW{gw}
+              </option>
             ))}
           </select>
         </div>
@@ -154,7 +159,9 @@ export function LeagueAnalyzer() {
                         <td className="font-mono text-foreground-muted">{manager.rank}</td>
                         <td className="font-medium text-foreground">{manager.name}</td>
                         <td className="text-foreground-muted">{manager.team_name}</td>
-                        <td className="text-right font-mono font-bold text-fpl-green">{manager.total}</td>
+                        <td className="text-right font-mono font-bold text-fpl-green">
+                          {manager.total}
+                        </td>
                         <td>
                           {risk && (
                             <div className="flex justify-center">
@@ -217,7 +224,7 @@ export function LeagueAnalyzer() {
                       <p className="text-sm text-foreground-dim">No major differentials</p>
                     ) : (
                       <ul className="space-y-2">
-                        {diffs.slice(0, 5).map(diff => {
+                        {diffs.slice(0, 5).map((diff) => {
                           const player = analysisData.comparison.players[diff.player_id]
                           return (
                             <li key={diff.player_id} className="flex items-center gap-2 text-sm">

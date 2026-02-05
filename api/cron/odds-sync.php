@@ -2,10 +2,8 @@
 <?php
 
 /**
- * Sync odds data from Oddschecker.
- * Run: php odds-sync.php [gameweek]
- *
- * If no gameweek specified, syncs for the next upcoming gameweek.
+ * Sync odds data from The Odds API.
+ * Run: php odds-sync.php
  */
 
 declare(strict_types=1);
@@ -13,39 +11,44 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use SuperFPL\Api\Database;
-use SuperFPL\Api\Clients\OddscheckerScraper;
+use SuperFPL\Api\Clients\OddsApiClient;
 use SuperFPL\Api\Sync\OddsSync;
 
 $config = require __DIR__ . '/../config/config.php';
 
-// Initialize database
+$apiKey = $config['odds_api']['api_key'] ?? '';
+if (empty($apiKey)) {
+    echo "Error: ODDS_API_KEY not configured\n";
+    exit(1);
+}
+
 $db = new Database($config['database']['path']);
 $db->init();
 
-// Initialize scraper with cache
-$cacheDir = $config['cache']['path'] . '/oddschecker';
+$cacheDir = $config['cache']['path'] . '/odds';
 if (!is_dir($cacheDir)) {
     mkdir($cacheDir, 0755, true);
 }
-$scraper = new OddscheckerScraper($cacheDir);
 
-$sync = new OddsSync($db, $scraper);
+$client = new OddsApiClient($apiKey, $cacheDir);
+$sync = new OddsSync($db, $client);
 
-echo "Syncing match odds from Oddschecker...\n";
+echo "Syncing odds from The Odds API...\n";
 
 $startTime = microtime(true);
 
 // Sync match odds
-$result = $sync->syncMatchOdds();
-echo "Fetched odds for {$result['fixtures']} fixtures, matched {$result['matched']} to database\n";
+$matchResult = $sync->syncMatchOdds();
+echo "Match odds: {$matchResult['fixtures']} fixtures found, {$matchResult['matched']} matched\n";
 
-// Optionally sync goalscorer odds for a specific gameweek
-if (isset($argv[1])) {
-    $gameweek = (int) $argv[1];
-    echo "\nSyncing goalscorer odds for GW{$gameweek}...\n";
+// Sync goalscorer odds
+$gsResult = $sync->syncAllGoalscorerOdds();
+echo "Goalscorer odds: {$gsResult['fixtures']} fixtures, {$gsResult['players']} players\n";
 
-    $gsResult = $sync->syncGoalscorerOddsForGameweek($gameweek);
-    echo "Processed {$gsResult['fixtures']} fixtures, {$gsResult['players']} player odds\n";
+// Show quota
+$quota = $client->getQuota();
+if ($quota) {
+    echo "API quota: {$quota['requests_used']} used, {$quota['requests_remaining']} remaining\n";
 }
 
 $elapsed = round(microtime(true) - $startTime, 2);

@@ -41,12 +41,12 @@ class FixturesEndpoint
     /**
      * @return array<int, mixed>
      */
-    public function getRaw(?int $gameweek = null): array
+    public function getRaw(?int $gameweek = null, bool $useCache = true): array
     {
         $endpoint = $gameweek !== null
             ? "fixtures/?event={$gameweek}"
             : 'fixtures/';
 
-        return $this->httpClient->get($endpoint);
+        return $this->httpClient->get($endpoint, $useCache);
     }
 }

@@ -13,10 +13,138 @@ class OddsApiClient
     private const BASE_URL = 'https://api.the-odds-api.com/v4';
     private const SPORT = 'soccer_epl';
 
+    private int $cacheTtl;
+
     public function __construct(
         private readonly string $apiKey,
-        private readonly string $cacheDir = '/tmp'
-    ) {}
+        private readonly string $cacheDir = '/tmp',
+        int $cacheTtlSeconds = 86400  // 24 hours default - limits to ~30 requests/month
+    ) {
+        $this->cacheTtl = $cacheTtlSeconds;
+
+        if (!is_dir($this->cacheDir)) {
+            mkdir($this->cacheDir, 0755, true);
+        }
+    }
+
+    /**
+     * Get match odds for upcoming EPL fixtures.
+     * Compatible with OddsSync interface.
+     *
+     * @return array<int, array{
+     *     home_team: string,
+     *     away_team: string,
+     *     home_win_prob: float,
+     *     draw_prob: float,
+     *     away_win_prob: float,
+     *     home_cs_prob: float,
+     *     away_cs_prob: float,
+     *     expected_total_goals: float
+     * }>
+     */
+    public function getMatchOdds(): array
+    {
+        return $this->getUpcomingOdds(['h2h', 'totals']);
+    }
+
+    /**
+     * Get anytime goalscorer odds for upcoming EPL fixtures.
+     * Note: Limited to US bookmakers per API docs.
+     * Uses event-specific endpoint since player props aren't in bulk odds endpoint.
+     *
+     * @return array<int, array{
+     *     event_id: string,
+     *     home_team: string,
+     *     away_team: string,
+     *     players: array<string, float>
+     * }>
+     */
+    public function getGoalscorerOdds(): array
+    {
+        // First, get list of upcoming events
+        $eventsUrl = self::BASE_URL . "/sports/" . self::SPORT . "/events"
+            . "?apiKey={$this->apiKey}";
+
+        $events = $this->makeRequest($eventsUrl);
+
+        if ($events === null || empty($events)) {
+            return [];
+        }
+
+        $fixtures = [];
+
+        // Fetch goalscorer odds for each event (uses caching to limit API calls)
+        foreach ($events as $event) {
+            $eventId = $event['id'] ?? '';
+            if (empty($eventId)) {
+                continue;
+            }
+
+            $oddsUrl = self::BASE_URL . "/sports/" . self::SPORT . "/events/{$eventId}/odds"
+                . "?apiKey={$this->apiKey}"
+                . "&regions=us"  // Player props limited to US bookmakers
+                . "&markets=player_goal_scorer_anytime"
+                . "&oddsFormat=decimal";
+
+            $oddsResponse = $this->makeRequest($oddsUrl);
+
+            if ($oddsResponse === null) {
+                continue;
+            }
+
+            $players = $this->extractPlayerGoalscorerOdds($oddsResponse);
+            if (!empty($players)) {
+                $fixtures[] = [
+                    'event_id' => $eventId,
+                    'home_team' => $oddsResponse['home_team'] ?? $event['home_team'] ?? '',
+                    'away_team' => $oddsResponse['away_team'] ?? $event['away_team'] ?? '',
+                    'players' => $players,
+                ];
+            }
+        }
+
+        return $fixtures;
+    }
+
+    /**
+     * Extract anytime goalscorer probabilities from event data.
+     * Handles both bulk and event-specific API response formats.
+     *
+     * @return array<string, float> Player name => probability
+     */
+    private function extractPlayerGoalscorerOdds(array $event): array
+    {
+        $players = [];
+
+        foreach ($event['bookmakers'] ?? [] as $bookmaker) {
+            foreach ($bookmaker['markets'] ?? [] as $market) {
+                if ($market['key'] !== 'player_goal_scorer_anytime') {
+                    continue;
+                }
+
+                foreach ($market['outcomes'] ?? [] as $outcome) {
+                    // Player name is in 'description' for event-specific endpoint
+                    // or 'name' for bulk endpoint
+                    $playerName = $outcome['description'] ?? $outcome['name'] ?? '';
+                    $price = (float) ($outcome['price'] ?? 0);
+
+                    if ($playerName && $price > 1) {
+                        // Convert odds to probability, remove ~10% overround
+                        $prob = (1 / $price) / 1.10;
+
+                        // Average if we already have odds for this player
+                        if (isset($players[$playerName])) {
+                            $players[$playerName] = ($players[$playerName] + $prob) / 2;
+                        } else {
+                            $players[$playerName] = round($prob, 4);
+                        }
+                    }
+                }
+            }
+        }
+
+        return $players;
+    }
 
     /**
      * Fetch odds for upcoming EPL fixtures.
@@ -223,29 +351,37 @@ class OddsApiClient
 
     /**
      * Estimate clean sheet probability based on match odds and totals.
+     *
+     * Uses team's win probability as a proxy for defensive dominance.
+     * Strong favorites (80%+ win prob) should have ~40-50% CS probability.
      */
     private function estimateCleanSheetProb(
         float $teamWinProb,
         float $opponentWinProb,
         array $totalsOdds
     ): float {
-        // Base CS probability from defensive strength (inverse of opponent's attack)
-        $baseCs = 0.25; // League average ~25% CS rate
+        // CS probability correlates with team strength and opponent weakness
+        // Win prob of 0.80 (strong favorite) → ~45% CS
+        // Win prob of 0.50 (even match) → ~28% CS
+        // Win prob of 0.20 (underdog) → ~15% CS
+        $baseCs = 0.15 + ($teamWinProb * 0.40);
 
-        // Adjust based on opponent's win probability (stronger opponent = lower CS chance)
-        $adjustedCs = $baseCs * (1 - ($opponentWinProb * 0.5));
+        // Further adjust based on opponent weakness
+        // Very weak opponent (low win prob) increases CS chance
+        $opponentWeakness = 1 - $opponentWinProb;
+        $adjustedCs = $baseCs * (0.7 + ($opponentWeakness * 0.4));
 
         // If we have under goals data, factor that in
         if (!empty($totalsOdds)) {
             $expectedGoals = $this->estimateTotalGoals($totalsOdds);
             // Lower expected goals = higher CS probability
             if ($expectedGoals > 0) {
-                $goalsMultiplier = max(0.5, min(1.5, 2.5 / $expectedGoals));
+                $goalsMultiplier = max(0.7, min(1.3, 2.5 / $expectedGoals));
                 $adjustedCs *= $goalsMultiplier;
             }
         }
 
-        return round(min(0.6, max(0.05, $adjustedCs)), 4);
+        return round(min(0.55, max(0.08, $adjustedCs)), 4);
     }
 
     /**
@@ -289,12 +425,27 @@ class OddsApiClient
     }
 
     /**
-     * Make HTTP request to the API.
+     * Make HTTP request to the API with caching.
      *
      * @return array<int|string, mixed>|null
      */
     private function makeRequest(string $url): ?array
     {
+        // Check cache first (default 24 hours to limit API usage)
+        $cacheKey = md5($url);
+        $cacheFile = $this->cacheDir . "/odds_cache_{$cacheKey}.json";
+
+        if (file_exists($cacheFile)) {
+            $cacheAge = time() - filemtime($cacheFile);
+            if ($cacheAge < $this->cacheTtl) {
+                $cached = json_decode(file_get_contents($cacheFile), true);
+                if ($cached !== null) {
+                    error_log("OddsApiClient: Using cached data ({$cacheAge}s old, TTL: {$this->cacheTtl}s)");
+                    return $cached;
+                }
+            }
+        }
+
         $context = stream_context_create([
             'http' => [
                 'method' => 'GET',
@@ -306,20 +457,25 @@ class OddsApiClient
         $response = @file_get_contents($url, false, $context);
 
         if ($response === false) {
-            error_log("OddsApiClient: Failed to fetch from {$url}");
+            error_log("OddsApiClient: Failed to fetch from API");
             return null;
         }
 
-        // Parse quota from headers
-        if (isset($http_response_header)) {
-            $this->parseQuotaHeaders($http_response_header);
-        }
+        // Parse quota from headers (PHP 8.4+ compatible)
+        $headers = function_exists('http_get_last_response_headers')
+            ? http_get_last_response_headers()
+            : ($http_response_header ?? []);
+        $this->parseQuotaHeaders($headers);
 
         $data = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             error_log("OddsApiClient: Invalid JSON response");
             return null;
         }
+
+        // Cache successful response
+        file_put_contents($cacheFile, json_encode($data));
+        error_log("OddsApiClient: Fetched fresh data from API, cached for {$this->cacheTtl}s");
 
         return $data;
     }

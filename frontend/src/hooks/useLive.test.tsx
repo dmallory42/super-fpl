@@ -120,9 +120,7 @@ describe('useLiveBonus', () => {
   it('fetches when gameweek is valid', async () => {
     const mockData = {
       gameweek: 25,
-      bonus_predictions: [
-        { player_id: 1, bps: 45, predicted_bonus: 3, fixture_id: 100 },
-      ],
+      bonus_predictions: [{ player_id: 1, bps: 45, predicted_bonus: 3, fixture_id: 100 }],
     }
     vi.mocked(client.fetchLiveBonus).mockResolvedValueOnce(mockData)
 

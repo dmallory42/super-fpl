@@ -78,8 +78,10 @@ function PlayerSlot({ pick, player, teamName, animationDelay = 0 }: PlayerSlotPr
 
 export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
   const { startingXI, bench } = useMemo(() => {
-    const starting = picks.filter(p => p.position <= 11).sort((a, b) => a.position - b.position)
-    const benchPlayers = picks.filter(p => p.position > 11).sort((a, b) => a.position - b.position)
+    const starting = picks.filter((p) => p.position <= 11).sort((a, b) => a.position - b.position)
+    const benchPlayers = picks
+      .filter((p) => p.position > 11)
+      .sort((a, b) => a.position - b.position)
     return { startingXI: starting, bench: benchPlayers }
   }, [picks])
 
@@ -94,14 +96,23 @@ export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
       if (!player) continue
 
       switch (player.element_type) {
-        case 1: gk.push(pick); break
-        case 2: def.push(pick); break
-        case 3: mid.push(pick); break
-        case 4: fwd.push(pick); break
+        case 1:
+          gk.push(pick)
+          break
+        case 2:
+          def.push(pick)
+          break
+        case 3:
+          mid.push(pick)
+          break
+        case 4:
+          fwd.push(pick)
+          break
       }
     }
 
-    return [fwd, mid, def, gk]
+    // Order: GK at top, then DEF, MID, FWD at bottom
+    return [gk, def, mid, fwd]
   }, [startingXI, players])
 
   const getTeamName = (playerId: number) => {

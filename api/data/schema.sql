@@ -36,6 +36,9 @@ CREATE TABLE players (
     news TEXT,
     penalties_order INTEGER DEFAULT 0,
     penalties_taken INTEGER DEFAULT 0,
+    defensive_contribution INTEGER DEFAULT 0,
+    defensive_contribution_per_90 REAL DEFAULT 0,
+    saves INTEGER DEFAULT 0,
     updated_at TIMESTAMP
 );
 

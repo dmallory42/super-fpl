@@ -36,7 +36,9 @@ export function RiskMeter({ managerName, riskScore, compact = false }: RiskMeter
             style={{ width: `${percentage}%` }}
           />
         </div>
-        <span className={`text-xs font-display uppercase tracking-wider ${levelTextColors[riskScore.level]}`}>
+        <span
+          className={`text-xs font-display uppercase tracking-wider ${levelTextColors[riskScore.level]}`}
+        >
           {riskScore.level}
         </span>
       </div>
@@ -44,10 +46,14 @@ export function RiskMeter({ managerName, riskScore, compact = false }: RiskMeter
   }
 
   return (
-    <div className={`p-4 rounded-lg ${levelBgColors[riskScore.level]} border border-border animate-fade-in-up`}>
+    <div
+      className={`p-4 rounded-lg ${levelBgColors[riskScore.level]} border border-border animate-fade-in-up`}
+    >
       <div className="flex items-center justify-between mb-3">
         <span className="text-foreground font-medium truncate max-w-[150px]">{managerName}</span>
-        <span className={`text-xs font-display uppercase tracking-wider font-bold ${levelTextColors[riskScore.level]}`}>
+        <span
+          className={`text-xs font-display uppercase tracking-wider font-bold ${levelTextColors[riskScore.level]}`}
+        >
           {riskScore.level} risk
         </span>
       </div>

@@ -24,6 +24,7 @@ class PredictionEngine
     private GoalProbability $goalProb;
     private CleanSheetProbability $csProb;
     private BonusProbability $bonusProb;
+    private DefensiveContributionProbability $dcProb;
 
     public function __construct()
     {
@@ -31,6 +32,7 @@ class PredictionEngine
         $this->goalProb = new GoalProbability();
         $this->csProb = new CleanSheetProbability();
         $this->bonusProb = new BonusProbability();
+        $this->dcProb = new DefensiveContributionProbability();
     }
 
     /**
@@ -52,7 +54,7 @@ class PredictionEngine
 
         // Calculate individual probabilities
         $minutes = $this->minutesProb->calculate($player);
-        $goal = $this->goalProb->calculate($player, $fixture, $goalscorerOdds);
+        $goal = $this->goalProb->calculate($player, $fixture, $goalscorerOdds, $fixtureOdds);
         $cs = $this->csProb->calculate($player, $fixture, $fixtureOdds);
         $bonus = $this->bonusProb->calculate($player);
 
@@ -69,7 +71,7 @@ class PredictionEngine
         $breakdown['goals'] = round($goalPoints, 2);
 
         // Assist points
-        $assistProb = $this->calculateAssistProb($player, $fixture);
+        $assistProb = $this->calculateAssistProb($player, $fixture, $fixtureOdds);
         $assistPoints = $assistProb * $minutes['prob_any'] * self::ASSIST_POINTS;
         $breakdown['assists'] = round($assistPoints, 2);
 
@@ -95,9 +97,16 @@ class PredictionEngine
         }
         $breakdown['saves'] = round($savePoints, 2);
 
+        // Defensive contribution points (outfield players only: DEF, MID, FWD)
+        $dcPoints = 0;
+        if ($position >= 2) {
+            $dcPoints = $this->dcProb->calculate($player, $position, $minutes['expected_mins']);
+        }
+        $breakdown['defensive_contribution'] = round($dcPoints, 2);
+
         // Total predicted points
         $total = $appearancePoints + $goalPoints + $assistPoints + $csPoints
-            + $bonusPoints + $gcPenalty + $savePoints;
+            + $bonusPoints + $gcPenalty + $savePoints + $dcPoints;
 
         // Calculate confidence based on data quality
         $confidence = $this->calculateConfidence($player, $fixtureOdds, $goalscorerOdds);
@@ -111,38 +120,46 @@ class PredictionEngine
 
     /**
      * Calculate assist probability based on xA and historical data.
+     * Uses odds-based adjustments instead of FPL difficulty ratings.
      */
-    private function calculateAssistProb(array $player, ?array $fixture): float
+    private function calculateAssistProb(array $player, ?array $fixture, ?array $fixtureOdds = null): float
     {
         $xa = (float) ($player['expected_assists'] ?? 0);
         $minutes = (int) ($player['minutes'] ?? 0);
         $assists = (int) ($player['assists'] ?? 0);
 
         if ($minutes > 0 && $xa > 0) {
-            $xaPer90 = ($xa / $minutes) * 90;
+            $xaPer95 = ($xa / $minutes) * 95;  // 95 mins = full match with injury time
             // Use Poisson for P(assists >= 1)
-            $prob = 1 - exp(-$xaPer90);
+            $prob = 1 - exp(-$xaPer95);
         } else {
             // Fallback to historical
             $gamesPlayed = max(1, (int) ($player['starts'] ?? 1));
             $prob = min(0.5, $assists / $gamesPlayed);
         }
 
-        // Adjust for fixture
+        // Adjust for fixture using odds if available
         if ($fixture !== null) {
             $clubId = $player['club_id'] ?? $player['team'] ?? 0;
             $isHome = ($fixture['home_club_id'] ?? 0) === $clubId;
-            $difficulty = $isHome
-                ? ($fixture['home_difficulty'] ?? 3)
-                : ($fixture['away_difficulty'] ?? 3);
 
-            $multiplier = match ((int) $difficulty) {
-                1, 2 => 1.15,
-                3 => 1.0,
-                4 => 0.9,
-                5 => 0.8,
-                default => 1.0,
-            };
+            $multiplier = 1.0;
+
+            // Use odds-based multiplier if available
+            if ($fixtureOdds !== null) {
+                $winProb = $isHome
+                    ? (float) ($fixtureOdds['home_win_prob'] ?? 0.33)
+                    : (float) ($fixtureOdds['away_win_prob'] ?? 0.33);
+
+                // Win prob ranges ~0.15 to ~0.65
+                // Map to multiplier range 0.8 - 1.15
+                $multiplier = 0.8 + ($winProb * 0.54);
+            }
+
+            // Home advantage (+5%)
+            if ($isHome) {
+                $multiplier *= 1.05;
+            }
 
             $prob *= $multiplier;
         }
@@ -193,13 +210,13 @@ class PredictionEngine
         $minutes = (int) ($player['minutes'] ?? 0);
 
         if ($minutes > 0) {
-            $savesPer90 = ($saves / $minutes) * 90;
+            $savesPer95 = ($saves / $minutes) * 95;  // 95 mins = full match with injury time
         } else {
-            $savesPer90 = 3; // Average
+            $savesPer95 = 3.2; // Average (~3 per 90, scaled to 95)
         }
 
         // +1 point per 3 saves, conditional on playing
-        return ($savesPer90 / 3) * $prob60;
+        return ($savesPer95 / 3) * $prob60;
     }
 
     /**

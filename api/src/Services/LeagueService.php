@@ -12,7 +12,8 @@ class LeagueService
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
-    ) {}
+    ) {
+    }
 
     /**
      * Get league info and standings, auto-caching members.

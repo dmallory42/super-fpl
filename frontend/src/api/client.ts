@@ -176,11 +176,26 @@ export interface LivePlayerStats {
   bonus: number
   bps: number
   total_points: number
+  clearances_blocks_interceptions?: number
+  defensive_contribution?: number
+}
+
+export interface ExplainStat {
+  identifier: string
+  points: number
+  value: number
+  points_modification: number
+}
+
+export interface ExplainEntry {
+  fixture: number
+  stats: ExplainStat[]
 }
 
 export interface LiveElement {
   id: number
   stats: LivePlayerStats
+  explain?: ExplainEntry[]
   web_name?: string
   team?: number
   position?: number
@@ -242,6 +257,7 @@ export interface TierSampleData {
   avg_points: number
   sample_size: number
   effective_ownership: Record<number, number>
+  captain_percent?: Record<number, number>
   estimated?: boolean // True if using FPL average estimates instead of real samples
 }
 

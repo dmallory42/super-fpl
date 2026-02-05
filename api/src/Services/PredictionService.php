@@ -45,18 +45,27 @@ class PredictionService
         $players = $this->db->fetchAll('SELECT * FROM players');
         $fixtures = $this->getFixturesForGameweek($gameweek);
         $fixtureOdds = $this->getFixtureOdds($gameweek);
+        $goalscorerOdds = $this->getGoalscorerOdds($gameweek);
 
         $predictions = [];
 
         foreach ($players as $player) {
             $clubId = (int) $player['club_id'];
+            $playerId = (int) $player['id'];
 
             // Find player's fixture
             $fixture = $this->findPlayerFixture($clubId, $fixtures);
             $odds = $fixture ? ($fixtureOdds[$fixture['id']] ?? null) : null;
 
+            // Get player-specific goalscorer odds
+            $playerGoalscorerOdds = null;
+            if ($fixture) {
+                $key = $playerId . '_' . $fixture['id'];
+                $playerGoalscorerOdds = $goalscorerOdds[$key] ?? null;
+            }
+
             // Generate prediction
-            $prediction = $this->engine->predict($player, $fixture, $odds);
+            $prediction = $this->engine->predict($player, $fixture, $odds, $playerGoalscorerOdds);
 
             $predictions[] = [
                 'player_id' => $player['id'],
@@ -106,7 +115,15 @@ class PredictionService
         $fixture = $this->findPlayerFixture((int) $player['club_id'], $fixtures);
         $odds = $fixture ? $this->getFixtureOdds($gameweek)[$fixture['id']] ?? null : null;
 
-        $prediction = $this->engine->predict($player, $fixture, $odds);
+        // Get player-specific goalscorer odds
+        $playerGoalscorerOdds = null;
+        if ($fixture) {
+            $goalscorerOdds = $this->getGoalscorerOdds($gameweek);
+            $key = $playerId . '_' . $fixture['id'];
+            $playerGoalscorerOdds = $goalscorerOdds[$key] ?? null;
+        }
+
+        $prediction = $this->engine->predict($player, $fixture, $odds, $playerGoalscorerOdds);
 
         return [
             'player_id' => $player['id'],
@@ -197,6 +214,29 @@ class PredictionService
     }
 
     /**
+     * Get player goalscorer odds for a gameweek.
+     *
+     * @return array<string, array<string, mixed>> Keyed by "player_id_fixture_id"
+     */
+    private function getGoalscorerOdds(int $gameweek): array
+    {
+        $odds = $this->db->fetchAll(
+            "SELECT pgo.*
+            FROM player_goalscorer_odds pgo
+            JOIN fixtures f ON pgo.fixture_id = f.id
+            WHERE f.gameweek = ?",
+            [$gameweek]
+        );
+
+        $result = [];
+        foreach ($odds as $row) {
+            $key = $row['player_id'] . '_' . $row['fixture_id'];
+            $result[$key] = $row;
+        }
+        return $result;
+    }
+
+    /**
      * Find a player's fixture from the list.
      *
      * @param array<int, array<string, mixed>> $fixtures
@@ -220,7 +260,7 @@ class PredictionService
     public static function getMethodology(): array
     {
         return [
-            'version' => 'v1.0',
+            'version' => 'v2.0',
             'overview' => 'Points predicted using probability models for each FPL scoring action',
             'scoring_rules' => [
                 'goals' => 'GK/DEF: 6pts, MID: 5pts, FWD: 4pts',
@@ -230,35 +270,40 @@ class PredictionService
                 'bonus' => '1-3pts based on BPS ranking',
                 'saves' => 'GK only: 1pt per 3 saves',
                 'goals_conceded' => 'GK/DEF: -1pt per 2 goals conceded',
+                'defensive_contribution' => 'DEF: 2pts for 10+ DC, MID/FWD: 2pts for 12+ DC',
             ],
             'probability_models' => [
                 'minutes' => [
-                    'description' => 'Probability of playing based on historical start rate and chance_of_playing flag',
-                    'factors' => ['starts/games ratio', 'chance_of_playing_next_round', 'recent form'],
+                    'description' => 'Probability of playing based on historical start rate',
+                    'factors' => ['starts/team_games ratio', 'average minutes when playing'],
+                    'note' => 'Only uses chance_of_playing when it equals 0 (confirmed out)',
                 ],
                 'goals' => [
                     'description' => 'Goal probability using Poisson distribution on xG per 90',
-                    'factors' => ['expected_goals', 'minutes played', 'fixture difficulty', 'goalscorer odds when available'],
+                    'factors' => ['expected_goals', 'minutes played', 'bookmaker win probability', 'goalscorer odds when available'],
                 ],
                 'assists' => [
                     'description' => 'Assist probability using Poisson distribution on xA per 90',
-                    'factors' => ['expected_assists', 'historical assist rate', 'fixture difficulty'],
+                    'factors' => ['expected_assists', 'historical assist rate', 'bookmaker win probability'],
                 ],
                 'clean_sheets' => [
-                    'description' => 'Clean sheet probability based on team defensive strength',
-                    'factors' => ['team xGC', 'opponent attack strength', 'fixture odds when available'],
+                    'description' => 'Clean sheet probability blending bookmaker odds with xGC-based estimate',
+                    'factors' => ['team xGC', 'bookmaker CS probability (60% weight)', 'xGC-based estimate (40% weight)'],
                 ],
                 'bonus' => [
                     'description' => 'Expected bonus using sigmoid on BPS per 90',
                     'factors' => ['bps', 'minutes', 'historical bonus rate'],
                 ],
+                'defensive_contribution' => [
+                    'description' => 'Probability of earning DC bonus using Poisson distribution',
+                    'factors' => ['defensive_contribution_per_90', 'expected_minutes', 'position-based threshold'],
+                ],
             ],
             'fixture_adjustments' => [
-                'difficulty_1_2' => '+15-20% goal/assist probability, +15-30% clean sheet',
-                'difficulty_3' => 'No adjustment (baseline)',
-                'difficulty_4' => '-10-15% goal/assist probability, -15-25% clean sheet',
-                'difficulty_5' => '-20-30% goal/assist probability, -30-50% clean sheet',
-                'home_advantage' => '+10% goals, +15% clean sheet probability',
+                'odds_based' => 'Uses bookmaker win probability to derive attack/defense multipliers',
+                'win_prob_mapping' => 'Win prob ~0.15-0.65 maps to multiplier 0.75-1.25 for attacks',
+                'home_advantage' => '+10% goals/assists, +15% clean sheet probability',
+                'fallback' => 'When no odds available, uses neutral multiplier (1.0)',
             ],
             'confidence_calculation' => [
                 'base' => 0.5,
@@ -269,7 +314,7 @@ class PredictionService
             ],
             'limitations' => [
                 'Does not account for tactical changes or rotation',
-                'Fixture difficulty ratings are FPL official, not form-adjusted',
+                'Availability modifier fixed at 100% (future: injury modeling)',
                 'DGW/BGW handling is separate from base predictions',
             ],
         ];

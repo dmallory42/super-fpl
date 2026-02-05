@@ -160,7 +160,9 @@ class TransferOptimizerService
         $squadScores = [];
         foreach ($squadCopy as $playerId) {
             $player = $playerMap[$playerId] ?? null;
-            if (!$player) continue;
+            if (!$player) {
+                continue;
+            }
 
             $totalPredicted = 0;
             foreach ($gameweeks as $gw) {
@@ -193,11 +195,17 @@ class TransferOptimizerService
             $bestGain = 0;
 
             foreach ($playerMap as $inPlayerId => $inPlayer) {
-                if (in_array($inPlayerId, $squadCopy)) continue;
-                if ((int) $inPlayer['element_type'] !== $position) continue;
+                if (in_array($inPlayerId, $squadCopy)) {
+                    continue;
+                }
+                if ((int) $inPlayer['element_type'] !== $position) {
+                    continue;
+                }
 
                 $inPrice = (int) $inPlayer['now_cost'] / 10;
-                if ($inPrice > $maxBudget) continue;
+                if ($inPrice > $maxBudget) {
+                    continue;
+                }
 
                 // Check team limit (max 3 per team)
                 $teamCount = 0;
@@ -206,7 +214,9 @@ class TransferOptimizerService
                         $teamCount++;
                     }
                 }
-                if ($teamCount >= 3) continue;
+                if ($teamCount >= 3) {
+                    continue;
+                }
 
                 $inPredicted = 0;
                 foreach ($gameweeks as $gw) {
@@ -328,7 +338,9 @@ class TransferOptimizerService
                 // TC value = extra captain points (normally 2x, TC is 3x, so +1x)
                 $tcValue = $maxPred;
                 $hasDgw = !empty($dgwTeams[$gw] ?? []);
-                if ($hasDgw) $tcValue *= 1.3;
+                if ($hasDgw) {
+                    $tcValue *= 1.3;
+                }
 
                 if ($tcValue > $bestTCValue) {
                     $bestTCValue = $tcValue;

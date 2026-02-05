@@ -1,5 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { fetchManager, fetchManagerPicks, fetchManagerHistory, type ManagerHistoryResponse } from '../api/client'
+import {
+  fetchManager,
+  fetchManagerPicks,
+  fetchManagerHistory,
+  type ManagerHistoryResponse,
+} from '../api/client'
 import type { Manager, ManagerPicks } from '../types'
 
 export function useManager(id: number | null) {

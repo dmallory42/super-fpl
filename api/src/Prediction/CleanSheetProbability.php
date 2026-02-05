@@ -22,28 +22,35 @@ class CleanSheetProbability
         ?array $fixture = null,
         ?array $fixtureOdds = null
     ): float {
-        // Use bookmaker odds if available (most accurate)
-        if ($fixtureOdds !== null) {
-            $clubId = $player['club_id'] ?? $player['team'] ?? 0;
-            $isHome = $fixture && ($fixture['home_club_id'] ?? 0) === $clubId;
+        $clubId = $player['club_id'] ?? $player['team'] ?? 0;
+        $isHome = $fixture && ($fixture['home_club_id'] ?? 0) === $clubId;
 
+        // Calculate xGC-based probability
+        $xgcBasedProb = $this->calculateFromStats($player, $fixture, $isHome);
+
+        // When odds available, blend bookmaker CS probability (60%) with xGC-based estimate (40%)
+        if ($fixtureOdds !== null) {
             $csProb = $isHome
                 ? ($fixtureOdds['home_cs_prob'] ?? null)
                 : ($fixtureOdds['away_cs_prob'] ?? null);
 
             if ($csProb !== null) {
-                return round((float) $csProb, 4);
+                $blendedProb = ((float) $csProb * 0.6) + ($xgcBasedProb * 0.4);
+                return round(min(0.6, max(0.05, $blendedProb)), 4);
             }
         }
 
-        // Fallback to statistical approach
-        return $this->calculateFromStats($player, $fixture);
+        // Fallback to xGC-based probability only
+        return round(min(0.6, max(0.05, $xgcBasedProb)), 4);
     }
 
     /**
      * Calculate CS probability from player/team stats.
+     *
+     * No longer uses FPL difficulty ratings - uses neutral baseline
+     * when odds are not available.
      */
-    private function calculateFromStats(array $player, ?array $fixture): float
+    private function calculateFromStats(array $player, ?array $fixture, bool $isHome): float
     {
         $cleanSheets = (int) ($player['clean_sheets'] ?? 0);
         $minutes = (int) ($player['minutes'] ?? 0);
@@ -57,40 +64,21 @@ class CleanSheetProbability
 
         // If we have xGC, use it for better accuracy
         if ($xgc > 0 && $minutes > 0) {
-            $xgcPer90 = ($xgc / $minutes) * 90;
+            $xgcPer95 = ($xgc / $minutes) * 95;  // 95 mins = full match with injury time
             // Lower xGC = higher CS probability
             // xGC of 1.0 per game ≈ 35% CS, xGC of 0.5 ≈ 55% CS
-            $xgcProb = exp(-$xgcPer90 * 0.9);
+            $xgcProb = exp(-$xgcPer95 * 0.9);
             // Blend historical CS rate with xGC-based estimate
             $baseProb = ($csRate * 0.4) + ($xgcProb * 0.6);
         } else {
             $baseProb = $csRate;
         }
 
-        // Adjust for fixture difficulty
-        if ($fixture !== null) {
-            $clubId = $player['club_id'] ?? $player['team'] ?? 0;
-            $isHome = ($fixture['home_club_id'] ?? 0) === $clubId;
+        // Home advantage for clean sheets (+15% home, -10% away)
+        // No longer using FPL difficulty ratings
+        $homeBoost = $isHome ? 1.15 : 0.9;
+        $baseProb *= $homeBoost;
 
-            $difficulty = $isHome
-                ? ($fixture['home_difficulty'] ?? 3)
-                : ($fixture['away_difficulty'] ?? 3);
-
-            $difficultyMultiplier = match ((int) $difficulty) {
-                1, 2 => 1.3,  // Easy fixture - high CS chance
-                3 => 1.0,     // Medium
-                4 => 0.75,    // Hard
-                5 => 0.5,     // Very hard
-                default => 1.0,
-            };
-
-            // Home advantage for clean sheets
-            $homeBoost = $isHome ? 1.15 : 0.9;
-
-            $baseProb *= $difficultyMultiplier * $homeBoost;
-        }
-
-        // Cap probability at reasonable bounds
-        return round(min(0.6, max(0.05, $baseProb)), 4);
+        return $baseProb;
     }
 }

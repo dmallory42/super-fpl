@@ -3,12 +3,62 @@ import { render, screen } from '../../test/utils'
 import { SeasonReview } from './SeasonReview'
 import type { ManagerHistoryResponse } from '../../api/client'
 
-const createHistoryData = (overrides: Partial<ManagerHistoryResponse> = {}): ManagerHistoryResponse => ({
+const createHistoryData = (
+  overrides: Partial<ManagerHistoryResponse> = {}
+): ManagerHistoryResponse => ({
   current: [
-    { event: 1, points: 65, total_points: 65, rank: 1000000, rank_sort: 1000000, overall_rank: 1000000, bank: 0, value: 1000, event_transfers: 0, event_transfers_cost: 0, points_on_bench: 8 },
-    { event: 2, points: 72, total_points: 137, rank: 800000, rank_sort: 800000, overall_rank: 800000, bank: 5, value: 1005, event_transfers: 1, event_transfers_cost: 0, points_on_bench: 5 },
-    { event: 3, points: 45, total_points: 182, rank: 1200000, rank_sort: 1200000, overall_rank: 900000, bank: 10, value: 1010, event_transfers: 0, event_transfers_cost: 0, points_on_bench: 12 },
-    { event: 4, points: 88, total_points: 270, rank: 500000, rank_sort: 500000, overall_rank: 600000, bank: 15, value: 1015, event_transfers: 2, event_transfers_cost: 4, points_on_bench: 3 },
+    {
+      event: 1,
+      points: 65,
+      total_points: 65,
+      rank: 1000000,
+      rank_sort: 1000000,
+      overall_rank: 1000000,
+      bank: 0,
+      value: 1000,
+      event_transfers: 0,
+      event_transfers_cost: 0,
+      points_on_bench: 8,
+    },
+    {
+      event: 2,
+      points: 72,
+      total_points: 137,
+      rank: 800000,
+      rank_sort: 800000,
+      overall_rank: 800000,
+      bank: 5,
+      value: 1005,
+      event_transfers: 1,
+      event_transfers_cost: 0,
+      points_on_bench: 5,
+    },
+    {
+      event: 3,
+      points: 45,
+      total_points: 182,
+      rank: 1200000,
+      rank_sort: 1200000,
+      overall_rank: 900000,
+      bank: 10,
+      value: 1010,
+      event_transfers: 0,
+      event_transfers_cost: 0,
+      points_on_bench: 12,
+    },
+    {
+      event: 4,
+      points: 88,
+      total_points: 270,
+      rank: 500000,
+      rank_sort: 500000,
+      overall_rank: 600000,
+      bank: 15,
+      value: 1015,
+      event_transfers: 2,
+      event_transfers_cost: 4,
+      points_on_bench: 3,
+    },
   ],
   chips: [
     { name: 'wildcard', time: '2024-09-01T10:00:00Z', event: 2 },
