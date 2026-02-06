@@ -10,29 +10,34 @@ namespace SuperFPL\Api\Prediction;
 class MinutesProbability
 {
     /**
-     * Default estimated team games played in the season so far.
-     * Used when calculating start rate.
+     * Minimum minutes for reliable predictions.
+     * Below this, regress toward conservative baseline.
      */
-    private const DEFAULT_TEAM_GAMES = 24;
+    private const RELIABLE_MINUTES_THRESHOLD = 270;
 
     /**
-     * Calculate probability of playing 60+ minutes.
+     * Calculate probability of playing and expected minutes.
      *
-     * Uses minutes-per-start ratio to identify nailed starters vs rotation players.
-     * A player averaging 85+ mins per start is clearly first-choice when fit.
+     * Uses actual appearances data (synced from FPL API) to calculate
+     * accurate minutes per appearance. This correctly handles:
+     * - Super-subs who rarely start but appear often
+     * - Injured players who play full games when fit
+     * - Rotation players
      *
      * @param array<string, mixed> $player Player data from database
-     * @param int|null $estimatedTeamGames Override for team games (for testing)
+     * @param int $teamGames Number of games the player's team has played
      * @return array{prob_60: float, prob_any: float, expected_mins: float}
      */
-    public function calculate(array $player, ?int $estimatedTeamGames = null): array
+    public function calculate(array $player, int $teamGames): array
     {
         $chanceOfPlaying = $player['chance_of_playing'] ?? null;
         $starts = (int) ($player['starts'] ?? 0);
         $minutes = (int) ($player['minutes'] ?? 0);
+        $appearances = (int) ($player['appearances'] ?? 0);
 
         // Only trust chance_of_playing if it equals 0 (confirmed out)
-        if ($chanceOfPlaying === 0) {
+        // Cast to int to handle string "0" from API
+        if ($chanceOfPlaying !== null && (int) $chanceOfPlaying === 0) {
             return [
                 'prob_60' => 0.0,
                 'prob_any' => 0.0,
@@ -41,7 +46,7 @@ class MinutesProbability
         }
 
         // No playing time this season
-        if ($starts === 0 || $minutes === 0) {
+        if ($minutes === 0 || $appearances === 0) {
             return [
                 'prob_60' => 0.1,
                 'prob_any' => 0.15,
@@ -49,28 +54,31 @@ class MinutesProbability
             ];
         }
 
-        // Average minutes when playing
-        $avgMinsWhenPlaying = $minutes / $starts;
+        // Core metrics from real data
+        $minsPerAppearance = $minutes / $appearances;
+        $appearanceRate = $appearances / $teamGames;
+        $startRate = $starts / $teamGames;
 
-        // Determine start probability based on minutes-per-start pattern
-        // This accounts for players who were injured/unavailable early season
-        // but are nailed-on starters when fit
-        $probAny = $this->calculateStartProbability($starts, $avgMinsWhenPlaying, $estimatedTeamGames);
+        // Probability of any appearance (capped at 98%)
+        $probAny = min(0.98, $appearanceRate);
 
-        // Probability of playing 60+ minutes (conditional on starting)
-        // If they average 85+ mins, they almost always play 60+
-        $prob60Given = match (true) {
-            $avgMinsWhenPlaying >= 85 => 0.95,
-            $avgMinsWhenPlaying >= 75 => 0.90,
-            $avgMinsWhenPlaying >= 60 => 0.80,
-            $avgMinsWhenPlaying >= 45 => 0.60,
-            default => 0.40,
-        };
+        // Probability of 60+ mins depends on whether they typically start or sub
+        $prob60 = $this->calculate60MinsProbability($minsPerAppearance, $startRate, $probAny);
 
-        $prob60 = $probAny * $prob60Given;
+        // Expected minutes = probability of playing × minutes when playing
+        $expectedMins = $probAny * $minsPerAppearance;
 
-        // Expected minutes
-        $expectedMins = $probAny * $avgMinsWhenPlaying;
+        // Apply reliability discount for low-minutes players
+        if ($minutes < self::RELIABLE_MINUTES_THRESHOLD) {
+            $reliability = $minutes / self::RELIABLE_MINUTES_THRESHOLD;
+            $baselineExpectedMins = 15.0;
+            $baselineProb60 = 0.10;
+            $baselineProbAny = 0.25;
+
+            $expectedMins = ($expectedMins * $reliability) + ($baselineExpectedMins * (1 - $reliability));
+            $prob60 = ($prob60 * $reliability) + ($baselineProb60 * (1 - $reliability));
+            $probAny = ($probAny * $reliability) + ($baselineProbAny * (1 - $reliability));
+        }
 
         return [
             'prob_60' => round($prob60, 4),
@@ -80,38 +88,31 @@ class MinutesProbability
     }
 
     /**
-     * Calculate probability of starting based on playing patterns.
-     *
-     * Key insight: A player with 85+ mins per start is a nailed starter when fit.
-     * Their low season starts may be due to injury, not rotation.
+     * Calculate probability of playing 60+ minutes.
      */
-    private function calculateStartProbability(int $starts, float $avgMinsWhenPlaying, ?int $estimatedTeamGames): float
+    private function calculate60MinsProbability(float $minsPerAppearance, float $startRate, float $probAny): float
     {
-        $teamGames = $estimatedTeamGames ?? self::DEFAULT_TEAM_GAMES;
-
-        // Nailed starter pattern: plays full games when they play
-        // These players start 90%+ of games when available
-        if ($avgMinsWhenPlaying >= 85) {
-            // Still factor in volume - more starts = more confidence
-            $volumeBonus = min(0.05, $starts / $teamGames * 0.1);
-            return min(0.95, 0.90 + $volumeBonus);
+        // High mins per appearance = usually plays full games
+        if ($minsPerAppearance >= 85) {
+            return 0.95 * $probAny;
+        }
+        if ($minsPerAppearance >= 70) {
+            return 0.85 * $probAny;
         }
 
-        // Regular starter pattern: usually plays 70-85 mins
-        if ($avgMinsWhenPlaying >= 70) {
-            $baseProb = 0.80;
-            $volumeFactor = min(1.0, $starts / ($teamGames * 0.7));
-            return min(0.90, $baseProb * $volumeFactor + 0.10);
+        // For lower mins per appearance, use start rate to estimate
+        // A player with 40 mins/appearance could be rotation starter or super-sub
+        if ($startRate > 0.5) {
+            // Mostly starts - probably gets subbed off sometimes
+            $prob60GivenPlay = min(0.80, 0.50 + ($minsPerAppearance / 150));
+        } elseif ($startRate > 0.2) {
+            // Mix of starts and subs
+            $prob60GivenPlay = min(0.60, 0.30 + ($minsPerAppearance / 200));
+        } else {
+            // Mostly subs - rarely plays 60+
+            $prob60GivenPlay = min(0.30, $minsPerAppearance / 150);
         }
 
-        // Rotation/squad player: 45-70 mins average
-        if ($avgMinsWhenPlaying >= 45) {
-            $startRate = $starts / $teamGames;
-            return min(0.75, max(0.40, $startRate + 0.20));
-        }
-
-        // Fringe/bench player: sub appearances
-        $startRate = $starts / $teamGames;
-        return min(0.50, max(0.15, $startRate));
+        return $prob60GivenPlay * $probAny;
     }
 }

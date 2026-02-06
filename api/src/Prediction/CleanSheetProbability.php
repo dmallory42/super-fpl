@@ -6,6 +6,13 @@ namespace SuperFPL\Api\Prediction;
 
 /**
  * Calculates clean sheet probability for defenders and goalkeepers.
+ *
+ * Priority:
+ * 1. Direct CS odds as primary (80% odds / 20% xGC-based)
+ *    No separate home boost — odds already include it.
+ * 2. Match odds available but no CS odds: derive from opponent expected goals
+ *    oppXG = deriveOpponentGoals(fixtureOdds, isHome), csProb = exp(-oppXG)
+ * 3. No odds: historical CS rate from actuals (no home/away boost)
  */
 class CleanSheetProbability
 {
@@ -25,60 +32,79 @@ class CleanSheetProbability
         $clubId = $player['club_id'] ?? $player['team'] ?? 0;
         $isHome = $fixture && ($fixture['home_club_id'] ?? 0) === $clubId;
 
-        // Calculate xGC-based probability
-        $xgcBasedProb = $this->calculateFromStats($player, $fixture, $isHome);
-
-        // When odds available, blend bookmaker CS probability (60%) with xGC-based estimate (40%)
+        // Method 1: Direct CS odds (primary signal)
         if ($fixtureOdds !== null) {
             $csProb = $isHome
                 ? ($fixtureOdds['home_cs_prob'] ?? null)
                 : ($fixtureOdds['away_cs_prob'] ?? null);
 
             if ($csProb !== null) {
-                $blendedProb = ((float) $csProb * 0.6) + ($xgcBasedProb * 0.4);
+                // Blend 80% odds / 20% xGC-based — no separate home boost
+                $xgcBasedProb = $this->calculateFromXGC($player);
+                $blendedProb = ((float) $csProb * 0.8) + ($xgcBasedProb * 0.2);
                 return round(min(0.6, max(0.05, $blendedProb)), 4);
             }
+
+            // Method 2: Derive from match odds (no CS odds available)
+            $oppXG = $this->deriveOpponentGoals($fixtureOdds, $isHome);
+            $derivedCsProb = exp(-$oppXG);
+            return round(min(0.6, max(0.05, $derivedCsProb)), 4);
         }
 
-        // Fallback to xGC-based probability only
-        return round(min(0.6, max(0.05, $xgcBasedProb)), 4);
+        // Method 3: Historical CS rate from actuals (no home/away boost)
+        $baseProb = $this->calculateFromActuals($player);
+        return round(min(0.6, max(0.05, $baseProb)), 4);
     }
 
     /**
-     * Calculate CS probability from player/team stats.
-     *
-     * No longer uses FPL difficulty ratings - uses neutral baseline
-     * when odds are not available.
+     * Derive opponent expected goals from match odds.
      */
-    private function calculateFromStats(array $player, ?array $fixture, bool $isHome): float
+    private function deriveOpponentGoals(array $fixtureOdds, bool $isHome): float
+    {
+        $totalGoals = (float) ($fixtureOdds['expected_total_goals'] ?? 2.5);
+        $homeWinProb = (float) ($fixtureOdds['home_win_prob'] ?? 0.33);
+        $drawProb = (float) ($fixtureOdds['draw_prob'] ?? 0.33);
+
+        // Home share of goals
+        $homeShare = $homeWinProb + 0.5 * $drawProb;
+
+        // Opponent goals = total - team goals
+        if ($isHome) {
+            return $totalGoals * (1 - $homeShare);
+        }
+        return $totalGoals * $homeShare;
+    }
+
+    /**
+     * Calculate CS probability from xGC data.
+     */
+    private function calculateFromXGC(array $player): float
+    {
+        $xgc = (float) ($player['expected_goals_conceded'] ?? 0);
+        $minutes = (int) ($player['minutes'] ?? 0);
+
+        if ($xgc > 0 && $minutes > 0) {
+            $xgcPer90 = ($xgc / $minutes) * 90;
+            return exp(-$xgcPer90);
+        }
+
+        // Fallback to league average if no xGC
+        return 0.28;
+    }
+
+    /**
+     * Calculate CS probability from actual clean sheet records.
+     */
+    private function calculateFromActuals(array $player): float
     {
         $cleanSheets = (int) ($player['clean_sheets'] ?? 0);
         $minutes = (int) ($player['minutes'] ?? 0);
-        $xgc = (float) ($player['expected_goals_conceded'] ?? 0);
 
-        // Calculate games played (approximate)
-        $gamesPlayed = max(1, floor($minutes / 60));
-
-        // Base CS rate
-        $csRate = $cleanSheets / $gamesPlayed;
-
-        // If we have xGC, use it for better accuracy
-        if ($xgc > 0 && $minutes > 0) {
-            $xgcPer95 = ($xgc / $minutes) * 95;  // 95 mins = full match with injury time
-            // Lower xGC = higher CS probability
-            // xGC of 1.0 per game ≈ 35% CS, xGC of 0.5 ≈ 55% CS
-            $xgcProb = exp(-$xgcPer95 * 0.9);
-            // Blend historical CS rate with xGC-based estimate
-            $baseProb = ($csRate * 0.4) + ($xgcProb * 0.6);
-        } else {
-            $baseProb = $csRate;
+        if ($minutes <= 0) {
+            return 0.28; // League average
         }
 
-        // Home advantage for clean sheets (+15% home, -10% away)
-        // No longer using FPL difficulty ratings
-        $homeBoost = $isHome ? 1.15 : 0.9;
-        $baseProb *= $homeBoost;
-
-        return $baseProb;
+        $gamesPlayed = max(1, floor($minutes / 60));
+        return $cleanSheets / $gamesPlayed;
     }
 }

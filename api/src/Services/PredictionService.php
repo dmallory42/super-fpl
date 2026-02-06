@@ -15,7 +15,7 @@ class PredictionService
     public function __construct(Database $db)
     {
         $this->db = $db;
-        $this->engine = new PredictionEngine();
+        $this->engine = new PredictionEngine($db);
     }
 
     /**
@@ -25,7 +25,7 @@ class PredictionService
      */
     public function getPredictions(int $gameweek): array
     {
-        // First check if we have cached predictions
+        // First check if we have cached predictions (v2.0 only)
         $cached = $this->getCachedPredictions($gameweek);
         if (!empty($cached)) {
             return $cached;
@@ -46,26 +46,72 @@ class PredictionService
         $fixtures = $this->getFixturesForGameweek($gameweek);
         $fixtureOdds = $this->getFixtureOdds($gameweek);
         $goalscorerOdds = $this->getGoalscorerOdds($gameweek);
+        $assistOdds = $this->getAssistOdds($gameweek);
+        $teamGames = $this->getTeamGames();
 
         $predictions = [];
 
         foreach ($players as $player) {
             $clubId = (int) $player['club_id'];
             $playerId = (int) $player['id'];
+            $playerTeamGames = $teamGames[$clubId] ?? 24;
 
-            // Find player's fixture
-            $fixture = $this->findPlayerFixture($clubId, $fixtures);
-            $odds = $fixture ? ($fixtureOdds[$fixture['id']] ?? null) : null;
+            // Find ALL player fixtures (handles DGWs)
+            $playerFixtures = $this->findPlayerFixtures($clubId, $fixtures);
 
-            // Get player-specific goalscorer odds
-            $playerGoalscorerOdds = null;
-            if ($fixture) {
-                $key = $playerId . '_' . $fixture['id'];
-                $playerGoalscorerOdds = $goalscorerOdds[$key] ?? null;
+            if (empty($playerFixtures)) {
+                // No fixture - blank gameweek for this player
+                $prediction = $this->engine->predict($player, null, null, null, null, $playerTeamGames);
+                $fixtureInfo = null;
+            } else {
+                // Sum predictions across all fixtures (DGW support)
+                $totalPoints = 0.0;
+                $totalConfidence = 0.0;
+                $combinedBreakdown = [];
+                $fixtureInfoList = [];
+
+                foreach ($playerFixtures as $fixture) {
+                    $odds = $fixtureOdds[$fixture['id']] ?? null;
+                    $key = $playerId . '_' . $fixture['id'];
+                    $playerGoalscorerOdds = $goalscorerOdds[$key] ?? null;
+                    $playerAssistOdds = $assistOdds[$key] ?? null;
+
+                    $fixturePrediction = $this->engine->predict(
+                        $player,
+                        $fixture,
+                        $odds,
+                        $playerGoalscorerOdds,
+                        $playerAssistOdds,
+                        $playerTeamGames
+                    );
+                    $totalPoints += $fixturePrediction['predicted_points'];
+                    $totalConfidence += $fixturePrediction['confidence'];
+
+                    // Merge breakdown (sum values)
+                    foreach ($fixturePrediction['breakdown'] as $bkey => $value) {
+                        $combinedBreakdown[$bkey] = ($combinedBreakdown[$bkey] ?? 0) + $value;
+                    }
+
+                    $fixtureInfoList[] = [
+                        'opponent' => $fixture['home_club_id'] === $clubId
+                            ? $fixture['away_club_id']
+                            : $fixture['home_club_id'],
+                        'is_home' => $fixture['home_club_id'] === $clubId,
+                        'difficulty' => $fixture['home_club_id'] === $clubId
+                            ? $fixture['home_difficulty']
+                            : $fixture['away_difficulty'],
+                    ];
+                }
+
+                $prediction = [
+                    'predicted_points' => round($totalPoints, 2),
+                    'confidence' => round($totalConfidence / count($playerFixtures), 2),
+                    'breakdown' => $combinedBreakdown,
+                ];
+
+                // For single fixture, return object; for DGW return array
+                $fixtureInfo = count($fixtureInfoList) === 1 ? $fixtureInfoList[0] : $fixtureInfoList;
             }
-
-            // Generate prediction
-            $prediction = $this->engine->predict($player, $fixture, $odds, $playerGoalscorerOdds);
 
             $predictions[] = [
                 'player_id' => $player['id'],
@@ -78,15 +124,8 @@ class PredictionService
                 'predicted_points' => $prediction['predicted_points'],
                 'confidence' => $prediction['confidence'],
                 'breakdown' => $prediction['breakdown'],
-                'fixture' => $fixture ? [
-                    'opponent' => $fixture['home_club_id'] === $clubId
-                        ? $fixture['away_club_id']
-                        : $fixture['home_club_id'],
-                    'is_home' => $fixture['home_club_id'] === $clubId,
-                    'difficulty' => $fixture['home_club_id'] === $clubId
-                        ? $fixture['home_difficulty']
-                        : $fixture['away_difficulty'],
-                ] : null,
+                'fixture' => $fixtureInfo,
+                'fixture_count' => count($playerFixtures),
             ];
 
             // Cache the prediction
@@ -112,18 +151,49 @@ class PredictionService
         }
 
         $fixtures = $this->getFixturesForGameweek($gameweek);
-        $fixture = $this->findPlayerFixture((int) $player['club_id'], $fixtures);
-        $odds = $fixture ? $this->getFixtureOdds($gameweek)[$fixture['id']] ?? null : null;
+        $playerFixtures = $this->findPlayerFixtures((int) $player['club_id'], $fixtures);
+        $fixtureOdds = $this->getFixtureOdds($gameweek);
+        $goalscorerOdds = $this->getGoalscorerOdds($gameweek);
+        $assistOdds = $this->getAssistOdds($gameweek);
+        $teamGames = $this->getTeamGames();
+        $playerTeamGames = $teamGames[(int) $player['club_id']] ?? 24;
 
-        // Get player-specific goalscorer odds
-        $playerGoalscorerOdds = null;
-        if ($fixture) {
-            $goalscorerOdds = $this->getGoalscorerOdds($gameweek);
-            $key = $playerId . '_' . $fixture['id'];
-            $playerGoalscorerOdds = $goalscorerOdds[$key] ?? null;
+        if (empty($playerFixtures)) {
+            $prediction = $this->engine->predict($player, null, null, null, null, $playerTeamGames);
+        } else {
+            // Sum predictions across all fixtures (DGW support)
+            $totalPoints = 0.0;
+            $totalConfidence = 0.0;
+            $combinedBreakdown = [];
+
+            foreach ($playerFixtures as $fixture) {
+                $odds = $fixtureOdds[$fixture['id']] ?? null;
+                $key = $playerId . '_' . $fixture['id'];
+                $playerGoalscorerOdds = $goalscorerOdds[$key] ?? null;
+                $playerAssistOdds = $assistOdds[$key] ?? null;
+
+                $fixturePrediction = $this->engine->predict(
+                    $player,
+                    $fixture,
+                    $odds,
+                    $playerGoalscorerOdds,
+                    $playerAssistOdds,
+                    $playerTeamGames
+                );
+                $totalPoints += $fixturePrediction['predicted_points'];
+                $totalConfidence += $fixturePrediction['confidence'];
+
+                foreach ($fixturePrediction['breakdown'] as $k => $value) {
+                    $combinedBreakdown[$k] = ($combinedBreakdown[$k] ?? 0) + $value;
+                }
+            }
+
+            $prediction = [
+                'predicted_points' => round($totalPoints, 2),
+                'confidence' => round($totalConfidence / count($playerFixtures), 2),
+                'breakdown' => $combinedBreakdown,
+            ];
         }
-
-        $prediction = $this->engine->predict($player, $fixture, $odds, $playerGoalscorerOdds);
 
         return [
             'player_id' => $player['id'],
@@ -132,11 +202,13 @@ class PredictionService
             'predicted_points' => $prediction['predicted_points'],
             'confidence' => $prediction['confidence'],
             'breakdown' => $prediction['breakdown'],
+            'fixture_count' => count($playerFixtures),
         ];
     }
 
     /**
      * Get cached predictions for a gameweek.
+     * Only returns v2.0 predictions to invalidate old cache.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -155,6 +227,7 @@ class PredictionService
             FROM player_predictions pp
             JOIN players p ON pp.player_id = p.id
             WHERE pp.gameweek = ?
+            AND pp.model_version = 'v2.0'
             AND pp.computed_at > datetime('now', '-6 hours')
             ORDER BY pp.predicted_points DESC";
 
@@ -173,7 +246,7 @@ class PredictionService
             'gameweek' => $gameweek,
             'predicted_points' => $prediction['predicted_points'],
             'confidence' => $prediction['confidence'],
-            'model_version' => 'v1.0',
+            'model_version' => 'v2.0',
             'computed_at' => date('Y-m-d H:i:s'),
         ], ['player_id', 'gameweek']);
     }
@@ -237,19 +310,65 @@ class PredictionService
     }
 
     /**
-     * Find a player's fixture from the list.
+     * Get player assist odds for a gameweek.
+     *
+     * @return array<string, array<string, mixed>> Keyed by "player_id_fixture_id"
+     */
+    private function getAssistOdds(int $gameweek): array
+    {
+        $odds = $this->db->fetchAll(
+            "SELECT pao.*
+            FROM player_assist_odds pao
+            JOIN fixtures f ON pao.fixture_id = f.id
+            WHERE f.gameweek = ?",
+            [$gameweek]
+        );
+
+        $result = [];
+        foreach ($odds as $row) {
+            $key = $row['player_id'] . '_' . $row['fixture_id'];
+            $result[$key] = $row;
+        }
+        return $result;
+    }
+
+    /**
+     * Calculate team games dynamically from finished fixtures.
+     *
+     * @return array<int, int> club_id => count of finished fixtures
+     */
+    private function getTeamGames(): array
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT club_id, COUNT(*) as games FROM (
+                SELECT home_club_id as club_id FROM fixtures WHERE finished = 1
+                UNION ALL
+                SELECT away_club_id as club_id FROM fixtures WHERE finished = 1
+            ) GROUP BY club_id"
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[(int) $row['club_id']] = (int) $row['games'];
+        }
+        return $result;
+    }
+
+    /**
+     * Find ALL fixtures for a player's club in a gameweek (handles DGWs).
      *
      * @param array<int, array<string, mixed>> $fixtures
-     * @return array<string, mixed>|null
+     * @return array<int, array<string, mixed>>
      */
-    private function findPlayerFixture(int $clubId, array $fixtures): ?array
+    private function findPlayerFixtures(int $clubId, array $fixtures): array
     {
+        $playerFixtures = [];
         foreach ($fixtures as $fixture) {
             if ($fixture['home_club_id'] === $clubId || $fixture['away_club_id'] === $clubId) {
-                return $fixture;
+                $playerFixtures[] = $fixture;
             }
         }
-        return null;
+        return $playerFixtures;
     }
 
     /**
@@ -261,7 +380,9 @@ class PredictionService
     {
         return [
             'version' => 'v2.0',
-            'overview' => 'Points predicted using probability models for each FPL scoring action',
+            'overview' => 'Odds-first prediction model: bookmaker odds are the primary signal, '
+                . 'xG/xA are trusted secondary signals regressed to career baselines, '
+                . 'and arbitrary multipliers have been replaced with proper statistical derivations.',
             'scoring_rules' => [
                 'goals' => 'GK/DEF: 6pts, MID: 5pts, FWD: 4pts',
                 'assists' => '3pts all positions',
@@ -269,53 +390,79 @@ class PredictionService
                 'appearance' => '2pts for 60+ mins, 1pt for <60 mins',
                 'bonus' => '1-3pts based on BPS ranking',
                 'saves' => 'GK only: 1pt per 3 saves',
-                'goals_conceded' => 'GK/DEF: -1pt per 2 goals conceded',
+                'goals_conceded' => 'GK/DEF only: -1pt per 2 goals conceded',
+                'cards' => 'Yellow: -1pt, Red: -3pts, Own goal: -2pts, Pen miss: -2pts',
                 'defensive_contribution' => 'DEF: 2pts for 10+ DC, MID/FWD: 2pts for 12+ DC',
             ],
             'probability_models' => [
                 'minutes' => [
-                    'description' => 'Probability of playing based on historical start rate',
-                    'factors' => ['starts/team_games ratio', 'average minutes when playing'],
-                    'note' => 'Only uses chance_of_playing when it equals 0 (confirmed out)',
+                    'description' => 'Probability of playing based on appearance rate and start rate',
+                    'factors' => ['appearances/team_games ratio', 'average minutes per appearance', 'start rate'],
+                    'note' => 'Team games calculated dynamically from finished fixtures. '
+                        . 'Only uses chance_of_playing when it equals 0 (confirmed out)',
                 ],
                 'goals' => [
-                    'description' => 'Goal probability using Poisson distribution on xG per 90',
-                    'factors' => ['expected_goals', 'minutes played', 'bookmaker win probability', 'goalscorer odds when available'],
+                    'description' => 'Odds-first goal prediction with career regression',
+                    'priority' => [
+                        '1. Scorer odds → inverse Poisson (90% odds / 10% regressed xG)',
+                        '2. Season xG/90 regressed to career baseline, fixture-adjusted from match odds',
+                        '3. Historical goals per 90 (no position weight suppression)',
+                    ],
                 ],
                 'assists' => [
-                    'description' => 'Assist probability using Poisson distribution on xA per 90',
-                    'factors' => ['expected_assists', 'historical assist rate', 'bookmaker win probability'],
+                    'description' => 'Odds-first assist prediction with career regression',
+                    'priority' => [
+                        '1. Assist odds → inverse Poisson (90% odds / 10% regressed xA)',
+                        '2. Season xA/90 regressed to career baseline, fixture-adjusted from match odds',
+                        '3. Historical assists per 90',
+                    ],
                 ],
                 'clean_sheets' => [
-                    'description' => 'Clean sheet probability blending bookmaker odds with xGC-based estimate',
-                    'factors' => ['team xGC', 'bookmaker CS probability (60% weight)', 'xGC-based estimate (40% weight)'],
+                    'description' => 'Clean sheet probability from odds or derived from match odds',
+                    'priority' => [
+                        '1. Direct CS odds (80% odds / 20% xGC-based), no separate home boost',
+                        '2. Derive from match odds: opponent xG via Poisson P(0 goals)',
+                        '3. Historical CS rate from actuals',
+                    ],
                 ],
                 'bonus' => [
-                    'description' => 'Expected bonus using sigmoid on BPS per 90',
-                    'factors' => ['bps', 'minutes', 'historical bonus rate'],
+                    'description' => 'Sigmoid on BPS per 90, boosted by expected goals/assists',
+                    'factors' => ['BPS per 90', 'expected goals (+24 BPS)', 'expected assists (+15 BPS)', 'historical bonus rate'],
+                    'blend' => '60% BPS-based, 40% historical',
+                ],
+                'cards' => [
+                    'description' => 'Per-90 rates for yellow cards, red cards, own goals, penalty misses',
+                    'factors' => ['yellow_cards/90', 'red_cards/90', 'own_goals/90', 'penalties_missed/90'],
                 ],
                 'defensive_contribution' => [
-                    'description' => 'Probability of earning DC bonus using Poisson distribution',
-                    'factors' => ['defensive_contribution_per_90', 'expected_minutes', 'position-based threshold'],
+                    'description' => 'Poisson CDF probability of reaching DC threshold',
+                    'factors' => ['DC per 90', 'conditional minutes (not probability-weighted)'],
                 ],
             ],
             'fixture_adjustments' => [
-                'odds_based' => 'Uses bookmaker win probability to derive attack/defense multipliers',
-                'win_prob_mapping' => 'Win prob ~0.15-0.65 maps to multiplier 0.75-1.25 for attacks',
-                'home_advantage' => '+10% goals/assists, +15% clean sheet probability',
-                'fallback' => 'When no odds available, uses neutral multiplier (1.0)',
+                'odds_based' => 'Derives team expected goals from total goals and home/away share',
+                'formula' => 'homeShare = homeWinProb + 0.5 * drawProb; teamXG = totalGoals * share; '
+                    . 'multiplier = teamXG / leagueAvgTeamXG',
+                'no_double_counting' => 'When odds are present, no separate home advantage applied',
+            ],
+            'regression_to_mean' => [
+                'method' => 'Career xG/90 and xA/90 from player_season_history',
+                'weight' => 'Linear ramp: min(1.0, currentMinutes / 1800)',
+                'blend' => 'effectiveRate = (current * w) + (historical * (1 - w))',
             ],
             'confidence_calculation' => [
                 'base' => 0.5,
                 'minutes_bonus' => '+0.15 for 450+ mins, +0.10 for 270+ mins',
                 'xg_data_bonus' => '+0.10 when xG data available',
-                'odds_data_bonus' => '+0.10 for fixture odds, +0.10 for goalscorer odds',
+                'odds_data_bonus' => '+0.10 for fixture odds, +0.05 for goalscorer odds, +0.05 for assist odds',
                 'maximum' => 0.95,
             ],
-            'limitations' => [
-                'Does not account for tactical changes or rotation',
-                'Availability modifier fixed at 100% (future: injury modeling)',
-                'DGW/BGW handling is separate from base predictions',
+            'bug_fixes_in_v2' => [
+                'GC penalty only applies to GK/DEF (was incorrectly applied to MID)',
+                'DC uses conditional minutes (minsIfPlaying * prob_60), not probability-weighted expected_mins',
+                'Team games calculated dynamically, not hardcoded',
+                'chance_of_playing handles string "0" correctly',
+                'No home advantage double-counting when odds present',
             ],
         ];
     }

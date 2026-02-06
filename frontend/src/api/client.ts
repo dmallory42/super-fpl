@@ -77,6 +77,8 @@ export interface PlayerPrediction {
     bonus: number
     goals_conceded: number
     saves: number
+    defensive_contribution: number
+    cards: number
   }
   fixture?: {
     opponent: number
@@ -91,8 +93,38 @@ export interface PredictionsResponse {
   generated_at: string
 }
 
-export async function fetchPredictions(gameweek: number): Promise<PredictionsResponse> {
-  return fetchApi<PredictionsResponse>(`/predictions/${gameweek}`)
+export async function fetchPredictions(gameweek?: number): Promise<PredictionsResponse> {
+  // If no gameweek specified, fetch current (next upcoming)
+  const gw = gameweek ?? 'next'
+  return fetchApi<PredictionsResponse>(`/predictions/${gw}`)
+}
+
+// Multi-gameweek predictions for player comparison
+export interface PlayerMultiWeekPrediction {
+  player_id: number
+  web_name: string
+  team: number
+  position: number
+  now_cost: number
+  form: number
+  total_points: number
+  predictions: Record<number, number> // gameweek -> predicted points
+  total_predicted: number
+}
+
+export interface PredictionsRangeResponse {
+  gameweeks: number[]
+  current_gameweek: number
+  players: PlayerMultiWeekPrediction[]
+  generated_at: string
+}
+
+export async function fetchPredictionsRange(startGw?: number, endGw?: number): Promise<PredictionsRangeResponse> {
+  const params = new URLSearchParams()
+  if (startGw) params.set('start', String(startGw))
+  if (endGw) params.set('end', String(endGw))
+  const query = params.toString()
+  return fetchApi<PredictionsRangeResponse>(`/predictions/range${query ? `?${query}` : ''}`)
 }
 
 export interface LeagueStanding {
@@ -472,6 +504,29 @@ export interface ChipSuggestion {
   reason?: string
 }
 
+export interface FormationPlayer {
+  player_id: number
+  web_name: string
+  element_type: number
+  team: number
+  position: number
+  predicted_points: number
+  expected_mins: number
+  multiplier: number
+  is_captain: boolean
+  is_vice_captain: boolean
+  now_cost: number
+}
+
+export interface FormationData {
+  gameweek: number
+  players: FormationPlayer[]
+  starting_total: number
+  bench_total: number
+  captain_id: number
+  vice_captain_id: number
+}
+
 export interface PlannerOptimizeResponse {
   current_gameweek: number
   planning_horizon: number[]
@@ -481,6 +536,7 @@ export interface PlannerOptimizeResponse {
     squad_value: number
     free_transfers: number
     predicted_points: Record<number | 'total', number>
+    formations?: Record<number, FormationData>
   }
   dgw_teams: Record<number, number[]>
   recommendations: TransferRecommendation[]
@@ -491,7 +547,8 @@ export interface PlannerOptimizeResponse {
 export async function fetchPlannerOptimize(
   managerId: number,
   freeTransfers: number = 1,
-  chipPlan: ChipPlan = {}
+  chipPlan: ChipPlan = {},
+  xMinsOverrides: Record<number, number> = {}
 ): Promise<PlannerOptimizeResponse> {
   const params = new URLSearchParams()
   params.set('manager', String(managerId))
@@ -501,6 +558,11 @@ export async function fetchPlannerOptimize(
   if (chipPlan.bench_boost) params.set('bench_boost_gw', String(chipPlan.bench_boost))
   if (chipPlan.free_hit) params.set('free_hit_gw', String(chipPlan.free_hit))
   if (chipPlan.triple_captain) params.set('triple_captain_gw', String(chipPlan.triple_captain))
+
+  // Pass xMins overrides as JSON if any exist
+  if (Object.keys(xMinsOverrides).length > 0) {
+    params.set('xmins', JSON.stringify(xMinsOverrides))
+  }
 
   return fetchApi<PlannerOptimizeResponse>(`/planner/optimize?${params.toString()}`)
 }

@@ -144,6 +144,55 @@ class OddsSync
     }
 
     /**
+     * Sync all anytime assist odds.
+     *
+     * @return array{fixtures: int, players: int}
+     */
+    public function syncAllAssistOdds(): array
+    {
+        $assistData = $this->client->getAssistOdds();
+        $fixtures = $this->getUpcomingFixtures();
+
+        $totalPlayers = 0;
+        $matchedFixtures = 0;
+
+        foreach ($assistData as $event) {
+            $fixture = $this->matchFixture(
+                $event['home_team'],
+                $event['away_team'],
+                $fixtures
+            );
+
+            if ($fixture === null) {
+                continue;
+            }
+
+            $matchedFixtures++;
+
+            foreach ($event['players'] as $playerName => $prob) {
+                $player = $this->matchPlayerByName($playerName);
+                if ($player === null) {
+                    continue;
+                }
+
+                $this->db->upsert('player_assist_odds', [
+                    'player_id' => $player['id'],
+                    'fixture_id' => $fixture['id'],
+                    'anytime_assist_prob' => $prob,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ], ['player_id', 'fixture_id']);
+
+                $totalPlayers++;
+            }
+        }
+
+        return [
+            'fixtures' => $matchedFixtures,
+            'players' => $totalPlayers,
+        ];
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     private function getUpcomingFixtures(): array

@@ -39,6 +39,13 @@ CREATE TABLE players (
     defensive_contribution INTEGER DEFAULT 0,
     defensive_contribution_per_90 REAL DEFAULT 0,
     saves INTEGER DEFAULT 0,
+    appearances INTEGER DEFAULT 0,
+    yellow_cards INTEGER DEFAULT 0,
+    red_cards INTEGER DEFAULT 0,
+    own_goals INTEGER DEFAULT 0,
+    penalties_missed INTEGER DEFAULT 0,
+    penalties_saved INTEGER DEFAULT 0,
+    goals_conceded INTEGER DEFAULT 0,
     updated_at TIMESTAMP
 );
 
@@ -139,6 +146,8 @@ CREATE TABLE player_season_history (
     clean_sheets INTEGER,
     expected_goals REAL,
     expected_assists REAL,
+    expected_goals_conceded REAL,
+    starts INTEGER,
     start_cost INTEGER,
     end_cost INTEGER,
     PRIMARY KEY (player_code, season_id)
@@ -161,6 +170,14 @@ CREATE TABLE player_goalscorer_odds (
     player_id INTEGER REFERENCES players(id),
     fixture_id INTEGER REFERENCES fixtures(id),
     anytime_scorer_prob REAL,
+    updated_at TIMESTAMP,
+    PRIMARY KEY (player_id, fixture_id)
+);
+
+CREATE TABLE player_assist_odds (
+    player_id INTEGER,
+    fixture_id INTEGER,
+    anytime_assist_prob REAL,
     updated_at TIMESTAMP,
     PRIMARY KEY (player_id, fixture_id)
 );

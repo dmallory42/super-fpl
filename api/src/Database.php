@@ -36,6 +36,7 @@ class Database
         );
 
         if ($result !== null) {
+            $this->migrate();
             return;
         }
 
@@ -48,6 +49,48 @@ class Database
         }
 
         $this->pdo->exec($schema);
+    }
+
+    /**
+     * Run idempotent schema migrations for columns/tables added after initial schema.
+     */
+    public function migrate(): void
+    {
+        $migrations = [
+            // players table - new columns
+            'ALTER TABLE players ADD COLUMN appearances INTEGER DEFAULT 0',
+            'ALTER TABLE players ADD COLUMN yellow_cards INTEGER DEFAULT 0',
+            'ALTER TABLE players ADD COLUMN red_cards INTEGER DEFAULT 0',
+            'ALTER TABLE players ADD COLUMN own_goals INTEGER DEFAULT 0',
+            'ALTER TABLE players ADD COLUMN penalties_missed INTEGER DEFAULT 0',
+            'ALTER TABLE players ADD COLUMN penalties_saved INTEGER DEFAULT 0',
+            'ALTER TABLE players ADD COLUMN goals_conceded INTEGER DEFAULT 0',
+            // player_season_history - new columns
+            'ALTER TABLE player_season_history ADD COLUMN expected_goals_conceded REAL',
+            'ALTER TABLE player_season_history ADD COLUMN starts INTEGER',
+        ];
+
+        foreach ($migrations as $sql) {
+            try {
+                $this->pdo->exec($sql);
+            } catch (\PDOException $e) {
+                // Ignore "duplicate column name" errors (column already exists)
+                if (!str_contains($e->getMessage(), 'duplicate column name')) {
+                    throw $e;
+                }
+            }
+        }
+
+        // Create new tables (IF NOT EXISTS is idempotent)
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS player_assist_odds (
+                player_id INTEGER,
+                fixture_id INTEGER,
+                anytime_assist_prob REAL,
+                updated_at TIMESTAMP,
+                PRIMARY KEY (player_id, fixture_id)
+            )
+        ");
     }
 
     /**

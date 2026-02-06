@@ -73,6 +73,7 @@ try {
         $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
         $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
         $uri === '/sync/odds' => handleSyncOdds($db, $config),
+        $uri === '/sync/season-history' => handleSyncSeasonHistory($db, $fplClient),
         preg_match('#^/players/(\d+)$#', $uri, $m) === 1 => handlePlayer($db, (int) $m[1]),
         preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, (int) $m[1]),
         preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, (int) $m[1], (int) $m[2]),
@@ -80,6 +81,7 @@ try {
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1]),
         preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
+        $uri === '/predictions/range' => handlePredictionsRange($db),
         $uri === '/predictions/methodology' => handlePredictionMethodology(),
         preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
@@ -233,6 +235,9 @@ function handleSyncOdds(Database $db, array $config): void
     // Sync goalscorer odds (anytime scorer)
     $goalscorerResult = $sync->syncAllGoalscorerOdds();
 
+    // Sync assist odds (anytime assist)
+    $assistResult = $sync->syncAllAssistOdds();
+
     echo json_encode([
         'success' => true,
         'match_odds' => [
@@ -243,7 +248,22 @@ function handleSyncOdds(Database $db, array $config): void
             'fixtures_matched' => $goalscorerResult['fixtures'],
             'players_synced' => $goalscorerResult['players'],
         ],
+        'assist_odds' => [
+            'fixtures_matched' => $assistResult['fixtures'],
+            'players_synced' => $assistResult['players'],
+        ],
         'api_quota' => $client->getQuota(),
+    ]);
+}
+
+function handleSyncSeasonHistory(Database $db, FplClient $fplClient): void
+{
+    $sync = new PlayerSync($db, $fplClient);
+    $count = $sync->syncSeasonHistory();
+
+    echo json_encode([
+        'success' => true,
+        'season_history_records' => $count,
     ]);
 }
 
@@ -333,6 +353,80 @@ function handlePredictions(Database $db, int $gameweek): void
     }
 
     echo json_encode($response);
+}
+
+function handlePredictionsRange(Database $db): void
+{
+    $gwService = new \SuperFPL\Api\Services\GameweekService($db);
+    $currentGw = $gwService->getCurrentGameweek();
+
+    // Get gameweek range from query params (default: next 6 gameweeks)
+    $startGw = isset($_GET['start']) ? (int) $_GET['start'] : $currentGw;
+    $endGw = isset($_GET['end']) ? (int) $_GET['end'] : min($startGw + 5, 38);
+
+    // Validate range
+    $startGw = max($currentGw, min(38, $startGw));
+    $endGw = max($startGw, min(38, $endGw));
+
+    $gameweeks = range($startGw, $endGw);
+
+    // Fetch all predictions for the range in a single query
+    $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
+    $predictions = $db->fetchAll(
+        "SELECT
+            pp.player_id,
+            pp.gameweek,
+            pp.predicted_points,
+            pp.confidence,
+            p.web_name,
+            p.club_id as team,
+            p.position,
+            p.now_cost,
+            p.form,
+            p.total_points
+        FROM player_predictions pp
+        JOIN players p ON pp.player_id = p.id
+        WHERE pp.gameweek IN ($placeholders)
+        ORDER BY pp.player_id, pp.gameweek",
+        $gameweeks
+    );
+
+    // Group by player with predictions keyed by gameweek
+    $playerMap = [];
+    foreach ($predictions as $pred) {
+        $playerId = $pred['player_id'];
+        if (!isset($playerMap[$playerId])) {
+            $playerMap[$playerId] = [
+                'player_id' => (int) $pred['player_id'],
+                'web_name' => $pred['web_name'],
+                'team' => (int) $pred['team'],
+                'position' => (int) $pred['position'],
+                'now_cost' => (int) $pred['now_cost'],
+                'form' => (float) $pred['form'],
+                'total_points' => (int) $pred['total_points'],
+                'predictions' => [],
+                'total_predicted' => 0,
+            ];
+        }
+        $playerMap[$playerId]['predictions'][(int) $pred['gameweek']] = round((float) $pred['predicted_points'], 1);
+        $playerMap[$playerId]['total_predicted'] += (float) $pred['predicted_points'];
+    }
+
+    // Round totals and convert to array
+    $players = array_values(array_map(function ($p) {
+        $p['total_predicted'] = round($p['total_predicted'], 1);
+        return $p;
+    }, $playerMap));
+
+    // Sort by total predicted points descending
+    usort($players, fn($a, $b) => $b['total_predicted'] <=> $a['total_predicted']);
+
+    echo json_encode([
+        'gameweeks' => $gameweeks,
+        'current_gameweek' => $currentGw,
+        'players' => $players,
+        'generated_at' => date('c'),
+    ]);
 }
 
 function handlePredictionMethodology(): void
@@ -819,6 +913,15 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
         $chipPlan['triple_captain'] = (int) $_GET['triple_captain_gw'];
     }
 
+    // Parse xMins overrides (JSON-encoded player_id -> expected_mins)
+    $xMinsOverrides = [];
+    if (isset($_GET['xmins'])) {
+        $decoded = json_decode($_GET['xmins'], true);
+        if (is_array($decoded)) {
+            $xMinsOverrides = array_map('intval', $decoded);
+        }
+    }
+
     if ($managerId === null) {
         http_response_code(400);
         echo json_encode(['error' => 'Missing manager parameter']);
@@ -836,7 +939,7 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
     );
 
     try {
-        $plan = $optimizer->getOptimalPlan($managerId, $chipPlan, $freeTransfers);
+        $plan = $optimizer->getOptimalPlan($managerId, $chipPlan, $freeTransfers, $xMinsOverrides);
         echo json_encode($plan);
     } catch (\Throwable $e) {
         http_response_code(500);

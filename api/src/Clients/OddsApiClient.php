@@ -107,6 +107,98 @@ class OddsApiClient
     }
 
     /**
+     * Get anytime assist odds for upcoming EPL fixtures.
+     * Uses event-specific endpoint with player_assists market.
+     *
+     * @return array<int, array{
+     *     event_id: string,
+     *     home_team: string,
+     *     away_team: string,
+     *     players: array<string, float>
+     * }>
+     */
+    public function getAssistOdds(): array
+    {
+        // First, get list of upcoming events
+        $eventsUrl = self::BASE_URL . "/sports/" . self::SPORT . "/events"
+            . "?apiKey={$this->apiKey}";
+
+        $events = $this->makeRequest($eventsUrl);
+
+        if ($events === null || empty($events)) {
+            return [];
+        }
+
+        $fixtures = [];
+
+        foreach ($events as $event) {
+            $eventId = $event['id'] ?? '';
+            if (empty($eventId)) {
+                continue;
+            }
+
+            $oddsUrl = self::BASE_URL . "/sports/" . self::SPORT . "/events/{$eventId}/odds"
+                . "?apiKey={$this->apiKey}"
+                . "&regions=us"
+                . "&markets=player_assists"
+                . "&oddsFormat=decimal";
+
+            $oddsResponse = $this->makeRequest($oddsUrl);
+
+            if ($oddsResponse === null) {
+                continue;
+            }
+
+            $players = $this->extractPlayerAssistOdds($oddsResponse);
+            if (!empty($players)) {
+                $fixtures[] = [
+                    'event_id' => $eventId,
+                    'home_team' => $oddsResponse['home_team'] ?? $event['home_team'] ?? '',
+                    'away_team' => $oddsResponse['away_team'] ?? $event['away_team'] ?? '',
+                    'players' => $players,
+                ];
+            }
+        }
+
+        return $fixtures;
+    }
+
+    /**
+     * Extract anytime assist probabilities from event data.
+     *
+     * @return array<string, float> Player name => probability
+     */
+    private function extractPlayerAssistOdds(array $event): array
+    {
+        $players = [];
+
+        foreach ($event['bookmakers'] ?? [] as $bookmaker) {
+            foreach ($bookmaker['markets'] ?? [] as $market) {
+                if ($market['key'] !== 'player_assists') {
+                    continue;
+                }
+
+                foreach ($market['outcomes'] ?? [] as $outcome) {
+                    $playerName = $outcome['description'] ?? $outcome['name'] ?? '';
+                    $price = (float) ($outcome['price'] ?? 0);
+
+                    if ($playerName && $price > 1) {
+                        $prob = (1 / $price) / 1.10;
+
+                        if (isset($players[$playerName])) {
+                            $players[$playerName] = ($players[$playerName] + $prob) / 2;
+                        } else {
+                            $players[$playerName] = round($prob, 4);
+                        }
+                    }
+                }
+            }
+        }
+
+        return $players;
+    }
+
+    /**
      * Extract anytime goalscorer probabilities from event data.
      * Handles both bulk and event-specific API response formats.
      *
