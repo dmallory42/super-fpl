@@ -18,7 +18,9 @@ class GameweekService
     public function getCurrentGameweek(): int
     {
         $fixture = $this->db->fetchOne(
-            "SELECT DISTINCT gameweek FROM fixtures WHERE finished = 0 ORDER BY gameweek ASC LIMIT 1"
+            "SELECT DISTINCT gameweek FROM fixtures
+             WHERE finished = 0 AND gameweek IS NOT NULL AND gameweek > 0
+             ORDER BY gameweek ASC LIMIT 1"
         );
 
         return $fixture ? (int) $fixture['gameweek'] : 38;

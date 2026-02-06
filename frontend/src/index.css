@@ -383,11 +383,15 @@
   }
 
   .table-broadcast thead {
-    @apply bg-surface-elevated;
+    @apply bg-surface-elevated border-l-2 border-l-fpl-green;
   }
 
   .table-broadcast th {
     @apply px-4 py-3 text-left font-display text-xs uppercase tracking-wider text-foreground-muted;
+  }
+
+  .table-broadcast th:first-child {
+    @apply pl-4;
   }
 
   .table-broadcast tbody tr {
@@ -395,7 +399,7 @@
   }
 
   .table-broadcast tbody tr:hover {
-    @apply bg-surface-hover;
+    @apply bg-surface-elevated/50;
   }
 
   .table-broadcast td {
