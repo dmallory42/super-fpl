@@ -460,6 +460,9 @@ class TransferOptimizerService
             }
         }
 
+        // Captain candidates shortlist
+        $captainCandidates = self::findCaptainCandidates($starting11);
+
         return [
             'gameweek' => $gameweek,
             'players' => $players,
@@ -467,7 +470,44 @@ class TransferOptimizerService
             'bench_total' => round($benchTotal, 1),
             'captain_id' => $captainId,
             'vice_captain_id' => $viceCaptainId,
+            'captain_candidates' => $captainCandidates,
         ];
+    }
+
+    /**
+     * Find captain candidates from a starting 11.
+     * Returns players within the threshold of the top predicted scorer.
+     *
+     * @param array<int, array{id: int, pred: float}> $starting11
+     * @param float $threshold Maximum point difference from top to be a candidate
+     * @return array<int, array{player_id: int, predicted_points: float, margin: float}>
+     */
+    public static function findCaptainCandidates(array $starting11, float $threshold = 0.5): array
+    {
+        if (empty($starting11)) {
+            return [];
+        }
+
+        // Sort by pred descending
+        usort($starting11, fn($a, $b) => $b['pred'] <=> $a['pred']);
+
+        $topPred = $starting11[0]['pred'];
+        $candidates = [];
+
+        foreach ($starting11 as $player) {
+            $margin = round($topPred - $player['pred'], 2);
+            if ($margin <= $threshold) {
+                $candidates[] = [
+                    'player_id' => $player['id'],
+                    'predicted_points' => $player['pred'],
+                    'margin' => $margin,
+                ];
+            } else {
+                break; // Sorted, so all further are worse
+            }
+        }
+
+        return $candidates;
     }
 
     private function findOptimalTransfers(

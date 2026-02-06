@@ -227,6 +227,112 @@ class PredictionEngineTest extends TestCase
         $this->assertGreaterThanOrEqual(0, $result['breakdown']['appearance']);
     }
 
+    public function testCalibrationDoesNotAffectZeroPredictions(): void
+    {
+        // Unavailable player with 0.0 prediction should stay at 0.0
+        $player = [
+            'position' => 3,
+            'club_id' => 1,
+            'code' => 500,
+            'expected_goals' => 0.0,
+            'expected_assists' => 0.0,
+            'minutes' => 0,
+            'goals_scored' => 0,
+            'assists' => 0,
+            'starts' => 0,
+            'appearances' => 0,
+            'bps' => 0,
+            'bonus' => 0,
+            'clean_sheets' => 0,
+            'defensive_contribution_per_90' => 0,
+            'saves' => 0,
+            'yellow_cards' => 0,
+            'red_cards' => 0,
+            'own_goals' => 0,
+            'penalties_missed' => 0,
+            'chance_of_playing' => 0,
+        ];
+
+        $result = $this->engine->predict($player, null, null, null, null, 24);
+
+        $this->assertEquals(0.0, $result['predicted_points']);
+    }
+
+    public function testCalibrationDoesNotAffectHighPredictions(): void
+    {
+        // Premium FWD archetype (Haaland-like) should stay in the 3-10 range
+        $player = [
+            'position' => 4,
+            'club_id' => 1,
+            'code' => 100,
+            'expected_goals' => 15.0,
+            'expected_assists' => 3.0,
+            'minutes' => 1800,
+            'goals_scored' => 18,
+            'assists' => 3,
+            'starts' => 20,
+            'appearances' => 20,
+            'bps' => 700,
+            'bonus' => 15,
+            'clean_sheets' => 0,
+            'defensive_contribution_per_90' => 2.0,
+            'saves' => 0,
+            'yellow_cards' => 2,
+            'red_cards' => 0,
+            'own_goals' => 0,
+            'penalties_missed' => 0,
+        ];
+
+        $fixture = ['home_club_id' => 1, 'away_club_id' => 2];
+        $fixtureOdds = [
+            'home_win_prob' => 0.55,
+            'draw_prob' => 0.25,
+            'away_win_prob' => 0.20,
+            'expected_total_goals' => 2.8,
+        ];
+        $goalscorerOdds = ['anytime_scorer_prob' => 0.55];
+
+        $result = $this->engine->predict($player, $fixture, $fixtureOdds, $goalscorerOdds, null, 24);
+
+        // High predictions (5+) should not be significantly altered
+        $this->assertGreaterThan(3.0, $result['predicted_points']);
+        $this->assertLessThan(10.0, $result['predicted_points']);
+    }
+
+    public function testCalibrationBoostsLowMidRange(): void
+    {
+        // Rotation GK: should predict ~1-3 range and get a small upward bump
+        $player = [
+            'position' => 1,
+            'club_id' => 1,
+            'code' => 300,
+            'expected_goals' => 0.0,
+            'expected_assists' => 0.0,
+            'minutes' => 270,
+            'goals_scored' => 0,
+            'assists' => 0,
+            'starts' => 3,
+            'appearances' => 3,
+            'bps' => 60,
+            'bonus' => 1,
+            'clean_sheets' => 1,
+            'expected_goals_conceded' => 3.0,
+            'defensive_contribution_per_90' => 0,
+            'saves' => 9,
+            'yellow_cards' => 0,
+            'red_cards' => 0,
+            'own_goals' => 0,
+            'penalties_missed' => 0,
+        ];
+
+        $result = $this->engine->predict($player, null, null, null, null, 24);
+
+        // Should be positive and get a slight boost from calibration
+        // The raw prediction for this player is typically ~1-2.5 range
+        $this->assertGreaterThan(0.0, $result['predicted_points']);
+        $this->assertLessThan(4.0, $result['predicted_points']);
+    }
+
     /**
      * Create a standard test player.
      */

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { fetchPlannerOptimize, type PlannerOptimizeResponse, type ChipPlan } from '../api/client'
 
 export function usePlannerOptimize(
@@ -18,5 +18,6 @@ export function usePlannerOptimize(
     queryFn: () => fetchPlannerOptimize(managerId!, freeTransfers, chipPlan, xMinsOverrides),
     enabled: managerId !== null && managerId > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    placeholderData: keepPreviousData,
   })
 }

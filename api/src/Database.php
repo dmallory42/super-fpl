@@ -65,6 +65,8 @@ class Database
             'ALTER TABLE players ADD COLUMN penalties_missed INTEGER DEFAULT 0',
             'ALTER TABLE players ADD COLUMN penalties_saved INTEGER DEFAULT 0',
             'ALTER TABLE players ADD COLUMN goals_conceded INTEGER DEFAULT 0',
+            // players table - xMins override for manual expected minutes
+            'ALTER TABLE players ADD COLUMN xmins_override INTEGER DEFAULT NULL',
             // player_season_history - new columns
             'ALTER TABLE player_season_history ADD COLUMN expected_goals_conceded REAL',
             'ALTER TABLE player_season_history ADD COLUMN starts INTEGER',
@@ -89,6 +91,19 @@ class Database
                 anytime_assist_prob REAL,
                 updated_at TIMESTAMP,
                 PRIMARY KEY (player_id, fixture_id)
+            )
+        ");
+
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS prediction_snapshots (
+                player_id INTEGER,
+                gameweek INTEGER,
+                predicted_points REAL,
+                confidence REAL,
+                breakdown TEXT,
+                model_version TEXT,
+                snapped_at TIMESTAMP,
+                PRIMARY KEY (player_id, gameweek)
             )
         ");
     }

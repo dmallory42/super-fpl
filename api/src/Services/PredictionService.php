@@ -126,6 +126,7 @@ class PredictionService
                 'breakdown' => $prediction['breakdown'],
                 'fixture' => $fixtureInfo,
                 'fixture_count' => count($playerFixtures),
+                'availability' => $this->deriveAvailability($player),
             ];
 
             // Cache the prediction
@@ -223,7 +224,9 @@ class PredictionService
                 p.form,
                 p.total_points,
                 pp.predicted_points,
-                pp.confidence
+                pp.confidence,
+                p.chance_of_playing,
+                p.news
             FROM player_predictions pp
             JOIN players p ON pp.player_id = p.id
             WHERE pp.gameweek = ?
@@ -231,7 +234,15 @@ class PredictionService
             AND pp.computed_at > datetime('now', '-6 hours')
             ORDER BY pp.predicted_points DESC";
 
-        return $this->db->fetchAll($sql, [$gameweek]);
+        $results = $this->db->fetchAll($sql, [$gameweek]);
+
+        // Add availability to each result
+        foreach ($results as &$row) {
+            $row['availability'] = $this->deriveAvailability($row);
+            unset($row['chance_of_playing'], $row['news']);
+        }
+
+        return $results;
     }
 
     /**
@@ -369,6 +380,257 @@ class PredictionService
             }
         }
         return $playerFixtures;
+    }
+
+    /**
+     * Snapshot current predictions for a gameweek (for historical accuracy tracking).
+     * Uses INSERT OR IGNORE so re-running is idempotent.
+     *
+     * @return int Number of rows inserted
+     */
+    public function snapshotPredictions(int $gameweek): int
+    {
+        $before = (int) $this->db->fetchOne(
+            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
+            [$gameweek]
+        )['cnt'];
+
+        $this->db->query(
+            "INSERT OR IGNORE INTO prediction_snapshots (player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapped_at)
+            SELECT player_id, gameweek, predicted_points, confidence, '{}', model_version, datetime('now')
+            FROM player_predictions
+            WHERE gameweek = ? AND model_version = 'v2.0'",
+            [$gameweek]
+        );
+
+        $after = (int) $this->db->fetchOne(
+            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
+            [$gameweek]
+        )['cnt'];
+
+        return $after - $before;
+    }
+
+    /**
+     * Get snapshot predictions for a past gameweek.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getSnapshotPredictions(int $gameweek): array
+    {
+        return $this->db->fetchAll(
+            "SELECT
+                ps.player_id,
+                p.web_name,
+                p.club_id as team,
+                p.position,
+                p.now_cost,
+                p.form,
+                p.total_points,
+                ps.predicted_points,
+                ps.confidence,
+                ps.breakdown
+            FROM prediction_snapshots ps
+            JOIN players p ON ps.player_id = p.id
+            WHERE ps.gameweek = ?
+            ORDER BY ps.predicted_points DESC",
+            [$gameweek]
+        );
+    }
+
+    /**
+     * Compute accuracy stats for a gameweek by comparing snapshots to actual results.
+     *
+     * @return array{summary: array, buckets: array, players: array}
+     */
+    public function getAccuracy(int $gameweek): array
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT
+                ps.player_id,
+                p.web_name,
+                ps.predicted_points,
+                pgh.total_points as actual_points
+            FROM prediction_snapshots ps
+            JOIN players p ON ps.player_id = p.id
+            JOIN player_gameweek_history pgh ON ps.player_id = pgh.player_id AND ps.gameweek = pgh.gameweek
+            WHERE ps.gameweek = ?",
+            [$gameweek]
+        );
+
+        if (empty($rows)) {
+            return [
+                'summary' => ['mae' => 0, 'bias' => 0, 'count' => 0],
+                'buckets' => [],
+                'players' => [],
+            ];
+        }
+
+        $totalAbsError = 0.0;
+        $totalBias = 0.0;
+        $bucketData = [];
+        $players = [];
+
+        // Define buckets
+        $bucketRanges = [
+            ['range' => '0-2', 'min' => 0, 'max' => 2],
+            ['range' => '2-5', 'min' => 2, 'max' => 5],
+            ['range' => '5-8', 'min' => 5, 'max' => 8],
+            ['range' => '8+', 'min' => 8, 'max' => PHP_FLOAT_MAX],
+        ];
+
+        foreach ($bucketRanges as $range) {
+            $bucketData[$range['range']] = ['errors' => [], 'biases' => []];
+        }
+
+        foreach ($rows as $row) {
+            $predicted = (float) $row['predicted_points'];
+            $actual = (float) $row['actual_points'];
+            $delta = $predicted - $actual;
+
+            $totalAbsError += abs($delta);
+            $totalBias += $delta;
+
+            $players[] = [
+                'player_id' => (int) $row['player_id'],
+                'web_name' => $row['web_name'],
+                'predicted' => $predicted,
+                'actual' => $actual,
+                'delta' => round($delta, 2),
+            ];
+
+            // Assign to bucket
+            foreach ($bucketRanges as $range) {
+                if ($predicted >= $range['min'] && $predicted < $range['max']) {
+                    $bucketData[$range['range']]['errors'][] = abs($delta);
+                    $bucketData[$range['range']]['biases'][] = $delta;
+                    break;
+                }
+            }
+        }
+
+        $count = count($rows);
+
+        $buckets = [];
+        foreach ($bucketRanges as $range) {
+            $bErrors = $bucketData[$range['range']]['errors'];
+            $bBiases = $bucketData[$range['range']]['biases'];
+            if (!empty($bErrors)) {
+                $buckets[] = [
+                    'range' => $range['range'],
+                    'mae' => round(array_sum($bErrors) / count($bErrors), 2),
+                    'bias' => round(array_sum($bBiases) / count($bBiases), 2),
+                    'count' => count($bErrors),
+                ];
+            }
+        }
+
+        return [
+            'summary' => [
+                'mae' => round($totalAbsError / $count, 2),
+                'bias' => round($totalBias / $count, 2),
+                'count' => $count,
+            ],
+            'buckets' => $buckets,
+            'players' => $players,
+        ];
+    }
+
+    /**
+     * Compute calibration curve from historical snapshots vs actuals.
+     * Returns bucket-level adjustments for future calibration tuning.
+     *
+     * @param array<int> $gameweeks Gameweeks to include
+     * @return array<int, array{range: string, avg_predicted: float, avg_actual: float, adjustment: float, count: int}>
+     */
+    public function computeCalibrationCurve(array $gameweeks): array
+    {
+        if (empty($gameweeks)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT ps.predicted_points, pgh.total_points as actual_points
+            FROM prediction_snapshots ps
+            JOIN player_gameweek_history pgh ON ps.player_id = pgh.player_id AND ps.gameweek = pgh.gameweek
+            WHERE ps.gameweek IN ($placeholders)",
+            $gameweeks
+        );
+
+        $bucketRanges = [
+            ['range' => '0-1', 'min' => 0, 'max' => 1],
+            ['range' => '1-2', 'min' => 1, 'max' => 2],
+            ['range' => '2-3', 'min' => 2, 'max' => 3],
+            ['range' => '3-4', 'min' => 3, 'max' => 4],
+            ['range' => '4-5', 'min' => 4, 'max' => 5],
+            ['range' => '5-6', 'min' => 5, 'max' => 6],
+            ['range' => '6-8', 'min' => 6, 'max' => 8],
+            ['range' => '8+', 'min' => 8, 'max' => PHP_FLOAT_MAX],
+        ];
+
+        $bucketData = [];
+        foreach ($bucketRanges as $range) {
+            $bucketData[$range['range']] = ['predicted' => [], 'actual' => []];
+        }
+
+        foreach ($rows as $row) {
+            $predicted = (float) $row['predicted_points'];
+            $actual = (float) $row['actual_points'];
+
+            foreach ($bucketRanges as $range) {
+                if ($predicted >= $range['min'] && $predicted < $range['max']) {
+                    $bucketData[$range['range']]['predicted'][] = $predicted;
+                    $bucketData[$range['range']]['actual'][] = $actual;
+                    break;
+                }
+            }
+        }
+
+        $curve = [];
+        foreach ($bucketRanges as $range) {
+            $preds = $bucketData[$range['range']]['predicted'];
+            $actuals = $bucketData[$range['range']]['actual'];
+            if (!empty($preds)) {
+                $avgPredicted = array_sum($preds) / count($preds);
+                $avgActual = array_sum($actuals) / count($actuals);
+                $curve[] = [
+                    'range' => $range['range'],
+                    'avg_predicted' => round($avgPredicted, 2),
+                    'avg_actual' => round($avgActual, 2),
+                    'adjustment' => round($avgActual - $avgPredicted, 2),
+                    'count' => count($preds),
+                ];
+            }
+        }
+
+        return $curve;
+    }
+
+    /**
+     * Derive player availability status from FPL data.
+     */
+    private function deriveAvailability(array $player): string
+    {
+        $cop = $player['chance_of_playing'] ?? null;
+        $news = $player['news'] ?? '';
+
+        if ($cop === null && empty($news)) {
+            return 'available';
+        }
+        if ((int) $cop === 0 && $cop !== null) {
+            if (stripos($news, 'suspend') !== false) {
+                return 'suspended';
+            }
+            return 'unavailable';
+        }
+        if ($cop !== null && (int) $cop <= 25) {
+            return 'injured';
+        }
+        if ($cop !== null && (int) $cop <= 75) {
+            return 'doubtful';
+        }
+        return 'available';
     }
 
     /**

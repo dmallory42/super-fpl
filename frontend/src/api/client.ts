@@ -85,12 +85,14 @@ export interface PlayerPrediction {
     is_home: boolean
     difficulty: number
   }
+  availability?: 'available' | 'unavailable' | 'injured' | 'doubtful' | 'suspended'
 }
 
 export interface PredictionsResponse {
   gameweek: number
   predictions: PlayerPrediction[]
   generated_at: string
+  source?: 'snapshot'
 }
 
 export async function fetchPredictions(gameweek?: number): Promise<PredictionsResponse> {
@@ -108,6 +110,7 @@ export interface PlayerMultiWeekPrediction {
   now_cost: number
   form: number
   total_points: number
+  expected_mins: number // backend override or 90 default
   predictions: Record<number, number> // gameweek -> predicted points
   total_predicted: number
 }
@@ -518,6 +521,12 @@ export interface FormationPlayer {
   now_cost: number
 }
 
+export interface CaptainCandidate {
+  player_id: number
+  predicted_points: number
+  margin: number
+}
+
 export interface FormationData {
   gameweek: number
   players: FormationPlayer[]
@@ -525,6 +534,7 @@ export interface FormationData {
   bench_total: number
   captain_id: number
   vice_captain_id: number
+  captain_candidates?: CaptainCandidate[]
 }
 
 export interface PlannerOptimizeResponse {

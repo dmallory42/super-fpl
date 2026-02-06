@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
 import { usePlannerOptimize } from '../hooks/usePlannerOptimize'
 import { usePredictionsRange } from '../hooks/usePredictionsRange'
-import type { ChipPlan, PlayerMultiWeekPrediction } from '../api/client'
+import type { ChipPlan, PlayerMultiWeekPrediction, CaptainCandidate } from '../api/client'
 import { StatPanel, StatPanelGrid } from '../components/ui/StatPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, ChartIcon } from '../components/ui/EmptyState'
@@ -263,6 +263,13 @@ export function Planner() {
     }))
   }
 
+  // Get captain candidates from API formation data for selected GW
+  const captainCandidates: CaptainCandidate[] = useMemo(() => {
+    if (!optimizeData?.current_squad?.formations || selectedGameweek === null) return []
+    const formation = optimizeData.current_squad.formations?.[selectedGameweek]
+    return formation?.captain_candidates ?? []
+  }, [optimizeData?.current_squad?.formations, selectedGameweek])
+
   // Build formation players for the selected gameweek
   const formationPlayers = useMemo(() => {
     if (!effectiveSquad.length || !playersData?.players || selectedGameweek === null) return []
@@ -497,6 +504,54 @@ export function Planner() {
                 <div className="text-center text-foreground-muted py-8">Loading squad...</div>
               )}
             </BroadcastCard>
+
+            {/* Captain Decision Panel */}
+            {captainCandidates.length > 1 && (
+              <BroadcastCard title="Captain Decision" accentColor="highlight" animationDelay={350}>
+                <p className="text-xs text-foreground-muted mb-3">
+                  Multiple players within 0.5 pts — consider form, fixtures, and gut feel.
+                </p>
+                <div className="space-y-2">
+                  {captainCandidates.map((c, idx) => {
+                    const player = playersData?.players.find((p) => p.id === c.player_id)
+                    if (!player) return null
+                    return (
+                      <div
+                        key={c.player_id}
+                        className={`flex items-center justify-between p-3 rounded-lg animate-fade-in-up opacity-0 ${
+                          idx === 0
+                            ? 'bg-yellow-400/10 border border-yellow-400/30'
+                            : 'bg-surface-elevated'
+                        }`}
+                        style={{ animationDelay: `${400 + idx * 50}ms` }}
+                      >
+                        <div className="flex items-center gap-3">
+                          {idx === 0 && (
+                            <span className="text-yellow-400 font-display text-xs uppercase tracking-wider">
+                              Top
+                            </span>
+                          )}
+                          <span className="text-foreground font-medium">{player.web_name}</span>
+                          <span className="text-xs text-foreground-dim">
+                            {teamsMap.get(player.team)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-fpl-green">
+                            {c.predicted_points.toFixed(1)}
+                          </span>
+                          {c.margin > 0 && (
+                            <span className="text-xs text-foreground-muted ml-2">
+                              -{c.margin.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </BroadcastCard>
+            )}
           </div>
 
           {/* Sidebar - Transfers & Replacements */}

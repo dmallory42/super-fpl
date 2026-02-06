@@ -25,7 +25,7 @@ use SuperFPL\FplClient\Cache\FileCache;
 
 // CORS headers
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
 
@@ -74,11 +74,14 @@ try {
         $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
         $uri === '/sync/odds' => handleSyncOdds($db, $config),
         $uri === '/sync/season-history' => handleSyncSeasonHistory($db, $fplClient),
+        preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetXMins($db, (int) $m[1]),
+        preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'DELETE' => handleClearXMins($db, (int) $m[1]),
         preg_match('#^/players/(\d+)$#', $uri, $m) === 1 => handlePlayer($db, (int) $m[1]),
         preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, (int) $m[1]),
         preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, (int) $m[1], (int) $m[2]),
         preg_match('#^/managers/(\d+)/history$#', $uri, $m) === 1 => handleManagerHistory($db, $fplClient, (int) $m[1]),
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
+        preg_match('#^/predictions/(\d+)/accuracy$#', $uri, $m) === 1 => handlePredictionAccuracy($db, (int) $m[1]),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1]),
         preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
         $uri === '/predictions/range' => handlePredictionsRange($db),
@@ -325,19 +328,44 @@ function handlePredictions(Database $db, int $gameweek): void
 {
     $gwService = new \SuperFPL\Api\Services\GameweekService($db);
     $currentGw = $gwService->getCurrentGameweek();
+    $service = new PredictionService($db);
 
-    // Don't predict for past gameweeks
     if ($gameweek < $currentGw) {
-        http_response_code(400);
+        // Serve from snapshots for past gameweeks
+        $predictions = $service->getSnapshotPredictions($gameweek);
+
+        if (empty($predictions)) {
+            http_response_code(404);
+            echo json_encode([
+                'error' => 'No prediction snapshot found for this gameweek',
+                'requested_gameweek' => $gameweek,
+                'current_gameweek' => $currentGw,
+            ]);
+            return;
+        }
+
         echo json_encode([
-            'error' => 'Cannot predict for past gameweeks',
-            'requested_gameweek' => $gameweek,
+            'gameweek' => $gameweek,
             'current_gameweek' => $currentGw,
+            'source' => 'snapshot',
+            'predictions' => $predictions,
+            'generated_at' => date('c'),
         ]);
         return;
     }
 
-    $service = new PredictionService($db);
+    // Lazy snapshot: when serving current GW, snapshot previous GW if not done
+    if ($gameweek >= $currentGw && $currentGw > 1) {
+        $prevGw = $currentGw - 1;
+        $existing = $db->fetchOne(
+            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
+            [$prevGw]
+        );
+        if ((int) ($existing['cnt'] ?? 0) === 0) {
+            $service->snapshotPredictions($prevGw);
+        }
+    }
+
     $predictions = $service->getPredictions($gameweek);
 
     $response = [
@@ -347,12 +375,31 @@ function handlePredictions(Database $db, int $gameweek): void
         'generated_at' => date('c'),
     ];
 
-    // Include methodology if requested
     if (isset($_GET['include_methodology'])) {
         $response['methodology'] = PredictionService::getMethodology();
     }
 
     echo json_encode($response);
+}
+
+function handlePredictionAccuracy(Database $db, int $gameweek): void
+{
+    $service = new PredictionService($db);
+    $accuracy = $service->getAccuracy($gameweek);
+
+    if ($accuracy['summary']['count'] === 0) {
+        http_response_code(404);
+        echo json_encode([
+            'error' => 'No accuracy data available for this gameweek',
+            'gameweek' => $gameweek,
+        ]);
+        return;
+    }
+
+    echo json_encode([
+        'gameweek' => $gameweek,
+        'accuracy' => $accuracy,
+    ]);
 }
 
 function handlePredictionsRange(Database $db): void
@@ -383,7 +430,8 @@ function handlePredictionsRange(Database $db): void
             p.position,
             p.now_cost,
             p.form,
-            p.total_points
+            p.total_points,
+            p.xmins_override
         FROM player_predictions pp
         JOIN players p ON pp.player_id = p.id
         WHERE pp.gameweek IN ($placeholders)
@@ -404,6 +452,9 @@ function handlePredictionsRange(Database $db): void
                 'now_cost' => (int) $pred['now_cost'],
                 'form' => (float) $pred['form'],
                 'total_points' => (int) $pred['total_points'],
+                'expected_mins' => $pred['xmins_override'] !== null
+                    ? (int) $pred['xmins_override']
+                    : 90,
                 'predictions' => [],
                 'total_predicted' => 0,
             ];
@@ -961,6 +1012,31 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
             'error' => $e->getMessage(),
         ]);
     }
+}
+
+function handleSetXMins(Database $db, int $playerId): void
+{
+    $body = json_decode(file_get_contents('php://input'), true);
+    $expectedMins = $body['expected_mins'] ?? null;
+
+    if ($expectedMins === null || !is_numeric($expectedMins)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing or invalid expected_mins']);
+        return;
+    }
+
+    $expectedMins = max(0, min(95, (int) $expectedMins));
+
+    $db->query('UPDATE players SET xmins_override = ? WHERE id = ?', [$expectedMins, $playerId]);
+
+    echo json_encode(['success' => true, 'player_id' => $playerId, 'expected_mins' => $expectedMins]);
+}
+
+function handleClearXMins(Database $db, int $playerId): void
+{
+    $db->query('UPDATE players SET xmins_override = NULL WHERE id = ?', [$playerId]);
+
+    echo json_encode(['success' => true, 'player_id' => $playerId, 'expected_mins' => 90]);
 }
 
 function handleNotFound(): void
