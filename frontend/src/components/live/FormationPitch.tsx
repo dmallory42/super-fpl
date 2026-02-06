@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback, memo } from 'react'
 import { TeamShirt } from './TeamShirt'
 
 interface Player {
@@ -162,10 +162,28 @@ export function FormationPitch({
     }
   }, [players, xMinsOverrides])
 
-  const handleXMinsChange = (playerId: number, value: number) => {
-    onXMinsChange?.(playerId, value)
+  const handleXMinsSubmit = useCallback(
+    (playerId: number, value: number) => {
+      onXMinsChange?.(playerId, value)
+      setEditingPlayer(null)
+    },
+    [onXMinsChange]
+  )
+
+  const handleEditClick = useCallback((playerId: number) => {
+    setEditingPlayer(playerId)
+  }, [])
+
+  const handleEditClose = useCallback(() => {
     setEditingPlayer(null)
-  }
+  }, [])
+
+  const handleTransferClick = useCallback(
+    (playerId: number) => {
+      onPlayerClick?.(playerId)
+    },
+    [onPlayerClick]
+  )
 
   // Group starting players by position type
   const gk = starting.filter((p) => p.element_type === 1)
@@ -175,7 +193,8 @@ export function FormationPitch({
 
   const rows = [gk, def, mid, fwd]
 
-  let animationIndex = 0
+  // Pre-compute animation offset (avoids mutable counter in render)
+  const startingCount = rows.reduce((sum, row) => sum + row.length, 0)
 
   return (
     <div className="pitch-texture rounded-lg p-4 relative overflow-hidden">
@@ -197,33 +216,39 @@ export function FormationPitch({
 
       {/* Formation display */}
       <div className="relative z-10 flex flex-col gap-6 py-4">
-        {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-2 md:gap-4">
-            {row.map((player) => {
-              const delay = animationIndex++ * 50
-              return (
-                <PlayerCard
-                  key={player.player_id}
-                  player={player}
-                  teams={teams}
-                  showEO={showEffectiveOwnership}
-                  animationDelay={delay}
-                  editable={editable}
-                  isEditing={editingPlayer === player.player_id}
-                  customXMins={xMinsOverrides[player.player_id]}
-                  adjustedPoints={getAdjustedPoints(player)}
-                  onEditClick={() => setEditingPlayer(player.player_id)}
-                  onXMinsChange={(value) => handleXMinsChange(player.player_id, value)}
-                  onEditClose={() => setEditingPlayer(null)}
-                  transferMode={transferMode}
-                  isSelectedForTransfer={selectedForTransfer === player.player_id}
-                  isNewTransfer={newTransferIds.includes(player.player_id)}
-                  onTransferClick={() => onPlayerClick?.(player.player_id)}
-                />
+        {
+          rows.reduce<{ elements: JSX.Element[]; offset: number }>(
+            (acc, row, rowIndex) => {
+              acc.elements.push(
+                <div key={rowIndex} className="flex justify-center gap-2 md:gap-4">
+                  {row.map((player, itemIdx) => (
+                    <PlayerCard
+                      key={player.player_id}
+                      player={player}
+                      teams={teams}
+                      showEO={showEffectiveOwnership}
+                      animationDelay={(acc.offset + itemIdx) * 50}
+                      editable={editable}
+                      isEditing={editingPlayer === player.player_id}
+                      customXMins={xMinsOverrides[player.player_id]}
+                      adjustedPoints={getAdjustedPoints(player)}
+                      onEditClick={handleEditClick}
+                      onXMinsChange={handleXMinsSubmit}
+                      onEditClose={handleEditClose}
+                      transferMode={transferMode}
+                      isSelectedForTransfer={selectedForTransfer === player.player_id}
+                      isNewTransfer={newTransferIds.includes(player.player_id)}
+                      onTransferClick={handleTransferClick}
+                    />
+                  ))}
+                </div>
               )
-            })}
-          </div>
-        ))}
+              acc.offset += row.length
+              return acc
+            },
+            { elements: [], offset: 0 }
+          ).elements
+        }
       </div>
 
       {/* Bench */}
@@ -243,18 +268,18 @@ export function FormationPitch({
               teams={teams}
               showEO={showEffectiveOwnership}
               isBench
-              animationDelay={(animationIndex + idx) * 50}
+              animationDelay={(startingCount + idx) * 50}
               editable={editable}
               isEditing={editingPlayer === player.player_id}
               customXMins={xMinsOverrides[player.player_id]}
               adjustedPoints={getAdjustedPoints(player)}
-              onEditClick={() => setEditingPlayer(player.player_id)}
-              onXMinsChange={(value) => handleXMinsChange(player.player_id, value)}
-              onEditClose={() => setEditingPlayer(null)}
+              onEditClick={handleEditClick}
+              onXMinsChange={handleXMinsSubmit}
+              onEditClose={handleEditClose}
               transferMode={transferMode}
               isSelectedForTransfer={selectedForTransfer === player.player_id}
               isNewTransfer={newTransferIds.includes(player.player_id)}
-              onTransferClick={() => onPlayerClick?.(player.player_id)}
+              onTransferClick={handleTransferClick}
             />
           ))}
         </div>
@@ -273,17 +298,17 @@ interface PlayerCardProps {
   isEditing?: boolean
   customXMins?: number
   adjustedPoints?: number
-  onEditClick?: () => void
-  onXMinsChange?: (value: number) => void
+  onEditClick?: (playerId: number) => void
+  onXMinsChange?: (playerId: number, value: number) => void
   onEditClose?: () => void
   // Transfer mode props
   transferMode?: boolean
   isSelectedForTransfer?: boolean
   isNewTransfer?: boolean
-  onTransferClick?: () => void
+  onTransferClick?: (playerId: number) => void
 }
 
-function PlayerCard({
+const PlayerCard = memo(function PlayerCard({
   player,
   teams,
   showEO = false,
@@ -308,6 +333,7 @@ function PlayerCard({
       '80'
   )
 
+  const playerId = player.player_id
   const basePoints = player.stats?.total_points ?? player.points ?? player.predicted_points ?? 0
   // Use adjusted points if available (for editable mode), otherwise base points
   const displayPoints = adjustedPoints ?? player.effective_points ?? basePoints
@@ -318,7 +344,7 @@ function PlayerCard({
   const handleSubmit = () => {
     const value = parseInt(inputValue, 10)
     if (!isNaN(value) && value >= 0 && value <= 95) {
-      onXMinsChange?.(value)
+      onXMinsChange?.(playerId, value)
     } else {
       onEditClose?.()
     }
@@ -327,9 +353,9 @@ function PlayerCard({
   const isClickable = transferMode || editable
   const handleClick = () => {
     if (transferMode && onTransferClick) {
-      onTransferClick()
+      onTransferClick(playerId)
     } else if (editable && onEditClick) {
-      onEditClick()
+      onEditClick(playerId)
     }
   }
 
@@ -424,7 +450,7 @@ function PlayerCard({
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onEditClick?.()
+              onEditClick?.(playerId)
             }}
             className="absolute -bottom-0.5 -right-0.5 bg-surface/90 hover:bg-fpl-green hover:text-black rounded-full w-5 h-5 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-all z-20"
           >
@@ -456,4 +482,4 @@ function PlayerCard({
       )}
     </div>
   )
-}
+})
