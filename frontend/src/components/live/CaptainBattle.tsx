@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { TierSampleData } from '../../api/client'
-
-type CaptainTier = 'top_10k' | 'top_100k' | 'top_1m' | 'overall'
+import { type Tier, TIER_OPTIONS } from '../../lib/tiers'
 
 interface CaptainBattleProps {
   userCaptainId: number | undefined
@@ -24,13 +23,6 @@ interface CaptainOption {
   rank: number
 }
 
-const tierOptions: { value: CaptainTier; label: string }[] = [
-  { value: 'top_10k', label: '10K' },
-  { value: 'top_100k', label: '100K' },
-  { value: 'top_1m', label: '1M' },
-  { value: 'overall', label: 'All' },
-]
-
 // Rank badge styles (1st, 2nd, 3rd get special treatment)
 const rankBadgeStyles: Record<number, string> = {
   1: 'bg-gradient-to-br from-amber-400 to-amber-600 text-amber-950',
@@ -39,7 +31,7 @@ const rankBadgeStyles: Record<number, string> = {
 }
 
 export function CaptainBattle({ userCaptainId, samples, playersMap }: CaptainBattleProps) {
-  const [selectedTier, setSelectedTier] = useState<CaptainTier>('top_10k')
+  const [selectedTier, setSelectedTier] = useState<Tier>('top_10k')
 
   const tierData = samples?.[selectedTier]
   const captainPercent = tierData?.captain_percent
@@ -116,7 +108,7 @@ export function CaptainBattle({ userCaptainId, samples, playersMap }: CaptainBat
         )}
         <div className={`flex items-center gap-1 ${!isDifferential ? 'ml-auto' : ''}`}>
           <span className="text-[10px] text-foreground-dim mr-1">vs</span>
-          {tierOptions.map((tier) => (
+          {TIER_OPTIONS.map((tier) => (
             <button
               key={tier.value}
               onClick={() => setSelectedTier(tier.value)}

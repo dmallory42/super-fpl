@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { ManagerHistoryResponse } from '../../api/client'
 import type { EntryHistory } from '../../types'
+import { formatRank } from '../../lib/format'
 import { StatPanel, StatPanelGrid } from '../ui/StatPanel'
 import { BroadcastCard } from '../ui/BroadcastCard'
 
@@ -19,13 +20,6 @@ const chipDisplayNames: Record<string, string> = {
   bboost: 'Bench Boost',
   '3xc': 'Triple Captain',
   freehit: 'Free Hit',
-}
-
-function formatRank(rank: number | null): string {
-  if (rank === null) return '-'
-  if (rank >= 1000000) return `${(rank / 1000000).toFixed(2)}M`
-  if (rank >= 1000) return `${Math.round(rank / 1000)}K`
-  return rank.toLocaleString()
 }
 
 function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {

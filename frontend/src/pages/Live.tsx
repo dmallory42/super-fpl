@@ -10,11 +10,7 @@ import { LiveIndicator } from '../components/ui/LiveIndicator'
 import { EmptyState, CalendarIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonPitch } from '../components/ui/SkeletonLoader'
 import { LiveFormationPitch } from '../components/live/LiveFormationPitch'
-import {
-  ComparisonBars,
-  type PlayerImpact,
-  type ComparisonTier,
-} from '../components/live/ComparisonBars'
+import { ComparisonBars, type PlayerImpact } from '../components/live/ComparisonBars'
 import { FixtureScores } from '../components/live/FixtureScores'
 import { CaptainBattle } from '../components/live/CaptainBattle'
 import { PlayersRemaining } from '../components/live/PlayersRemaining'
@@ -22,18 +18,12 @@ import { RankProjection } from '../components/live/RankProjection'
 import { VarianceAnalysis } from '../components/live/VarianceAnalysis'
 import { FixtureThreatIndex } from '../components/live/FixtureThreatIndex'
 import { DifferentialAnalysis } from '../components/live/DifferentialAnalysis'
+import { formatRank } from '../lib/format'
+import { type Tier, TIER_OPTIONS } from '../lib/tiers'
 import type { LiveManagerPlayer } from '../api/client'
 import type { GameweekFixtureStatus } from '../api/client'
 
 type PlayerInfo = { web_name: string; team: number; element_type: number }
-
-/** Format rank for display (e.g., 1.2M, 450K, 5,000) */
-function formatRank(rank: number): string {
-  if (rank >= 1000000) return `${(rank / 1000000).toFixed(1)}M`
-  if (rank >= 10000) return `${Math.round(rank / 1000)}K`
-  if (rank >= 1000) return `${(rank / 1000).toFixed(1)}K`
-  return rank.toLocaleString()
-}
 
 /**
  * Apply FPL auto-sub rules to the squad.
@@ -233,7 +223,7 @@ export function Live() {
   const initial = getInitialManagerId()
   const [managerId, setManagerId] = useState<number | null>(initial.id)
   const [managerInput, setManagerInput] = useState(initial.input)
-  const [comparisonTier, setComparisonTier] = useState<ComparisonTier>('top_10k')
+  const [comparisonTier, setComparisonTier] = useState<Tier>('top_10k')
 
   // Auto-detect current gameweek
   const { data: gwData, isLoading: isLoadingGw, gameweekData } = useCurrentGameweek()
@@ -521,12 +511,7 @@ export function Live() {
   }, [processedSquad, tierEO, playersMap])
 
   // Get tier label for differential analysis
-  const tierLabels: Record<ComparisonTier, string> = {
-    top_10k: '10K',
-    top_100k: '100K',
-    top_1m: '1M',
-    overall: 'All',
-  }
+  const tierLabel = TIER_OPTIONS.find((t) => t.value === comparisonTier)?.label ?? comparisonTier
 
   const handleLoadManager = (id?: number) => {
     const managerId = id ?? parseInt(managerInput, 10)
@@ -768,10 +753,7 @@ export function Live() {
             {/* Differential Analysis */}
             {differentialData.length > 0 && (
               <BroadcastCard title="Differentials" accentColor="purple" animationDelay={650}>
-                <DifferentialAnalysis
-                  players={differentialData}
-                  tierLabel={tierLabels[comparisonTier]}
-                />
+                <DifferentialAnalysis players={differentialData} tierLabel={tierLabel} />
               </BroadcastCard>
             )}
           </div>

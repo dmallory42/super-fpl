@@ -1,3 +1,5 @@
+import { formatRank } from '../../lib/format'
+
 interface RankProjectionProps {
   currentRank: number
   previousRank: number
@@ -5,14 +7,6 @@ interface RankProjectionProps {
   tierAvgPoints: number
   fixturesFinished: number
   fixturesTotal: number
-}
-
-/** Format rank for display (e.g., 1.2M, 450K, 5,000) */
-function formatRank(rank: number): string {
-  if (rank >= 1000000) return `${(rank / 1000000).toFixed(1)}M`
-  if (rank >= 10000) return `${Math.round(rank / 1000)}K`
-  if (rank >= 1000) return `${(rank / 1000).toFixed(1)}K`
-  return rank.toLocaleString()
 }
 
 export function RankProjection({

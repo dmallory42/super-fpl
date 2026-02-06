@@ -1,4 +1,6 @@
 import type { TierComparison } from '../../hooks/useLiveSamples'
+import { formatRank } from '../../lib/format'
+import { type Tier, TIER_OPTIONS, TIER_CONFIG } from '../../lib/tiers'
 
 export interface PlayerImpact {
   playerId: number
@@ -10,31 +12,14 @@ export interface PlayerImpact {
   owned: boolean // Whether user owns this player
 }
 
-export type ComparisonTier = 'top_10k' | 'top_100k' | 'top_1m' | 'overall'
-
 interface ComparisonBarsProps {
   userPoints: number
   comparisons: TierComparison[]
   playerImpacts?: PlayerImpact[]
-  selectedTier: ComparisonTier
-  onTierChange: (tier: ComparisonTier) => void
+  selectedTier: Tier
+  onTierChange: (tier: Tier) => void
   animationDelay?: number
 }
-
-// Tier abbreviations and colors for the gauge
-const tierConfig: Record<string, { abbrev: string; color: string }> = {
-  top_10k: { abbrev: '10K', color: 'bg-amber-500' },
-  top_100k: { abbrev: '100K', color: 'bg-purple-500' },
-  top_1m: { abbrev: '1M', color: 'bg-blue-500' },
-  overall: { abbrev: 'AVG', color: 'bg-slate-500' },
-}
-
-const tierOptions: { value: ComparisonTier; label: string }[] = [
-  { value: 'top_10k', label: '10K' },
-  { value: 'top_100k', label: '100K' },
-  { value: 'top_1m', label: '1M' },
-  { value: 'overall', label: 'All' },
-]
 
 export function ComparisonBars({
   userPoints,
@@ -101,7 +86,10 @@ export function ComparisonBars({
 
         {/* Tier markers on the track */}
         {comparisons.map((comp, idx) => {
-          const config = tierConfig[comp.tier] || { abbrev: comp.tier, color: 'bg-slate-500' }
+          const config = TIER_CONFIG[comp.tier as Tier] || {
+            abbrev: comp.tier,
+            color: 'bg-slate-500',
+          }
           const position = pointsToPercent(comp.avgPoints)
 
           return (
@@ -157,7 +145,10 @@ export function ComparisonBars({
         {comparisons.map((comp, idx) => {
           const isAhead = comp.difference > 0
           const isBehind = comp.difference < 0
-          const config = tierConfig[comp.tier] || { abbrev: comp.tier, color: 'bg-slate-500' }
+          const config = TIER_CONFIG[comp.tier as Tier] || {
+            abbrev: comp.tier,
+            color: 'bg-slate-500',
+          }
 
           return (
             <div
@@ -200,7 +191,7 @@ export function ComparisonBars({
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="text-[10px] text-foreground-dim mr-1">vs</span>
-                  {tierOptions.map((tier) => (
+                  {TIER_OPTIONS.map((tier) => (
                     <button
                       key={tier.value}
                       onClick={() => onTierChange(tier.value)}
@@ -330,10 +321,4 @@ export function RankMovement({ currentRank, startingRank }: RankMovementProps) {
       </div>
     </div>
   )
-}
-
-function formatRank(rank: number): string {
-  if (rank >= 1000000) return `${(rank / 1000000).toFixed(1)}M`
-  if (rank >= 1000) return `${Math.round(rank / 1000)}K`
-  return rank.toLocaleString()
 }

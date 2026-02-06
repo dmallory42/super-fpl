@@ -1,6 +1,5 @@
 import type { GameweekFixtureStatus } from '../../api/client'
-
-type Tier = 'top_10k' | 'top_100k' | 'top_1m' | 'overall'
+import { type Tier, TIER_OPTIONS } from '../../lib/tiers'
 
 interface FixtureImpact {
   fixtureId: number
@@ -21,13 +20,6 @@ interface FixtureThreatIndexProps {
   selectedTier: Tier
   onTierChange: (tier: Tier) => void
 }
-
-const tierOptions: { value: Tier; label: string }[] = [
-  { value: 'top_10k', label: '10K' },
-  { value: 'top_100k', label: '100K' },
-  { value: 'top_1m', label: '1M' },
-  { value: 'overall', label: 'All' },
-]
 
 export function FixtureThreatIndex({
   fixtureData,
@@ -75,7 +67,7 @@ export function FixtureThreatIndex({
 
         <div className="flex items-center gap-1">
           <span className="text-[10px] text-foreground-dim mr-1">vs</span>
-          {tierOptions.map((tier) => (
+          {TIER_OPTIONS.map((tier) => (
             <button
               key={tier.value}
               onClick={() => onTierChange(tier.value)}
