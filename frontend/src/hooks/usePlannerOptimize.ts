@@ -4,11 +4,12 @@ import { fetchPlannerOptimize, type PlannerOptimizeResponse, type ChipPlan } fro
 export function usePlannerOptimize(
   managerId: number | null,
   freeTransfers: number = 1,
-  chipPlan: ChipPlan = {}
+  chipPlan: ChipPlan = {},
+  xMinsOverrides: Record<number, number> = {}
 ) {
   return useQuery<PlannerOptimizeResponse>({
-    queryKey: ['planner-optimize', managerId, freeTransfers, chipPlan],
-    queryFn: () => fetchPlannerOptimize(managerId!, freeTransfers, chipPlan),
+    queryKey: ['planner-optimize', managerId, freeTransfers, chipPlan, xMinsOverrides],
+    queryFn: () => fetchPlannerOptimize(managerId!, freeTransfers, chipPlan, xMinsOverrides),
     enabled: managerId !== null && managerId > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })
