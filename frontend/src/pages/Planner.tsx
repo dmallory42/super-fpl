@@ -20,9 +20,29 @@ interface StagedTransfer {
   inPrice: number
 }
 
+function getInitialManagerId(): { id: number | null; input: string } {
+  const params = new URLSearchParams(window.location.search)
+  const urlManager = params.get('manager')
+  if (urlManager) {
+    const id = parseInt(urlManager, 10)
+    if (!isNaN(id) && id > 0) {
+      return { id, input: urlManager }
+    }
+  }
+  const savedId = localStorage.getItem('fpl_manager_id')
+  if (savedId) {
+    const id = parseInt(savedId, 10)
+    if (!isNaN(id) && id > 0) {
+      return { id, input: savedId }
+    }
+  }
+  return { id: null, input: '' }
+}
+
 export function Planner() {
-  const [managerId, setManagerId] = useState<number | null>(null)
-  const [managerInput, setManagerInput] = useState('')
+  const initial = getInitialManagerId()
+  const [managerId, setManagerId] = useState<number | null>(initial.id)
+  const [managerInput, setManagerInput] = useState(initial.input)
   const [freeTransfers, setFreeTransfers] = useState(1)
   const chipPlan: ChipPlan = {}
   const [xMinsOverrides, setXMinsOverrides] = useState<Record<number, number>>({})
@@ -158,6 +178,16 @@ export function Planner() {
     effectiveBank,
     replacementSearch,
   ])
+
+  // Persist manager ID to URL and localStorage
+  useEffect(() => {
+    if (managerId) {
+      localStorage.setItem('fpl_manager_id', String(managerId))
+      const params = new URLSearchParams(window.location.search)
+      params.set('manager', String(managerId))
+      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
+    }
+  }, [managerId])
 
   const handleLoadManager = () => {
     const id = parseInt(managerInput, 10)
