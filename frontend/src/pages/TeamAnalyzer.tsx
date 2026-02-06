@@ -19,7 +19,11 @@ export function TeamAnalyzer() {
     isLoading: picksLoading,
     error: picksError,
   } = useManagerPicks(managerId, manager?.current_event ?? null)
-  const { data: history, isLoading: historyLoading } = useManagerHistory(managerId)
+  const {
+    data: history,
+    isLoading: historyLoading,
+    error: historyError,
+  } = useManagerHistory(managerId)
 
   const playersMap = useMemo(() => {
     if (!playersData?.players) return new Map()
@@ -36,7 +40,7 @@ export function TeamAnalyzer() {
   }
 
   const isLoading = playersLoading || managerLoading || picksLoading || historyLoading
-  const error = managerError || picksError
+  const error = managerError || picksError || historyError
 
   return (
     <div className="space-y-6">
