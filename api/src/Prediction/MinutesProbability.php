@@ -6,6 +6,10 @@ namespace SuperFPL\Api\Prediction;
 
 /**
  * Calculates probability of a player playing minutes.
+ *
+ * Uses minutes, starts, and (when available) appearances from the FPL API.
+ * Separates "what happens when selected" from "current availability" so that
+ * past injury absences don't penalize nailed players who are now fit.
  */
 class MinutesProbability
 {
@@ -16,14 +20,6 @@ class MinutesProbability
     private const RELIABLE_MINUTES_THRESHOLD = 270;
 
     /**
-     * Calculate probability of playing and expected minutes.
-     *
-     * Uses actual appearances data (synced from FPL API) to calculate
-     * accurate minutes per appearance. This correctly handles:
-     * - Super-subs who rarely start but appear often
-     * - Injured players who play full games when fit
-     * - Rotation players
-     *
      * @param array<string, mixed> $player Player data from database
      * @param int $teamGames Number of games the player's team has played
      * @return array{prob_60: float, prob_any: float, expected_mins: float}
@@ -35,8 +31,7 @@ class MinutesProbability
         $minutes = (int) ($player['minutes'] ?? 0);
         $appearances = (int) ($player['appearances'] ?? 0);
 
-        // Only trust chance_of_playing if it equals 0 (confirmed out)
-        // Cast to int to handle string "0" from API
+        // Confirmed out
         if ($chanceOfPlaying !== null && (int) $chanceOfPlaying === 0) {
             return [
                 'prob_60' => 0.0,
@@ -46,7 +41,7 @@ class MinutesProbability
         }
 
         // No playing time this season
-        if ($minutes === 0 || $appearances === 0) {
+        if ($minutes === 0) {
             return [
                 'prob_60' => 0.1,
                 'prob_any' => 0.15,
@@ -54,21 +49,42 @@ class MinutesProbability
             ];
         }
 
-        // Core metrics from real data
-        $minsPerAppearance = $minutes / $appearances;
-        $appearanceRate = $appearances / $teamGames;
+        $teamGames = max(1, $teamGames);
+        $availability = $this->getAvailability($chanceOfPlaying);
+
+        // Derive per-appearance stats from best available data
+        if ($appearances > 0) {
+            // Slow sync has run — use real appearances
+            $minsPerAppearance = $minutes / $appearances;
+            $appearanceRate = $appearances / $teamGames;
+        } elseif ($starts > 0) {
+            // Bootstrap only — use starts as lower bound for appearances
+            $minsPerAppearance = $minutes / $starts;
+            $appearanceRate = $starts / $teamGames;
+        } else {
+            // Pure sub (minutes > 0, zero starts) — estimate ~20 mins per sub
+            $minsPerAppearance = 20.0;
+            $appearanceRate = ($minutes / $teamGames) / 20.0;
+        }
+
         $startRate = $starts / $teamGames;
 
-        // Probability of any appearance (capped at 98%)
-        $probAny = min(0.98, $appearanceRate);
+        // Selection probability when available.
+        // High mins-per-appearance = nailed starter; gap between
+        // appearanceRate and 1.0 is mostly injury, not rotation.
+        if ($minsPerAppearance >= 75) {
+            $selectionProb = 0.98;
+        } elseif ($minsPerAppearance >= 60) {
+            $selectionProb = min(0.95, $appearanceRate * 1.2);
+        } else {
+            $selectionProb = min(0.90, $appearanceRate * 1.1);
+        }
 
-        // Probability of 60+ mins depends on whether they typically start or sub
+        $probAny = $availability * $selectionProb;
         $prob60 = $this->calculate60MinsProbability($minsPerAppearance, $startRate, $probAny);
-
-        // Expected minutes = probability of playing × minutes when playing
         $expectedMins = $probAny * $minsPerAppearance;
 
-        // Apply reliability discount for low-minutes players
+        // Reliability discount for low-minutes players
         if ($minutes < self::RELIABLE_MINUTES_THRESHOLD) {
             $reliability = $minutes / self::RELIABLE_MINUTES_THRESHOLD;
             $baselineExpectedMins = 15.0;
@@ -88,6 +104,19 @@ class MinutesProbability
     }
 
     /**
+     * Map FPL's chance_of_playing to an availability factor.
+     * null means "no news" — treat as fully available.
+     */
+    private function getAvailability(mixed $chanceOfPlaying): float
+    {
+        if ($chanceOfPlaying === null || $chanceOfPlaying === '') {
+            return 1.0;
+        }
+        $chance = (int) $chanceOfPlaying;
+        return max(0.0, min(1.0, $chance / 100));
+    }
+
+    /**
      * Calculate probability of playing 60+ minutes.
      */
     private function calculate60MinsProbability(float $minsPerAppearance, float $startRate, float $probAny): float
@@ -101,15 +130,14 @@ class MinutesProbability
         }
 
         // For lower mins per appearance, use start rate to estimate
-        // A player with 40 mins/appearance could be rotation starter or super-sub
         if ($startRate > 0.5) {
-            // Mostly starts - probably gets subbed off sometimes
+            // Mostly starts — gets subbed off sometimes
             $prob60GivenPlay = min(0.80, 0.50 + ($minsPerAppearance / 150));
         } elseif ($startRate > 0.2) {
             // Mix of starts and subs
             $prob60GivenPlay = min(0.60, 0.30 + ($minsPerAppearance / 200));
         } else {
-            // Mostly subs - rarely plays 60+
+            // Mostly subs — rarely plays 60+
             $prob60GivenPlay = min(0.30, $minsPerAppearance / 150);
         }
 

@@ -65,9 +65,9 @@ const XMinsInput = memo(function XMinsInput({
 
   return (
     <input
-      type="number"
-      min={0}
-      max={95}
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
       value={localValue}
       placeholder={String(baseXMins)}
       onChange={handleChange}

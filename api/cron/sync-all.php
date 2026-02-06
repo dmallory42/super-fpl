@@ -183,6 +183,7 @@ switch ($phase) {
         $tasks = [
             'fixtures'    => $syncFixtures,
             'players'     => $syncPlayers,
+            'appearances' => $syncAppearances,
             'odds'        => $syncOdds,
             'snapshot'    => $snapshotPrevGw,
             'predictions' => $generatePredictions,
