@@ -28,6 +28,7 @@ class ManagerService
             $this->cacheManager($entryData);
             return $this->formatManagerResponse($entryData);
         } catch (\Throwable $e) {
+            error_log("ManagerService: Failed to fetch manager {$id} from API: " . $e->getMessage());
             // Fall back to cached data if API fails
             $cached = $this->db->fetchOne(
                 'SELECT * FROM managers WHERE id = ?',

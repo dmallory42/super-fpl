@@ -587,6 +587,7 @@ export function Live() {
               onChange={(e) => setManagerInput(e.target.value)}
               placeholder="Enter your FPL Manager ID"
               className="input-broadcast flex-1"
+              aria-label="Manager ID"
               onKeyDown={(e) => e.key === 'Enter' && handleLoadManager()}
             />
             <button onClick={() => handleLoadManager()} className="btn-primary">

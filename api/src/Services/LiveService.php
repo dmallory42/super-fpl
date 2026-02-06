@@ -123,7 +123,7 @@ class LiveService
                 }
             }
         } catch (\Throwable $e) {
-            // Ignore - ranks will be null
+            error_log("LiveService: Failed to fetch rank data for manager {$managerId}: " . $e->getMessage());
         }
 
         return [
@@ -350,6 +350,7 @@ class LiveService
             $picksData = $this->fplClient->entry($managerId)->picks($gameweek);
             return $picksData['picks'] ?? [];
         } catch (\Throwable $e) {
+            error_log("LiveService: Failed to fetch picks for manager {$managerId} GW{$gameweek}: " . $e->getMessage());
             return [];
         }
     }

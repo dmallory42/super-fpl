@@ -16,7 +16,7 @@ describe('VarianceAnalysis', () => {
   it('shows total predicted points', () => {
     render(<VarianceAnalysis {...defaultProps} />)
 
-    expect(screen.getByText('18')).toBeInTheDocument()
+    expect(screen.getByText('18.0')).toBeInTheDocument()
     expect(screen.getByText(/Expected/i)).toBeInTheDocument()
   })
 
@@ -30,28 +30,28 @@ describe('VarianceAnalysis', () => {
   it('shows positive variance when outperforming', () => {
     render(<VarianceAnalysis {...defaultProps} />)
 
-    // 19 actual - 18 predicted = +1
-    expect(screen.getByText('+1')).toBeInTheDocument()
+    // 19 actual - 18 predicted = +1.0
+    expect(screen.getByText('+1.0')).toBeInTheDocument()
   })
 
   it('shows negative variance when underperforming', () => {
     render(<VarianceAnalysis players={defaultProps.players} totalPredicted={25} totalActual={20} />)
 
-    // 20 actual - 25 predicted = -5
-    expect(screen.getByText('-5')).toBeInTheDocument()
+    // 20 actual - 25 predicted = -5.0
+    expect(screen.getByText('-5.0')).toBeInTheDocument()
   })
 
   it('shows luck meter label for positive variance', () => {
     render(<VarianceAnalysis {...defaultProps} />)
 
-    // When variance is positive, you're "lucky"
-    expect(screen.getByText(/Lucky/i)).toBeInTheDocument()
+    // When variance is positive, label shows "Positive"
+    expect(screen.getByText(/Positive/i)).toBeInTheDocument()
   })
 
   it('shows luck meter label for negative variance', () => {
     render(<VarianceAnalysis players={defaultProps.players} totalPredicted={25} totalActual={20} />)
 
-    expect(screen.getByText(/Unlucky/i)).toBeInTheDocument()
+    expect(screen.getByText(/Negative/i)).toBeInTheDocument()
   })
 
   it('shows players sorted by variance (biggest overperformers first)', () => {

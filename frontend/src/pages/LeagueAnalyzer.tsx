@@ -67,6 +67,7 @@ export function LeagueAnalyzer() {
           onChange={(e) => setLeagueInput(e.target.value)}
           placeholder="Enter League ID"
           className="input-broadcast flex-1"
+          aria-label="League ID"
         />
         <button type="submit" className="btn-primary">
           Analyze
@@ -76,10 +77,14 @@ export function LeagueAnalyzer() {
       {/* Gameweek Selector */}
       {leagueId && (
         <div className="flex items-center gap-4 animate-fade-in-up animation-delay-200">
-          <label className="text-foreground-muted font-display text-sm uppercase tracking-wider">
+          <label
+            htmlFor="gameweek-select"
+            className="text-foreground-muted font-display text-sm uppercase tracking-wider"
+          >
             Gameweek:
           </label>
           <select
+            id="gameweek-select"
             value={gameweek || ''}
             onChange={(e) => setGameweek(e.target.value ? parseInt(e.target.value, 10) : undefined)}
             className="input-broadcast w-32"

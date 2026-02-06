@@ -40,6 +40,7 @@ export function ManagerSearch({ onSearch, isLoading }: ManagerSearchProps) {
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Enter FPL Manager ID (e.g., 12345)"
           className="input-broadcast"
+          aria-label="Search for manager"
           disabled={isLoading}
         />
         {error && <p className="text-destructive text-sm mt-1 animate-fade-in-up">{error}</p>}

@@ -24,7 +24,7 @@ export function Planner() {
   const [managerId, setManagerId] = useState<number | null>(null)
   const [managerInput, setManagerInput] = useState('')
   const [freeTransfers, setFreeTransfers] = useState(1)
-  const [chipPlan] = useState<ChipPlan>({})
+  const chipPlan: ChipPlan = {}
   const [xMinsOverrides, setXMinsOverrides] = useState<Record<number, number>>({})
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null)
 

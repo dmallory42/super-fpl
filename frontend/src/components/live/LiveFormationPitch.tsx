@@ -73,7 +73,18 @@ export function LiveFormationPitch({
     return { status: 'upcoming' }
   }
 
-  let animationIndex = 0
+  // Build a flat index mapping for stable animation delays
+  const animationDelays = useMemo(() => {
+    const delays = new Map<number, number>()
+    let index = 0
+    for (const row of rows) {
+      for (const player of row) {
+        delays.set(player.player_id, index * 50)
+        index++
+      }
+    }
+    return { delays, totalStarters: index }
+  }, [rows])
 
   return (
     <div className="pitch-texture rounded-lg p-4 relative overflow-hidden">
@@ -93,7 +104,7 @@ export function LiveFormationPitch({
               const info = playersInfo.get(player.player_id)
               const teamName = info?.team ? (teamsInfo.get(info.team) ?? '???') : '???'
               const { status, minutes } = getPlayerStatus(player.player_id)
-              const delay = animationIndex++ * 50
+              const delay = animationDelays.delays.get(player.player_id) ?? 0
 
               return (
                 <PlayerStatusCard
@@ -146,7 +157,7 @@ export function LiveFormationPitch({
                 status={status}
                 matchMinute={minutes}
                 isBench
-                animationDelay={(animationIndex + idx) * 50}
+                animationDelay={(animationDelays.totalStarters + idx) * 50}
               />
             )
           })}

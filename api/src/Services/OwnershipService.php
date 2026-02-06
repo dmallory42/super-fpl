@@ -218,7 +218,8 @@ class OwnershipService
         try {
             $picks = $this->fplClient->entry($managerId)->picks($gameweek);
             return $picks['picks'] ?? null;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            error_log("OwnershipService: Failed to fetch picks for manager {$managerId} GW{$gameweek}: " . $e->getMessage());
             return null;
         }
     }
@@ -231,8 +232,8 @@ class OwnershipService
         }
 
         $mtime = filemtime($file);
-        if (time() - $mtime > self::CACHE_TTL) {
-            unlink($file);
+        if ($mtime === false || time() - $mtime > self::CACHE_TTL) {
+            @unlink($file);
             return null;
         }
 

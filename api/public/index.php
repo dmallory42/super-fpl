@@ -727,6 +727,12 @@ function handleFixturesStatus(Database $db, FplClient $fplClient, array $config)
     $now = time();
     foreach ($fixtures as &$fixture) {
         $kickoff = strtotime($fixture['kickoff_time']);
+        if ($kickoff === false) {
+            $fixture['started'] = false;
+            $fixture['finished'] = (bool) $fixture['finished'];
+            $fixture['minutes'] = 0;
+            continue;
+        }
         $fixture['started'] = $now >= $kickoff;
 
         // If kickoff was more than 120 minutes ago, consider it finished
@@ -740,6 +746,7 @@ function handleFixturesStatus(Database $db, FplClient $fplClient, array $config)
             ? min(90, (int)$minutesSinceKickoff)
             : ($fixture['finished'] ? 90 : 0);
     }
+    unset($fixture);
 
     // Group by gameweek
     $byGameweek = [];
@@ -777,6 +784,13 @@ function handleFixturesStatus(Database $db, FplClient $fplClient, array $config)
     foreach ($byGameweek as $gw => $data) {
         $firstKickoff = strtotime($data['first_kickoff']);
         $lastKickoff = strtotime($data['last_kickoff']);
+
+        if ($firstKickoff === false || $lastKickoff === false) {
+            if ($data['finished'] === $data['total'] && $data['total'] > 0) {
+                $latestFinished = $gw;
+            }
+            continue;
+        }
 
         $gwStart = $firstKickoff - (90 * 60); // 90 min before first kickoff
         $gwEnd = $lastKickoff + (12 * 60 * 60); // 12 hours after last kickoff
