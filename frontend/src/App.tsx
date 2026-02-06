@@ -5,6 +5,7 @@ import { LeagueAnalyzer } from './pages/LeagueAnalyzer'
 import { Live } from './pages/Live'
 import { Planner } from './pages/Planner'
 import { TabNav } from './components/ui/TabNav'
+import { useSyncStatus } from './hooks/useSyncStatus'
 import { GradientText } from './components/ui/GradientText'
 import './index.css'
 
@@ -37,6 +38,11 @@ function getInitialPage(): Page {
   return 'season-review'
 }
 
+function SyncWatcher() {
+  useSyncStatus()
+  return null
+}
+
 function App() {
   const [page, setPage] = useState<Page>(getInitialPage)
 
@@ -60,6 +66,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SyncWatcher />
       <div className="min-h-screen bg-background text-foreground">
         {/* Header */}
         <header className="sticky top-0 z-50 border-b border-border glass">

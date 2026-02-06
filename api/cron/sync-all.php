@@ -237,3 +237,6 @@ if ($failed) {
     echo "WARNING: One or more tasks failed.\n";
     exit(1);
 }
+
+// Write sync version so the frontend can detect fresh data
+file_put_contents($cacheDir . '/sync_version.txt', (string) time());

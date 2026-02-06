@@ -15,6 +15,14 @@ async function fetchApi<T>(endpoint: string): Promise<T> {
   return response.json()
 }
 
+export interface SyncStatusResponse {
+  last_sync: number
+}
+
+export async function fetchSyncStatus(): Promise<SyncStatusResponse> {
+  return fetchApi<SyncStatusResponse>('/sync/status')
+}
+
 export interface PlayersResponse {
   players: import('../types').Player[]
   teams: { id: number; name: string; short_name: string }[]

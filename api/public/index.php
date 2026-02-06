@@ -70,6 +70,7 @@ try {
         $uri === '/fixtures' => handleFixtures($db),
         $uri === '/gameweek/current' => handleCurrentGameweek($db),
         $uri === '/teams' => handleTeams($db),
+        $uri === '/sync/status' => handleSyncStatus($config),
         $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
         $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
         $uri === '/sync/odds' => handleSyncOdds($db, $config),
@@ -116,6 +117,13 @@ try {
 function handleHealth(): void
 {
     echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
+}
+
+function handleSyncStatus(array $config): void
+{
+    $file = $config['cache']['path'] . '/sync_version.txt';
+    $lastSync = file_exists($file) ? (int) file_get_contents($file) : 0;
+    echo json_encode(['last_sync' => $lastSync]);
 }
 
 function handlePlayers(Database $db): void
