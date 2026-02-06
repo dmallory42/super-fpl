@@ -10,6 +10,7 @@ use SuperFPL\FplClient\Endpoints\EntryEndpoint;
 use SuperFPL\FplClient\Endpoints\FixturesEndpoint;
 use SuperFPL\FplClient\Endpoints\LeagueEndpoint;
 use SuperFPL\FplClient\Endpoints\LiveEndpoint;
+use SuperFPL\FplClient\Endpoints\PlayerEndpoint;
 
 class FplClient
 {
@@ -62,5 +63,10 @@ class FplClient
     public function league(int $id): LeagueEndpoint
     {
         return new LeagueEndpoint($this->httpClient, $id);
+    }
+
+    public function player(int $id): PlayerEndpoint
+    {
+        return new PlayerEndpoint($this->httpClient, $id);
     }
 }
