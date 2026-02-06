@@ -1,6 +1,6 @@
 # Dependencies
-/vendor/
-/node_modules/
+vendor/
+node_modules/
 /packages/*/vendor/
 
 # Build outputs
@@ -38,6 +38,9 @@ Thumbs.db
 # Testing
 /coverage/
 .phpunit.result.cache
+
+# Build artifacts
+tsconfig.tsbuildinfo
 
 # Worktrees
 .worktrees/
