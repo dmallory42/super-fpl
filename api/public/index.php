@@ -354,18 +354,6 @@ function handlePredictions(Database $db, int $gameweek): void
         return;
     }
 
-    // Lazy snapshot: when serving current GW, snapshot previous GW if not done
-    if ($gameweek >= $currentGw && $currentGw > 1) {
-        $prevGw = $currentGw - 1;
-        $existing = $db->fetchOne(
-            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
-            [$prevGw]
-        );
-        if ((int) ($existing['cnt'] ?? 0) === 0) {
-            $service->snapshotPredictions($prevGw);
-        }
-    }
-
     $predictions = $service->getPredictions($gameweek);
 
     $response = [

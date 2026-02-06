@@ -8,13 +8,10 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../vendor/autoload.php';
+require __DIR__ . '/bootstrap.php';
 
-use SuperFPL\Api\Database;
 use SuperFPL\Api\Clients\OddsApiClient;
 use SuperFPL\Api\Sync\OddsSync;
-
-$config = require __DIR__ . '/../config/config.php';
 
 $apiKey = $config['odds_api']['api_key'] ?? '';
 if (empty($apiKey)) {
@@ -22,15 +19,12 @@ if (empty($apiKey)) {
     exit(1);
 }
 
-$db = new Database($config['database']['path']);
-$db->init();
-
-$cacheDir = $config['cache']['path'] . '/odds';
-if (!is_dir($cacheDir)) {
-    mkdir($cacheDir, 0755, true);
+$oddsCacheDir = $cacheDir . '/odds';
+if (!is_dir($oddsCacheDir)) {
+    mkdir($oddsCacheDir, 0755, true);
 }
 
-$client = new OddsApiClient($apiKey, $cacheDir);
+$client = new OddsApiClient($apiKey, $oddsCacheDir);
 $sync = new OddsSync($db, $client);
 
 echo "Syncing odds from The Odds API...\n";
@@ -44,6 +38,10 @@ echo "Match odds: {$matchResult['fixtures']} fixtures found, {$matchResult['matc
 // Sync goalscorer odds
 $gsResult = $sync->syncAllGoalscorerOdds();
 echo "Goalscorer odds: {$gsResult['fixtures']} fixtures, {$gsResult['players']} players\n";
+
+// Sync assist odds
+$assistResult = $sync->syncAllAssistOdds();
+echo "Assist odds: {$assistResult['fixtures']} fixtures, {$assistResult['players']} players\n";
 
 // Show quota
 $quota = $client->getQuota();

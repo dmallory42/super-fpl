@@ -1,0 +1,14 @@
+# Super FPL sync schedule
+# All times UTC
+
+# pre-deadline: daily 09:00
+0 9 * * * cd /var/www/html/api && php cron/sync-all.php --phase=pre-deadline >> /var/log/cron/sync.log 2>&1
+
+# post-gameweek: daily 23:59
+59 23 * * * cd /var/www/html/api && php cron/sync-all.php --phase=post-gameweek >> /var/log/cron/sync.log 2>&1
+
+# slow: Monday 04:00
+0 4 * * 1 cd /var/www/html/api && php cron/sync-all.php --phase=slow >> /var/log/cron/sync.log 2>&1
+
+# samples: Saturday 12:00
+0 12 * * 6 cd /var/www/html/api && php cron/sync-all.php --phase=samples >> /var/log/cron/sync.log 2>&1

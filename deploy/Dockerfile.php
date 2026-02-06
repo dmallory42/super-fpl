@@ -13,6 +13,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY deploy/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+RUN mkdir -p /var/log/cron
+COPY deploy/crontab /etc/crontabs/root
+
 WORKDIR /var/www/html/api
 
 ENTRYPOINT ["docker-entrypoint.sh"]

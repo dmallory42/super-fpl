@@ -10,16 +10,9 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../vendor/autoload.php';
+require __DIR__ . '/bootstrap.php';
 
-use SuperFPL\Api\Database;
 use SuperFPL\Api\Services\PredictionService;
-
-$config = require __DIR__ . '/../config/config.php';
-
-// Initialize database
-$db = new Database($config['database']['path']);
-$db->init();
 
 // Determine gameweek
 $gameweek = isset($argv[1]) ? (int) $argv[1] : detectNextGameweek($db);
@@ -58,7 +51,7 @@ foreach ($top10 as $i => $pred) {
 /**
  * Detect the next gameweek from fixtures.
  */
-function detectNextGameweek(Database $db): int
+function detectNextGameweek(\SuperFPL\Api\Database $db): int
 {
     $fixture = $db->fetchOne(
         "SELECT gameweek FROM fixtures
