@@ -114,37 +114,69 @@ export function FixtureScores({
     )
   }
 
-  const sortedFixtures = [...fixtureData.fixtures].sort((a, b) => {
-    const aLive = a.started && !a.finished
-    const bLive = b.started && !b.finished
-    if (aLive && !bLive) return -1
-    if (!aLive && bLive) return 1
-    return new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
-  })
+  const groups = (() => {
+    const live: typeof fixtureData.fixtures = []
+    const finished: typeof fixtureData.fixtures = []
+    const upcoming: typeof fixtureData.fixtures = []
+
+    for (const f of fixtureData.fixtures) {
+      if (f.started && !f.finished) live.push(f)
+      else if (f.finished) finished.push(f)
+      else upcoming.push(f)
+    }
+
+    const byKickoff = (a: (typeof live)[0], b: (typeof live)[0]) =>
+      new Date(a.kickoff_time).getTime() - new Date(b.kickoff_time).getTime()
+    live.sort(byKickoff)
+    finished.sort(byKickoff)
+    upcoming.sort(byKickoff)
+
+    const result: Array<{ label: string; isLiveGroup: boolean; fixtures: typeof live }> = []
+    if (live.length > 0) result.push({ label: 'Live', isLiveGroup: true, fixtures: live })
+    if (finished.length > 0)
+      result.push({ label: 'Finished', isLiveGroup: false, fixtures: finished })
+    if (upcoming.length > 0)
+      result.push({ label: 'Upcoming', isLiveGroup: false, fixtures: upcoming })
+    return result
+  })()
+
+  let fixtureIdx = 0
 
   return (
-    <div className="space-y-1.5">
-      {sortedFixtures.map((fixture, idx) => {
-        const homeTeam = teamsMap.get(fixture.home_club_id) || '???'
-        const awayTeam = teamsMap.get(fixture.away_club_id) || '???'
-        const isLive = fixture.started && !fixture.finished
-        const isFinished = fixture.finished
-        const isUpcoming = !fixture.started
-        const isExpanded = expandedFixture === fixture.id
+    <div className="space-y-3">
+      {groups.map((group) => (
+        <div key={group.label} className="space-y-1.5">
+          <div className="flex items-center gap-2 px-1">
+            {group.isLiveGroup && (
+              <span className="w-1.5 h-1.5 rounded-full bg-fpl-green animate-pulse" />
+            )}
+            <span className="text-[9px] font-display uppercase tracking-widest text-foreground-dim">
+              {group.label}
+            </span>
+          </div>
+          {group.fixtures.map((fixture) => {
+            const idx = fixtureIdx++
+            const homeTeam = teamsMap.get(fixture.home_club_id) || '???'
+            const awayTeam = teamsMap.get(fixture.away_club_id) || '???'
+            const isLive = fixture.started && !fixture.finished
+            const isFinished = fixture.finished
+            const isUpcoming = !fixture.started
+            const isExpanded = expandedFixture === fixture.id
 
-        const homeEvents = playerEventsByTeam.get(fixture.home_club_id) || []
-        const awayEvents = playerEventsByTeam.get(fixture.away_club_id) || []
-        const bonusPlayers = getBonusForFixture(fixture.id)
+            const homeEvents = playerEventsByTeam.get(fixture.home_club_id) || []
+            const awayEvents = playerEventsByTeam.get(fixture.away_club_id) || []
+            const bonusPlayers = getBonusForFixture(fixture.id)
 
-        const hasDetails = homeEvents.length > 0 || awayEvents.length > 0 || bonusPlayers.length > 0
+            const hasDetails =
+              homeEvents.length > 0 || awayEvents.length > 0 || bonusPlayers.length > 0
 
-        return (
-          <div key={fixture.id}>
-            {/* Main fixture row */}
-            <button
-              onClick={() => hasDetails && setExpandedFixture(isExpanded ? null : fixture.id)}
-              disabled={!hasDetails}
-              className={`
+            return (
+              <div key={fixture.id}>
+                {/* Main fixture row */}
+                <button
+                  onClick={() => hasDetails && setExpandedFixture(isExpanded ? null : fixture.id)}
+                  disabled={!hasDetails}
+                  className={`
                 w-full flex items-center justify-between p-2 rounded-lg text-xs transition-all duration-200
                 animate-fade-in-up-fast opacity-0
                 ${
@@ -154,189 +186,191 @@ export function FixtureScores({
                 }
                 ${hasDetails ? 'cursor-pointer' : 'cursor-default'}
               `}
-              style={{ animationDelay: `${idx * 30}ms` }}
-            >
-              {/* Home team */}
-              <div className="flex-1 text-right pr-2">
-                <span
-                  className={`font-display text-[11px] uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
+                  style={{ animationDelay: `${idx * 30}ms` }}
                 >
-                  {homeTeam}
-                </span>
-              </div>
+                  {/* Home team */}
+                  <div className="flex-1 text-right pr-2">
+                    <span
+                      className={`font-display text-[11px] uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
+                    >
+                      {homeTeam}
+                    </span>
+                  </div>
 
-              {/* Score block */}
-              <div
-                className={`
+                  {/* Score block */}
+                  <div
+                    className={`
                 flex items-center gap-1 px-3 py-1 min-w-[90px] justify-center rounded
                 ${isLive ? 'bg-fpl-green/10' : isFinished ? 'bg-surface/50' : ''}
               `}
-              >
-                {isUpcoming ? (
-                  <span className="font-mono text-foreground-dim text-[11px]">
-                    {new Date(fixture.kickoff_time).toLocaleTimeString('en-GB', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                ) : (
-                  <>
-                    <span
-                      className={`font-mono text-base font-bold ${isLive ? 'text-fpl-green' : 'text-foreground'}`}
-                    >
-                      {fixture.home_score ?? 0}
-                    </span>
-                    <span
-                      className={`text-xs ${isLive ? 'text-fpl-green/60' : 'text-foreground-dim'}`}
-                    >
-                      –
-                    </span>
-                    <span
-                      className={`font-mono text-base font-bold ${isLive ? 'text-fpl-green' : 'text-foreground'}`}
-                    >
-                      {fixture.away_score ?? 0}
-                    </span>
-                  </>
-                )}
-                {isLive && (
-                  <span className="text-[9px] text-fpl-green font-mono ml-1 animate-pulse font-medium">
-                    {fixture.minutes}'
-                  </span>
-                )}
-                {isFinished && (
-                  <span className="text-[9px] text-foreground-dim font-display uppercase ml-1 tracking-wider">
-                    FT
-                  </span>
-                )}
-              </div>
-
-              {/* Away team */}
-              <div className="flex-1 text-left pl-2 flex items-center gap-1.5">
-                <span
-                  className={`font-display text-[11px] uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
-                >
-                  {awayTeam}
-                </span>
-                {hasDetails && (
-                  <span
-                    className={`text-[8px] text-foreground-dim/60 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                   >
-                    ▼
-                  </span>
-                )}
-              </div>
-            </button>
-
-            {/* Expanded details */}
-            {isExpanded && hasDetails && (
-              <div className="mt-1 mx-1 p-3 bg-gradient-to-b from-surface to-surface/50 rounded-lg text-[10px] space-y-3 animate-fade-in-up-fast border border-border/20">
-                {/* Scorers and events */}
-                {(homeEvents.length > 0 || awayEvents.length > 0) && (
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Home events */}
-                    <div className="space-y-1">
-                      {homeEvents.map((event) => (
-                        <div
-                          key={event.playerId}
-                          className="flex items-center gap-1.5 text-foreground"
+                    {isUpcoming ? (
+                      <span className="font-mono text-foreground-dim text-[11px]">
+                        {new Date(fixture.kickoff_time).toLocaleTimeString('en-GB', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    ) : (
+                      <>
+                        <span
+                          className={`font-mono text-base font-bold ${isLive ? 'text-fpl-green' : 'text-foreground'}`}
                         >
-                          <span className="truncate">{event.name}</span>
-                          <span className="flex items-center gap-0.5 shrink-0">
-                            {event.goals > 0 && (
-                              <span className="text-[11px]">{'⚽'.repeat(event.goals)}</span>
-                            )}
-                            {event.assists > 0 && (
-                              <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
-                            )}
-                            {event.cleanSheet && (
-                              <span className="text-[11px]" title="Clean sheet">
-                                🛡️
-                              </span>
-                            )}
-                            {event.position === 1 && event.saves >= 3 && (
-                              <span className="text-[11px]" title={`${event.saves} saves`}>
-                                🧤
-                              </span>
-                            )}
-                            {event.defCon && (
-                              <span className="text-[11px]" title="Defensive contribution">
-                                💪
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Away events */}
-                    <div className="space-y-1">
-                      {awayEvents.map((event) => (
-                        <div
-                          key={event.playerId}
-                          className="flex items-center gap-1.5 text-foreground"
+                          {fixture.home_score ?? 0}
+                        </span>
+                        <span
+                          className={`text-xs ${isLive ? 'text-fpl-green/60' : 'text-foreground-dim'}`}
                         >
-                          <span className="truncate">{event.name}</span>
-                          <span className="flex items-center gap-0.5 shrink-0">
-                            {event.goals > 0 && (
-                              <span className="text-[11px]">{'⚽'.repeat(event.goals)}</span>
-                            )}
-                            {event.assists > 0 && (
-                              <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
-                            )}
-                            {event.cleanSheet && (
-                              <span className="text-[11px]" title="Clean sheet">
-                                🛡️
-                              </span>
-                            )}
-                            {event.position === 1 && event.saves >= 3 && (
-                              <span className="text-[11px]" title={`${event.saves} saves`}>
-                                🧤
-                              </span>
-                            )}
-                            {event.defCon && (
-                              <span className="text-[11px]" title="Defensive contribution">
-                                💪
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                          –
+                        </span>
+                        <span
+                          className={`font-mono text-base font-bold ${isLive ? 'text-fpl-green' : 'text-foreground'}`}
+                        >
+                          {fixture.away_score ?? 0}
+                        </span>
+                      </>
+                    )}
+                    {isLive && (
+                      <span className="text-[9px] text-fpl-green font-mono ml-1 animate-pulse font-medium">
+                        {fixture.minutes}'
+                      </span>
+                    )}
+                    {isFinished && (
+                      <span className="text-[9px] text-foreground-dim font-display uppercase ml-1 tracking-wider">
+                        FT
+                      </span>
+                    )}
                   </div>
-                )}
 
-                {/* Bonus predictions with medal badges */}
-                {bonusPlayers.length > 0 && (
-                  <div className="pt-2 border-t border-border/30">
-                    <div className="text-[9px] text-foreground-dim font-display uppercase tracking-wider mb-2">
-                      Bonus Points
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {bonusPlayers.map((bp) => {
-                        const info = playersMap.get(bp.player_id)
-                        return (
-                          <div key={bp.player_id} className="flex items-center gap-1.5">
-                            <span
-                              className={`
+                  {/* Away team */}
+                  <div className="flex-1 text-left pl-2 flex items-center gap-1.5">
+                    <span
+                      className={`font-display text-[11px] uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
+                    >
+                      {awayTeam}
+                    </span>
+                    {hasDetails && (
+                      <span
+                        className={`text-[8px] text-foreground-dim/60 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                      >
+                        ▼
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {/* Expanded details */}
+                {isExpanded && hasDetails && (
+                  <div className="mt-1 mx-1 p-3 bg-gradient-to-b from-surface to-surface/50 rounded-lg text-[10px] space-y-3 animate-fade-in-up-fast border border-border/20">
+                    {/* Scorers and events */}
+                    {(homeEvents.length > 0 || awayEvents.length > 0) && (
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Home events */}
+                        <div className="space-y-1">
+                          {homeEvents.map((event) => (
+                            <div
+                              key={event.playerId}
+                              className="flex items-center gap-1.5 text-foreground"
+                            >
+                              <span className="truncate">{event.name}</span>
+                              <span className="flex items-center gap-0.5 shrink-0">
+                                {event.goals > 0 && (
+                                  <span className="text-[11px]">{'⚽'.repeat(event.goals)}</span>
+                                )}
+                                {event.assists > 0 && (
+                                  <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
+                                )}
+                                {event.cleanSheet && (
+                                  <span className="text-[11px]" title="Clean sheet">
+                                    🛡️
+                                  </span>
+                                )}
+                                {event.position === 1 && event.saves >= 3 && (
+                                  <span className="text-[11px]" title={`${event.saves} saves`}>
+                                    🧤
+                                  </span>
+                                )}
+                                {event.defCon && (
+                                  <span className="text-[11px]" title="Defensive contribution">
+                                    💪
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Away events */}
+                        <div className="space-y-1">
+                          {awayEvents.map((event) => (
+                            <div
+                              key={event.playerId}
+                              className="flex items-center gap-1.5 text-foreground"
+                            >
+                              <span className="truncate">{event.name}</span>
+                              <span className="flex items-center gap-0.5 shrink-0">
+                                {event.goals > 0 && (
+                                  <span className="text-[11px]">{'⚽'.repeat(event.goals)}</span>
+                                )}
+                                {event.assists > 0 && (
+                                  <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
+                                )}
+                                {event.cleanSheet && (
+                                  <span className="text-[11px]" title="Clean sheet">
+                                    🛡️
+                                  </span>
+                                )}
+                                {event.position === 1 && event.saves >= 3 && (
+                                  <span className="text-[11px]" title={`${event.saves} saves`}>
+                                    🧤
+                                  </span>
+                                )}
+                                {event.defCon && (
+                                  <span className="text-[11px]" title="Defensive contribution">
+                                    💪
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bonus predictions with medal badges */}
+                    {bonusPlayers.length > 0 && (
+                      <div className="pt-2 border-t border-border/30">
+                        <div className="text-[9px] text-foreground-dim font-display uppercase tracking-wider mb-2">
+                          Bonus Points
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          {bonusPlayers.map((bp) => {
+                            const info = playersMap.get(bp.player_id)
+                            return (
+                              <div key={bp.player_id} className="flex items-center gap-1.5">
+                                <span
+                                  className={`
                               inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-mono font-bold shadow-md
                               ${bonusMedalStyles[bp.predicted_bonus] || 'bg-foreground/10 text-foreground-muted'}
                             `}
-                            >
-                              {bp.predicted_bonus}
-                            </span>
-                            <span className="text-foreground">{info?.web_name || '?'}</span>
-                            <span className="text-foreground-dim text-[9px]">({bp.bps})</span>
-                          </div>
-                        )
-                      })}
-                    </div>
+                                >
+                                  {bp.predicted_bonus}
+                                </span>
+                                <span className="text-foreground">{info?.web_name || '?'}</span>
+                                <span className="text-foreground-dim text-[9px]">({bp.bps})</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
-        )
-      })}
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }

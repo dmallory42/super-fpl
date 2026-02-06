@@ -18,6 +18,7 @@ import { RankProjection } from '../components/live/RankProjection'
 import { VarianceAnalysis } from '../components/live/VarianceAnalysis'
 import { FixtureThreatIndex } from '../components/live/FixtureThreatIndex'
 import { DifferentialAnalysis } from '../components/live/DifferentialAnalysis'
+import { GoodWeekBanner } from '../components/live/GoodWeekBanner'
 import { formatRank } from '../lib/format'
 import { type Tier, TIER_OPTIONS } from '../lib/tiers'
 import { applyAutoSubs } from '../lib/autosubs'
@@ -227,7 +228,20 @@ export function Live() {
     return new Map(predictionsData.predictions.map((p) => [p.player_id, p.predicted_points]))
   }, [predictionsData?.predictions])
 
-  // Calculate variance analysis data
+  // Build a set of team IDs whose fixture has started (for filtering mid-GW analysis)
+  const startedTeamIds = useMemo(() => {
+    const ids = new Set<number>()
+    if (!gameweekData?.fixtures) return ids
+    for (const f of gameweekData.fixtures) {
+      if (f.started) {
+        ids.add(f.home_club_id)
+        ids.add(f.away_club_id)
+      }
+    }
+    return ids
+  }, [gameweekData?.fixtures])
+
+  // Calculate variance analysis data — only include players whose fixture has started
   const varianceData = useMemo(() => {
     if (!processedSquad || predictionsMap.size === 0) return null
 
@@ -239,6 +253,10 @@ export function Live() {
 
     for (const player of startingXI) {
       const info = playersMap.get(player.player_id)
+
+      // Skip players whose fixture hasn't started yet
+      if (info?.team && !startedTeamIds.has(info.team)) continue
+
       const predicted = predictionsMap.get(player.player_id) ?? 0
       const actual = player.effective_points
 
@@ -256,12 +274,14 @@ export function Live() {
       })
     }
 
+    if (players.length === 0) return null
+
     return {
       players,
-      totalPredicted: Math.round(totalPredicted),
+      totalPredicted: Math.round(totalPredicted * 10) / 10,
       totalActual,
     }
-  }, [processedSquad, predictionsMap, playersMap])
+  }, [processedSquad, predictionsMap, playersMap, startedTeamIds])
 
   // Calculate fixture impacts for threat index (user points vs tier avg per fixture)
   const fixtureImpacts = useMemo(() => {
@@ -396,6 +416,25 @@ export function Live() {
             'Track live points for your team during the gameweek.'
           )}
         </p>
+        {gwData && gwData.totalMatches > 0 && (
+          <div
+            className="flex h-1.5 mt-2 rounded-full overflow-hidden bg-surface-elevated max-w-xs"
+            title={`${gwData.matchesPlayed} finished, ${gwData.matchesInProgress} live, ${gwData.totalMatches - gwData.matchesPlayed - gwData.matchesInProgress} upcoming`}
+          >
+            {gwData.matchesPlayed > 0 && (
+              <div
+                className="bg-foreground-muted/50"
+                style={{ width: `${(gwData.matchesPlayed / gwData.totalMatches) * 100}%` }}
+              />
+            )}
+            {gwData.matchesInProgress > 0 && (
+              <div
+                className="bg-fpl-green animate-pulse"
+                style={{ width: `${(gwData.matchesInProgress / gwData.totalMatches) * 100}%` }}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Manager Input - Collapsible when loaded */}
@@ -481,6 +520,14 @@ export function Live() {
               />
             )}
           </StatPanelGrid>
+
+          {/* Good Week Celebration Banner */}
+          {(() => {
+            const top10k = comparisons.find((c) => c.tier === 'top_10k')
+            return top10k ? (
+              <GoodWeekBanner margin={top10k.difference} rankMovement={rankMovement?.movement} />
+            ) : null
+          })()}
 
           {/* Auto-subs indicator */}
           {processedSquad.autoSubs.length > 0 && (
