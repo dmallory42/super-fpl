@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import type { ComparisonPlayer } from '../../api/client'
 import { getPositionName } from '../../types'
 
@@ -26,10 +27,14 @@ export function OwnershipMatrix({
   teams,
 }: OwnershipMatrixProps) {
   // Sort players by EO descending
-  const sortedPlayerIds = Object.keys(effectiveOwnership)
-    .map(Number)
-    .sort((a, b) => effectiveOwnership[b] - effectiveOwnership[a])
-    .slice(0, 30) // Top 30 players
+  const sortedPlayerIds = useMemo(
+    () =>
+      Object.keys(effectiveOwnership)
+        .map(Number)
+        .sort((a, b) => effectiveOwnership[b] - effectiveOwnership[a])
+        .slice(0, 30),
+    [effectiveOwnership]
+  )
 
   return (
     <div className="overflow-x-auto -mx-4">

@@ -121,7 +121,8 @@ export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
     return teams.get(player.team) || ''
   }
 
-  let delayCounter = 0
+  // Pre-compute animation delays from row structure (avoids mutable counter in render)
+  const startingCount = rows.reduce((sum, row) => sum + row.length, 0)
 
   return (
     <div className="pitch-texture rounded-lg p-4 shadow-xl overflow-hidden">
@@ -138,22 +139,28 @@ export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
 
         {/* Starting XI */}
         <div className="space-y-6 relative z-10">
-          {rows.map((row, idx) => (
-            <div key={idx} className="flex justify-center gap-2">
-              {row.map((pick) => {
-                const delay = delayCounter++ * 50
-                return (
-                  <PlayerSlot
-                    key={pick.element}
-                    pick={pick}
-                    player={players.get(pick.element)}
-                    teamName={getTeamName(pick.element)}
-                    animationDelay={delay}
-                  />
+          {
+            rows.reduce<{ elements: JSX.Element[]; offset: number }>(
+              (acc, row, rowIdx) => {
+                acc.elements.push(
+                  <div key={rowIdx} className="flex justify-center gap-2">
+                    {row.map((pick, itemIdx) => (
+                      <PlayerSlot
+                        key={pick.element}
+                        pick={pick}
+                        player={players.get(pick.element)}
+                        teamName={getTeamName(pick.element)}
+                        animationDelay={(acc.offset + itemIdx) * 50}
+                      />
+                    ))}
+                  </div>
                 )
-              })}
-            </div>
-          ))}
+                acc.offset += row.length
+                return acc
+              },
+              { elements: [], offset: 0 }
+            ).elements
+          }
         </div>
       </div>
 
@@ -173,7 +180,7 @@ export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
               pick={pick}
               player={players.get(pick.element)}
               teamName={getTeamName(pick.element)}
-              animationDelay={(delayCounter + idx) * 50}
+              animationDelay={(startingCount + idx) * 50}
             />
           ))}
         </div>
