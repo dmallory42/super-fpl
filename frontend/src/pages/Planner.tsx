@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
 import { usePlannerOptimize } from '../hooks/usePlannerOptimize'
 import { usePredictionsRange } from '../hooks/usePredictionsRange'
@@ -8,6 +8,9 @@ import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, ChartIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonCard } from '../components/ui/SkeletonLoader'
 import { FormationPitch } from '../components/live/FormationPitch'
+import { useLiveSamples } from '../hooks/useLiveSamples'
+import { PlayerExplorer } from '../components/planner/PlayerExplorer'
+import { buildFormation } from '../lib/formation'
 
 const HIT_COST = 4
 
@@ -53,15 +56,32 @@ export function Planner() {
   const [selectedForTransferOut, setSelectedForTransferOut] = useState<number | null>(null)
   const [replacementSearch, setReplacementSearch] = useState('')
 
+  // Debounce xMinsOverrides so the optimize API call doesn't fire on every keystroke
+  const [debouncedXMins, setDebouncedXMins] = useState<Record<number, number>>(xMinsOverrides)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedXMins(xMinsOverrides)
+    }, 800)
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    }
+  }, [xMinsOverrides])
+
   const { data: playersData } = usePlayers()
   const {
     data: optimizeData,
     isLoading: isLoadingOptimize,
     error: optimizeError,
-  } = usePlannerOptimize(managerId, freeTransfers, chipPlan, xMinsOverrides)
+  } = usePlannerOptimize(managerId, freeTransfers, chipPlan, debouncedXMins)
 
   // Get predictions for multiple gameweeks
   const { data: predictionsRange } = usePredictionsRange()
+
+  // Get top 10k effective ownership for player explorer
+  const { data: samplesData } = useLiveSamples(predictionsRange?.current_gameweek ?? null)
+  const top10kEO = samplesData?.samples?.top_10k?.effective_ownership
 
   // Initialize selectedGameweek when data loads - use current_gameweek from API
   useEffect(() => {
@@ -247,7 +267,7 @@ export function Planner() {
   const formationPlayers = useMemo(() => {
     if (!effectiveSquad.length || !playersData?.players || selectedGameweek === null) return []
 
-    // Map squad player IDs to full player data with predictions
+    // Map squad player IDs to player data with GW predictions
     const squadWithData = effectiveSquad
       .map((playerId) => {
         const player = playersData.players.find((p) => p.id === playerId)
@@ -259,110 +279,12 @@ export function Planner() {
           web_name: player.web_name,
           element_type: player.element_type,
           team: player.team,
-          multiplier: 1,
-          position: 0, // Will be set below
           predicted_points: pred?.predictions[selectedGameweek] ?? 0,
-          total_predicted: pred?.total_predicted ?? 0,
         }
       })
-      .filter(Boolean) as Array<{
-      player_id: number
-      web_name: string
-      element_type: number
-      team: number
-      multiplier: number
-      position: number
-      predicted_points: number
-      total_predicted: number
-      is_captain?: boolean
-    }>
+      .filter((p): p is NonNullable<typeof p> => p !== null)
 
-    // Group by position
-    const gks = squadWithData
-      .filter((p) => p.element_type === 1)
-      .sort((a, b) => b.predicted_points - a.predicted_points)
-    const defs = squadWithData
-      .filter((p) => p.element_type === 2)
-      .sort((a, b) => b.predicted_points - a.predicted_points)
-    const mids = squadWithData
-      .filter((p) => p.element_type === 3)
-      .sort((a, b) => b.predicted_points - a.predicted_points)
-    const fwds = squadWithData
-      .filter((p) => p.element_type === 4)
-      .sort((a, b) => b.predicted_points - a.predicted_points)
-
-    // Select starting XI (basic strategy: pick best by position with valid formation)
-    // GK: 1, DEF: 3-5, MID: 2-5, FWD: 1-3, total = 11
-    const startingGks = gks.slice(0, 1)
-    const startingDefs = defs.slice(0, Math.min(defs.length, 5))
-    const startingMids = mids.slice(0, Math.min(mids.length, 5))
-    const startingFwds = fwds.slice(0, Math.min(fwds.length, 3))
-
-    // Ensure we have 11 starters with valid formation
-    let total = startingGks.length + startingDefs.length + startingMids.length + startingFwds.length
-    const starting = [...startingGks, ...startingDefs, ...startingMids, ...startingFwds]
-
-    // If we have too many, trim from the lowest scorers
-    if (total > 11) {
-      starting.sort((a, b) => b.predicted_points - a.predicted_points)
-      while (starting.length > 11) {
-        // Remove lowest scorer but maintain minimum formation (1 GK, 3 DEF, 1 FWD)
-        for (let i = starting.length - 1; i >= 0; i--) {
-          const p = starting[i]
-          const samePos = starting.filter((s) => s.element_type === p.element_type).length
-          const minRequired =
-            p.element_type === 1 ? 1 : p.element_type === 2 ? 3 : p.element_type === 4 ? 1 : 0
-          if (samePos > minRequired) {
-            starting.splice(i, 1)
-            break
-          }
-        }
-      }
-    }
-
-    // Find captain (highest predicted points in starting)
-    let maxPts = -1
-    let captainId: number | null = null
-    for (const p of starting) {
-      if (p.predicted_points > maxPts) {
-        maxPts = p.predicted_points
-        captainId = p.player_id
-      }
-    }
-
-    // Separate starters and bench, sort bench with GK first
-    const startingIds = new Set(starting.map((p) => p.player_id))
-    const starters = squadWithData.filter((p) => startingIds.has(p.player_id))
-    const bench = squadWithData
-      .filter((p) => !startingIds.has(p.player_id))
-      .sort((a, b) => {
-        // GK (element_type 1) always first on bench
-        if (a.element_type === 1 && b.element_type !== 1) return -1
-        if (a.element_type !== 1 && b.element_type === 1) return 1
-        // Then by predicted points desc
-        return b.predicted_points - a.predicted_points
-      })
-
-    // Assign positions: starters 1-11 by element_type, bench 12-15 in sorted order
-    starters.sort((a, b) => a.element_type - b.element_type)
-
-    let pos = 1
-    const result = [
-      ...starters.map((p) => ({
-        ...p,
-        position: pos++,
-        is_captain: p.player_id === captainId,
-        multiplier: p.player_id === captainId ? 2 : 1,
-      })),
-      ...bench.map((p) => ({
-        ...p,
-        position: pos++,
-        is_captain: false,
-        multiplier: 1,
-      })),
-    ]
-
-    return result
+    return buildFormation(squadWithData)
   }, [effectiveSquad, playersData?.players, playerPredictionsMap, selectedGameweek])
 
   // Calculate predicted points for effective squad
@@ -715,6 +637,19 @@ export function Planner() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Player Explorer - always visible when predictions loaded */}
+      {predictionsRange && (
+        <PlayerExplorer
+          players={predictionsRange.players}
+          gameweeks={predictionsRange.gameweeks}
+          teamsMap={teamsMap}
+          effectiveOwnership={top10kEO}
+          xMinsOverrides={xMinsOverrides}
+          onXMinsChange={handleXMinsChange}
+          onResetXMins={() => setXMinsOverrides({})}
+        />
       )}
 
       {!managerId && (
