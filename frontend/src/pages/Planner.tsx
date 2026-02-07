@@ -2,7 +2,14 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
 import { usePlannerOptimize } from '../hooks/usePlannerOptimize'
 import { usePredictionsRange } from '../hooks/usePredictionsRange'
-import type { ChipPlan, PlayerMultiWeekPrediction, CaptainCandidate } from '../api/client'
+import type {
+  ChipPlan,
+  PlayerMultiWeekPrediction,
+  CaptainCandidate,
+  TransferPath,
+  FixedTransfer,
+  SolverDepth,
+} from '../api/client'
 import { StatPanel, StatPanelGrid } from '../components/ui/StatPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, ChartIcon } from '../components/ui/EmptyState'
@@ -51,6 +58,12 @@ export function Planner() {
   const [xMinsOverrides, setXMinsOverrides] = useState<Record<number, number>>({})
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null)
 
+  // Path solver state
+  const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null)
+  const [ftValue, setFtValue] = useState(1.5)
+  const [solverDepth, setSolverDepth] = useState<SolverDepth>('standard')
+  const [fixedTransfers, setFixedTransfers] = useState<FixedTransfer[]>([])
+
   // Transfer planning state
   const [stagedTransfers, setStagedTransfers] = useState<StagedTransfer[]>([])
   const [selectedForTransferOut, setSelectedForTransferOut] = useState<number | null>(null)
@@ -74,7 +87,15 @@ export function Planner() {
     data: optimizeData,
     isLoading: isLoadingOptimize,
     error: optimizeError,
-  } = usePlannerOptimize(managerId, freeTransfers, chipPlan, debouncedXMins)
+  } = usePlannerOptimize(
+    managerId,
+    freeTransfers,
+    chipPlan,
+    debouncedXMins,
+    fixedTransfers,
+    ftValue,
+    solverDepth
+  )
 
   // Get predictions for multiple gameweeks
   const { data: predictionsRange } = usePredictionsRange()
@@ -215,6 +236,8 @@ export function Planner() {
       setManagerId(id)
       setStagedTransfers([])
       setSelectedForTransferOut(null)
+      setSelectedPathIndex(null)
+      setFixedTransfers([])
     }
   }
 
@@ -254,6 +277,8 @@ export function Planner() {
     setStagedTransfers([])
     setSelectedForTransferOut(null)
     setReplacementSearch('')
+    setSelectedPathIndex(null)
+    setFixedTransfers([])
   }
 
   const handleXMinsChange = (playerId: number, xMins: number) => {
@@ -262,6 +287,12 @@ export function Planner() {
       [playerId]: xMins,
     }))
   }
+
+  // Selected path from solver
+  const selectedPath: TransferPath | null = useMemo(() => {
+    if (selectedPathIndex === null || !optimizeData?.paths) return null
+    return optimizeData.paths[selectedPathIndex] ?? null
+  }, [selectedPathIndex, optimizeData?.paths])
 
   // Get captain candidates from API formation data for selected GW
   const captainCandidates: CaptainCandidate[] = useMemo(() => {
@@ -430,13 +461,134 @@ export function Planner() {
               />
             </StatPanelGrid>
 
+            {/* Path Selector */}
+            {optimizeData.paths && optimizeData.paths.length > 0 && (
+              <BroadcastCard title="Recommended Paths" accentColor="purple" animationDelay={175}>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {optimizeData.paths.map((path, idx) => {
+                    const isSelected = selectedPathIndex === idx
+                    const horizon = optimizeData.planning_horizon
+                    return (
+                      <button
+                        key={path.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedPathIndex(null)
+                          } else {
+                            setSelectedPathIndex(idx)
+                            setStagedTransfers([])
+                            setSelectedForTransferOut(null)
+                          }
+                        }}
+                        className={`p-3 rounded-lg text-left transition-all animate-fade-in-up opacity-0 ${
+                          isSelected
+                            ? 'bg-fpl-purple/20 border-2 border-fpl-purple ring-2 ring-fpl-purple/30'
+                            : 'bg-surface-elevated hover:bg-surface-hover border border-transparent'
+                        }`}
+                        style={{ animationDelay: `${200 + idx * 50}ms` }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-display text-xs uppercase tracking-wider text-foreground-muted">
+                            Path {path.id}
+                          </span>
+                          {path.total_hits > 0 && (
+                            <span className="text-xs text-destructive font-mono">
+                              {path.total_hits} hit{path.total_hits > 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          className={`font-mono text-lg font-bold ${
+                            path.score_vs_hold > 0 ? 'text-fpl-green' : 'text-foreground'
+                          }`}
+                        >
+                          {path.score_vs_hold > 0 ? '+' : ''}
+                          {path.score_vs_hold.toFixed(1)} pts
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {horizon.map((gw) => {
+                            const gwData = path.transfers_by_gw[gw]
+                            if (!gwData) return null
+                            return (
+                              <div key={gw} className="text-xs text-foreground-muted truncate">
+                                <span className="text-foreground-dim">GW{gw}:</span>{' '}
+                                {gwData.action === 'bank' ? (
+                                  <span className="text-foreground-dim">Bank</span>
+                                ) : (
+                                  gwData.moves.map((m, mi) => (
+                                    <span key={mi}>
+                                      {mi > 0 && ', '}
+                                      <span className="text-destructive/70">{m.out_name}</span>
+                                      <span className="text-foreground-dim">{' \u2192 '}</span>
+                                      <span className="text-fpl-green/70">{m.in_name}</span>
+                                    </span>
+                                  ))
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Solver Controls */}
+                <div className="pt-3 border-t border-border/50 flex flex-wrap items-center gap-4">
+                  {/* FT Value Slider */}
+                  <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                    <label className="font-display text-xs uppercase tracking-wider text-foreground-muted whitespace-nowrap">
+                      FT Value
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="5"
+                      step="0.5"
+                      value={ftValue}
+                      onChange={(e) => {
+                        setFtValue(parseFloat(e.target.value))
+                        setSelectedPathIndex(null)
+                      }}
+                      className="flex-1 accent-fpl-purple"
+                    />
+                    <span className="font-mono text-sm text-foreground w-10 text-right">
+                      {ftValue.toFixed(1)}
+                    </span>
+                  </div>
+
+                  {/* Depth Toggle */}
+                  <div className="flex gap-1">
+                    {(['quick', 'standard', 'deep'] as const).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => {
+                          setSolverDepth(d)
+                          setSelectedPathIndex(null)
+                        }}
+                        className={`px-3 py-1 rounded text-xs font-display uppercase tracking-wider transition-colors ${
+                          solverDepth === d
+                            ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
+                            : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </BroadcastCard>
+            )}
+
             {/* Gameweek Selector */}
             <BroadcastCard title="Select Gameweek" animationDelay={200}>
               <div className="flex gap-2 flex-wrap">
                 {predictionsRange?.gameweeks.map((gw, idx) => {
-                  const pts = squadPredictions?.byGw[gw] ?? 0
+                  const pathGw = selectedPath?.transfers_by_gw[gw]
+                  const pts = pathGw ? pathGw.gw_score : (squadPredictions?.byGw[gw] ?? 0)
                   const isFirst = idx === 0
                   const isSelected = gw === selectedGameweek
+                  const pathAction = pathGw?.action
                   return (
                     <button
                       key={gw}
@@ -446,9 +598,11 @@ export function Planner() {
                         ${
                           isSelected
                             ? 'bg-fpl-green/20 border-2 border-fpl-green ring-2 ring-fpl-green/30'
-                            : isFirst && hitsCost > 0
+                            : isFirst && hitsCost > 0 && !selectedPath
                               ? 'bg-destructive/20 border border-destructive/30 hover:bg-destructive/30'
-                              : 'bg-surface-elevated hover:bg-surface-hover border border-transparent'
+                              : pathAction === 'transfer'
+                                ? 'bg-fpl-purple/10 border border-fpl-purple/20 hover:bg-fpl-purple/20'
+                                : 'bg-surface-elevated hover:bg-surface-hover border border-transparent'
                         }
                       `}
                       style={{ animationDelay: `${250 + idx * 50}ms` }}
@@ -457,13 +611,21 @@ export function Planner() {
                         className={`text-xs font-display uppercase ${isSelected ? 'text-fpl-green' : 'text-foreground-muted'}`}
                       >
                         GW{gw}
-                        {isFirst && hitsCost > 0 && ` (-${hitsCost})`}
+                        {!selectedPath && isFirst && hitsCost > 0 && ` (-${hitsCost})`}
+                        {pathGw?.hit_cost ? ` (-${pathGw.hit_cost})` : ''}
                       </div>
                       <div
                         className={`text-xl font-mono font-bold ${isSelected ? 'text-fpl-green' : 'text-foreground'}`}
                       >
                         {pts.toFixed(1)}
                       </div>
+                      {pathAction && (
+                        <div className="text-[10px] text-fpl-purple mt-0.5">
+                          {pathAction === 'bank'
+                            ? 'Bank'
+                            : `${pathGw.moves.length} move${pathGw.moves.length > 1 ? 's' : ''}`}
+                        </div>
+                      )}
                     </button>
                   )
                 })}
@@ -471,9 +633,12 @@ export function Planner() {
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                 <span className="text-xs text-foreground-muted">
                   Total ({predictionsRange?.gameweeks.length ?? 6} GWs)
+                  {selectedPath && ' — Path ' + selectedPath.id}
                 </span>
                 <span className="font-mono font-bold text-fpl-green text-lg">
-                  {squadPredictions?.total.toFixed(1) ?? '...'} pts
+                  {selectedPath
+                    ? `${selectedPath.total_score.toFixed(1)} pts`
+                    : `${squadPredictions?.total.toFixed(1) ?? '...'} pts`}
                 </span>
               </div>
             </BroadcastCard>

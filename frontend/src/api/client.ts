@@ -545,6 +545,45 @@ export interface FormationData {
   captain_candidates?: CaptainCandidate[]
 }
 
+export interface TransferMove {
+  out_id: number
+  out_name: string
+  out_team: number
+  out_price: number
+  in_id: number
+  in_name: string
+  in_team: number
+  in_price: number
+  gain: number
+  is_free: boolean
+}
+
+export interface PathGameweek {
+  action: 'bank' | 'transfer'
+  ft_available: number
+  ft_after: number
+  moves: TransferMove[]
+  hit_cost: number
+  gw_score: number
+  squad_ids: number[]
+}
+
+export interface TransferPath {
+  id: number
+  total_score: number
+  score_vs_hold: number
+  total_hits: number
+  transfers_by_gw: Record<number, PathGameweek>
+}
+
+export type SolverDepth = 'quick' | 'standard' | 'deep'
+
+export interface FixedTransfer {
+  gameweek: number
+  out: number
+  in: number
+}
+
 export interface PlannerOptimizeResponse {
   current_gameweek: number
   planning_horizon: number[]
@@ -560,13 +599,17 @@ export interface PlannerOptimizeResponse {
   recommendations: TransferRecommendation[]
   chip_suggestions: Record<string, ChipSuggestion>
   chip_plan: ChipPlan
+  paths: TransferPath[]
 }
 
 export async function fetchPlannerOptimize(
   managerId: number,
   freeTransfers: number = 1,
   chipPlan: ChipPlan = {},
-  xMinsOverrides: Record<number, number> = {}
+  xMinsOverrides: Record<number, number> = {},
+  fixedTransfers: FixedTransfer[] = [],
+  ftValue: number = 1.5,
+  depth: SolverDepth = 'standard',
 ): Promise<PlannerOptimizeResponse> {
   const params = new URLSearchParams()
   params.set('manager', String(managerId))
@@ -580,6 +623,17 @@ export async function fetchPlannerOptimize(
   // Pass xMins overrides as JSON if any exist
   if (Object.keys(xMinsOverrides).length > 0) {
     params.set('xmins', JSON.stringify(xMinsOverrides))
+  }
+
+  // Path solver params
+  if (fixedTransfers.length > 0) {
+    params.set('fixed_transfers', JSON.stringify(fixedTransfers))
+  }
+  if (ftValue !== 1.5) {
+    params.set('ft_value', String(ftValue))
+  }
+  if (depth !== 'standard') {
+    params.set('depth', depth)
   }
 
   return fetchApi<PlannerOptimizeResponse>(`/planner/optimize?${params.toString()}`)

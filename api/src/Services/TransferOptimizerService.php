@@ -33,7 +33,10 @@ class TransferOptimizerService
         int $managerId,
         array $chipPlan = [],
         int $freeTransfers = 1,
-        array $xMinsOverrides = []
+        array $xMinsOverrides = [],
+        array $fixedTransfers = [],
+        float $ftValue = 1.5,
+        string $depth = 'standard',
     ): array {
         $currentGw = $this->gameweekService->getCurrentGameweek();
         $upcomingGws = $this->gameweekService->getUpcomingGameweeks(self::PLANNING_HORIZON);
@@ -180,6 +183,18 @@ class TransferOptimizerService
             $formations[$gw] = $this->buildFormationData($currentSquad, $predictions, $gw, $playerMap);
         }
 
+        // Run beam search path solver
+        $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
+        $paths = $pathSolver->solve(
+            $currentSquad,
+            $predictions,
+            $upcomingGws,
+            $playerMap,
+            $bank,
+            $freeTransfers,
+            $fixedTransfers,
+        );
+
         return [
             'current_gameweek' => $currentGw,
             'planning_horizon' => $upcomingGws,
@@ -195,6 +210,7 @@ class TransferOptimizerService
             'recommendations' => $recommendations,
             'chip_suggestions' => $chipSuggestions,
             'chip_plan' => $chipPlan,
+            'paths' => $paths,
         ];
     }
 
@@ -252,77 +268,11 @@ class TransferOptimizerService
 
     /**
      * Select optimal starting 11 from players grouped by position.
-     * Formation constraints: 1 GK, 3-5 DEF, 2-5 MID, 1-3 FWD, total 11
+     * Delegates to PathSolver's shared static implementation.
      */
     private function selectOptimalStarting11(array $byPosition): array
     {
-        $starting = [];
-
-        // Must have 1 GK
-        if (!empty($byPosition[1])) {
-            $starting[] = $byPosition[1][0];
-        }
-
-        // Get top players from each position
-        $defs = array_slice($byPosition[2], 0, 5);
-        $mids = array_slice($byPosition[3], 0, 5);
-        $fwds = array_slice($byPosition[4], 0, 3);
-
-        // Must have minimum: 3 DEF, 2 MID, 1 FWD
-        $selectedDefs = array_slice($defs, 0, 3);
-        $selectedMids = array_slice($mids, 0, 2);
-        $selectedFwds = array_slice($fwds, 0, 1);
-
-        // Remaining slots (11 - 1 GK - 3 DEF - 2 MID - 1 FWD = 4 flex spots)
-        $flexSpots = 4;
-
-        // Pool remaining players for flex spots
-        $flexPool = array_merge(
-            array_slice($defs, 3),  // DEF 4-5
-            array_slice($mids, 2),  // MID 3-5
-            array_slice($fwds, 1)   // FWD 2-3
-        );
-
-        // Sort flex pool by predicted points
-        usort($flexPool, fn($a, $b) => $b['pred'] <=> $a['pred']);
-
-        // Fill flex spots with highest predicted, respecting max limits
-        $defCount = 3;
-        $midCount = 2;
-        $fwdCount = 1;
-
-        foreach ($flexPool as $player) {
-            if ($flexSpots <= 0) {
-                break;
-            }
-
-            $pos = null;
-            foreach ($byPosition as $position => $players) {
-                foreach ($players as $p) {
-                    if ($p['id'] === $player['id']) {
-                        $pos = $position;
-                        break 2;
-                    }
-                }
-            }
-
-            // Check position limits
-            if ($pos === 2 && $defCount < 5) {
-                $selectedDefs[] = $player;
-                $defCount++;
-                $flexSpots--;
-            } elseif ($pos === 3 && $midCount < 5) {
-                $selectedMids[] = $player;
-                $midCount++;
-                $flexSpots--;
-            } elseif ($pos === 4 && $fwdCount < 3) {
-                $selectedFwds[] = $player;
-                $fwdCount++;
-                $flexSpots--;
-            }
-        }
-
-        return array_merge($starting, $selectedDefs, $selectedMids, $selectedFwds);
+        return PathSolver::selectOptimalStarting11($byPosition);
     }
 
     /**

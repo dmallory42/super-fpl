@@ -983,6 +983,25 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
         }
     }
 
+    // Parse fixed transfers (JSON array of {gameweek, out, in})
+    $fixedTransfers = [];
+    if (isset($_GET['fixed_transfers'])) {
+        $decoded = json_decode($_GET['fixed_transfers'], true);
+        if (is_array($decoded)) {
+            $fixedTransfers = $decoded;
+        }
+    }
+
+    // Parse FT value (float, default 1.5)
+    $ftValue = isset($_GET['ft_value']) ? (float) $_GET['ft_value'] : 1.5;
+    $ftValue = max(0.0, min(5.0, $ftValue));
+
+    // Parse depth mode (quick, standard, deep)
+    $depth = $_GET['depth'] ?? 'standard';
+    if (!in_array($depth, ['quick', 'standard', 'deep'])) {
+        $depth = 'standard';
+    }
+
     if ($managerId === null) {
         http_response_code(400);
         echo json_encode(['error' => 'Missing manager parameter']);
@@ -1000,7 +1019,15 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
     );
 
     try {
-        $plan = $optimizer->getOptimalPlan($managerId, $chipPlan, $freeTransfers, $xMinsOverrides);
+        $plan = $optimizer->getOptimalPlan(
+            $managerId,
+            $chipPlan,
+            $freeTransfers,
+            $xMinsOverrides,
+            $fixedTransfers,
+            $ftValue,
+            $depth,
+        );
         echo json_encode($plan);
     } catch (\Throwable $e) {
         http_response_code(500);
