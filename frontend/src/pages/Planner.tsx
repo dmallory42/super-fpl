@@ -134,19 +134,31 @@ export function Planner() {
     return new Map(predictionsRange.players.map((p) => [p.player_id, p]))
   }, [predictionsRange?.players])
 
-  // Current squad with staged transfers applied
+  // Selected path from solver
+  const selectedPath: TransferPath | null = useMemo(() => {
+    if (selectedPathIndex === null || !optimizeData?.paths) return null
+    return optimizeData.paths[selectedPathIndex] ?? null
+  }, [selectedPathIndex, optimizeData?.paths])
+
+  // Current squad: when a path is selected, use the path's squad for the selected GW;
+  // otherwise use the original squad with staged manual transfers applied
   const effectiveSquad = useMemo(() => {
     if (!optimizeData?.current_squad?.player_ids) return []
-    let squad = [...optimizeData.current_squad.player_ids]
 
-    // Apply staged transfers
+    // Path mode: use the path's squad_ids for the selected GW
+    if (selectedPath && selectedGameweek !== null) {
+      const gwData = selectedPath.transfers_by_gw[selectedGameweek]
+      if (gwData?.squad_ids) return gwData.squad_ids
+    }
+
+    // Manual mode: original squad + staged transfers
+    let squad = [...optimizeData.current_squad.player_ids]
     for (const transfer of stagedTransfers) {
       squad = squad.filter((id) => id !== transfer.out)
       squad.push(transfer.in)
     }
-
     return squad
-  }, [optimizeData?.current_squad?.player_ids, stagedTransfers])
+  }, [optimizeData?.current_squad?.player_ids, stagedTransfers, selectedPath, selectedGameweek])
 
   // Calculate bank after staged transfers
   const effectiveBank = useMemo(() => {
@@ -287,12 +299,6 @@ export function Planner() {
       [playerId]: xMins,
     }))
   }
-
-  // Selected path from solver
-  const selectedPath: TransferPath | null = useMemo(() => {
-    if (selectedPathIndex === null || !optimizeData?.paths) return null
-    return optimizeData.paths[selectedPathIndex] ?? null
-  }, [selectedPathIndex, optimizeData?.paths])
 
   // Get captain candidates from API formation data for selected GW
   const captainCandidates: CaptainCandidate[] = useMemo(() => {
@@ -650,20 +656,31 @@ export function Planner() {
               animationDelay={300}
             >
               <p className="text-xs text-foreground-muted mb-4">
-                Click a player to transfer them out. Hover and click ✎ to edit expected minutes.
-                Points shown are for GW{selectedGameweek ?? '?'}.
+                {selectedPath
+                  ? `Showing Path ${selectedPath.id} squad for GW${selectedGameweek ?? '?'}. Click a different GW to see the squad at that point.`
+                  : `Click a player to transfer them out. Hover and click ✎ to edit expected minutes. Points shown are for GW${selectedGameweek ?? '?'}.`}
               </p>
               {formationPlayers.length > 0 ? (
                 <FormationPitch
                   players={formationPlayers}
                   teams={teamsRecord}
-                  editable
+                  editable={!selectedPath}
                   xMinsOverrides={xMinsOverrides}
                   onXMinsChange={handleXMinsChange}
-                  transferMode
+                  transferMode={!selectedPath}
                   selectedForTransfer={selectedForTransferOut}
-                  newTransferIds={stagedTransfers.map((t) => t.in)}
-                  onPlayerClick={handleSelectForTransferOut}
+                  newTransferIds={
+                    selectedPath && selectedGameweek !== null
+                      ? // Highlight all players brought in by this path up to the selected GW
+                        (() => {
+                          const originalSquad = new Set(optimizeData.current_squad.player_ids)
+                          const gwData = selectedPath.transfers_by_gw[selectedGameweek]
+                          const currentSquad = gwData?.squad_ids ?? []
+                          return currentSquad.filter((id) => !originalSquad.has(id))
+                        })()
+                      : stagedTransfers.map((t) => t.in)
+                  }
+                  onPlayerClick={selectedPath ? undefined : handleSelectForTransferOut}
                 />
               ) : (
                 <div className="text-center text-foreground-muted py-8">Loading squad...</div>
@@ -721,8 +738,103 @@ export function Planner() {
 
           {/* Sidebar - Transfers & Replacements */}
           <div className="space-y-6">
-            {/* Staged Transfers */}
-            {stagedTransfers.length > 0 && (
+            {/* Path GW Moves — shown when a path is selected */}
+            {selectedPath &&
+              selectedGameweek !== null &&
+              (() => {
+                const gwData = selectedPath.transfers_by_gw[selectedGameweek]
+                if (!gwData) return null
+                return (
+                  <BroadcastCard
+                    title={`Path ${selectedPath.id} — GW${selectedGameweek}`}
+                    accentColor="purple"
+                    animationDelay={200}
+                  >
+                    <div className="space-y-3">
+                      {/* FT info */}
+                      <div className="flex items-center justify-between text-xs text-foreground-muted">
+                        <span>{gwData.ft_available} FT available</span>
+                        <span>{gwData.ft_after} FT after</span>
+                      </div>
+
+                      {gwData.action === 'bank' ? (
+                        <div className="p-3 bg-surface-elevated rounded-lg text-center">
+                          <span className="font-display text-sm uppercase tracking-wider text-foreground-muted">
+                            Bank — save FT for later
+                          </span>
+                        </div>
+                      ) : (
+                        gwData.moves.map((move, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 bg-surface-elevated rounded-lg animate-fade-in-up opacity-0"
+                            style={{ animationDelay: `${250 + idx * 50}ms` }}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <span
+                                className={`text-xs font-display uppercase ${move.is_free ? 'text-fpl-green' : 'text-destructive'}`}
+                              >
+                                {move.is_free ? 'Free Transfer' : `-${HIT_COST} pt Hit`}
+                              </span>
+                              <span
+                                className={`text-xs font-mono ${move.gain > 0 ? 'text-fpl-green' : move.gain < 0 ? 'text-destructive' : 'text-foreground-muted'}`}
+                              >
+                                {move.gain > 0 ? '+' : ''}
+                                {move.gain.toFixed(1)} pts
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <span className="text-destructive">
+                                {move.out_name}
+                                <span className="text-foreground-dim text-xs ml-1">
+                                  {teamsMap.get(move.out_team)}
+                                </span>
+                              </span>
+                              <span className="text-foreground-dim">{'\u2192'}</span>
+                              <span className="text-fpl-green">
+                                {move.in_name}
+                                <span className="text-foreground-dim text-xs ml-1">
+                                  {teamsMap.get(move.in_team)}
+                                </span>
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between mt-1 text-xs text-foreground-muted">
+                              <span>
+                                {'\u00A3'}
+                                {move.out_price.toFixed(1)}m {'\u2192'} {'\u00A3'}
+                                {move.in_price.toFixed(1)}m
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+
+                      {gwData.hit_cost > 0 && (
+                        <div className="text-xs text-destructive text-center">
+                          Hit cost: -{gwData.hit_cost} pts
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-border/50 flex items-center justify-between">
+                        <span className="text-xs text-foreground-muted">GW Score</span>
+                        <span className="font-mono font-bold text-fpl-green">
+                          {gwData.gw_score.toFixed(1)} pts
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => setSelectedPathIndex(null)}
+                        className="btn-secondary w-full"
+                      >
+                        Exit Path View
+                      </button>
+                    </div>
+                  </BroadcastCard>
+                )
+              })()}
+
+            {/* Staged Transfers — shown in manual mode (no path selected) */}
+            {!selectedPath && stagedTransfers.length > 0 && (
               <BroadcastCard title="Staged Transfers" accentColor="purple" animationDelay={200}>
                 <div className="space-y-3">
                   {stagedTransfers.map((transfer, idx) => {
@@ -752,12 +864,14 @@ export function Planner() {
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-destructive">{transfer.outName}</span>
-                          <span className="text-foreground-dim">→</span>
+                          <span className="text-foreground-dim">{'\u2192'}</span>
                           <span className="text-fpl-green">{transfer.inName}</span>
                         </div>
                         <div className="flex items-center justify-between mt-1 text-xs text-foreground-muted">
                           <span>
-                            £{transfer.outPrice.toFixed(1)}m → £{transfer.inPrice.toFixed(1)}m
+                            {'\u00A3'}
+                            {transfer.outPrice.toFixed(1)}m {'\u2192'} {'\u00A3'}
+                            {transfer.inPrice.toFixed(1)}m
                           </span>
                           <span
                             className={
@@ -775,8 +889,8 @@ export function Planner() {
               </BroadcastCard>
             )}
 
-            {/* Replacement Picker */}
-            {selectedOutPlayer && (
+            {/* Replacement Picker — only in manual mode */}
+            {!selectedPath && selectedOutPlayer && (
               <BroadcastCard
                 title={`Replace ${selectedOutPlayer.web_name}`}
                 accentColor="green"
@@ -784,7 +898,8 @@ export function Planner() {
               >
                 <div className="space-y-3">
                   <div className="text-xs text-foreground-muted">
-                    Budget: £{(selectedOutPlayer.now_cost / 10 + effectiveBank).toFixed(1)}m
+                    Budget: {'\u00A3'}
+                    {(selectedOutPlayer.now_cost / 10 + effectiveBank).toFixed(1)}m
                   </div>
                   <input
                     type="text"
@@ -811,7 +926,8 @@ export function Planner() {
                               {player.web_name}
                             </div>
                             <div className="text-xs text-foreground-dim">
-                              {teamsMap.get(player.team)} · £{(player.now_cost / 10).toFixed(1)}m
+                              {teamsMap.get(player.team)} · {'\u00A3'}
+                              {(player.now_cost / 10).toFixed(1)}m
                             </div>
                           </div>
                           <div className="text-right">
@@ -844,14 +960,14 @@ export function Planner() {
               </BroadcastCard>
             )}
 
-            {/* Quick Tips when no player selected */}
-            {!selectedForTransferOut && stagedTransfers.length === 0 && (
+            {/* Quick Tips when no path and no player selected */}
+            {!selectedPath && !selectedForTransferOut && stagedTransfers.length === 0 && (
               <BroadcastCard title="How to Use" animationDelay={400}>
                 <ul className="text-sm text-foreground-muted space-y-2">
-                  <li>• Click any player in your squad to select them for transfer out</li>
-                  <li>• Browse replacements sorted by predicted points</li>
-                  <li>• See updated projections instantly</li>
-                  <li>• Hits are deducted from GW1 predictions</li>
+                  <li>{'•'} Select a recommended path to see the full multi-GW plan</li>
+                  <li>{'•'} Click GW tabs to see the squad at each point in the path</li>
+                  <li>{'•'} Or click any player in your squad to manually plan transfers</li>
+                  <li>{'•'} Adjust FT Value and Depth to tune solver behavior</li>
                 </ul>
               </BroadcastCard>
             )}
