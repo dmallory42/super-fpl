@@ -75,25 +75,30 @@ class PredictionEngine
         // Expected points breakdown
         $breakdown = [];
 
-        // Appearance points
+        // Per-game minutes fraction: converts per-90 rates to per-game values,
+        // accounting for both probability of playing and minutes per appearance.
+        // e.g. a 75-min player with 0.98 prob_any: 0.98 * 75/90 = 0.817
+        $minutesFraction = $minutes['expected_mins'] / 90;
+
+        // Appearance points (based on playing probability, not per-90 rates)
         $appearancePoints = ($minutes['prob_60'] * self::APPEARANCE_POINTS_60)
             + (($minutes['prob_any'] - $minutes['prob_60']) * self::APPEARANCE_POINTS_SUB);
         $breakdown['appearance'] = round($appearancePoints, 2);
 
-        // Goal points: expected goals * points per goal * probability of playing
-        $goalPoints = $expectedGoals * $minutes['prob_any'] * (self::GOAL_POINTS[$position] ?? 4);
+        // Goal points: expected goals per 90 * minutes fraction * points per goal
+        $goalPoints = $expectedGoals * $minutesFraction * (self::GOAL_POINTS[$position] ?? 4);
         $breakdown['goals'] = round($goalPoints, 2);
 
-        // Assist points: expected assists * points per assist * probability of playing
-        $assistPoints = $expectedAssists * $minutes['prob_any'] * self::ASSIST_POINTS;
+        // Assist points: expected assists per 90 * minutes fraction * points per assist
+        $assistPoints = $expectedAssists * $minutesFraction * self::ASSIST_POINTS;
         $breakdown['assists'] = round($assistPoints, 2);
 
-        // Clean sheet points (conditional on playing 60+ mins)
+        // Clean sheet points (conditional on playing 60+ mins — not a per-90 rate)
         $csPoints = $cs * $minutes['prob_60'] * (self::CS_POINTS[$position] ?? 0);
         $breakdown['clean_sheet'] = round($csPoints, 2);
 
-        // Bonus points (conditional on playing)
-        $bonusPoints = $bonus * $minutes['prob_any'];
+        // Bonus points (scales with playing time)
+        $bonusPoints = $bonus * $minutesFraction;
         $breakdown['bonus'] = round($bonusPoints, 2);
 
         // Goals conceded penalty (GK and DEF only, position <= 2)
@@ -122,8 +127,8 @@ class PredictionEngine
         }
         $breakdown['defensive_contribution'] = round($dcPoints, 2);
 
-        // Card/own goal/pen miss deductions (conditional on playing)
-        $cardPoints = $cardDeductions * $minutes['prob_any'];
+        // Card/own goal/pen miss deductions (scales with playing time)
+        $cardPoints = $cardDeductions * $minutesFraction;
         $breakdown['cards'] = round($cardPoints, 2);
 
         // Total predicted points

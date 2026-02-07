@@ -239,9 +239,9 @@ class PathSolverTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // Test 4: Hit threshold respected — only takes hits when gain >= 6
+    // Test 4: High FT value discourages hits
     // -------------------------------------------------------------------------
-    public function testHitThresholdRespected(): void
+    public function testHighFtValueDiscouragsHits(): void
     {
         $gameweeks = [30, 31];
         [$squadIds, $predictions, $playerMap] = $this->makeSquad($gameweeks, 4.0);
@@ -252,48 +252,37 @@ class PathSolverTest extends TestCase
         $predictions[25][30] = 2.0;
         $predictions[25][31] = 2.0;
 
-        // Add two good candidates
+        // Two decent candidates — enough gain to justify hits at ftValue=0, but not at ftValue=5
         $this->addCandidates($predictions, $playerMap, [
             [
                 'id' => 101,
                 'position' => 3,
                 'team' => 18,
                 'cost' => 50,
-                'name' => 'GoodMidA',
-                'predictions' => [30 => 7.0, 31 => 7.0],
-                // Gain per GW: 7-2=5, total over horizon: 10. Hit cost 4, net 6 >= threshold
+                'name' => 'DecentMidA',
+                'predictions' => [30 => 5.0, 31 => 5.0],
+                // Gain per GW: 3, total: 6. Hit cost -4, net +2 at ftValue=0
             ],
             [
                 'id' => 102,
                 'position' => 3,
                 'team' => 19,
                 'cost' => 50,
-                'name' => 'MarginalMidB',
-                'predictions' => [30 => 3.5, 31 => 3.5],
-                // Gain per GW: 3.5-2=1.5, total over horizon: 3. Hit cost 4, net -1 < threshold
+                'name' => 'DecentMidB',
+                'predictions' => [30 => 5.0, 31 => 5.0],
             ],
         ]);
 
-        // Only 1 FT, so second transfer is a hit
-        $solver = new PathSolver(ftValue: 0.0, depth: 'quick');
+        // At ftValue=5, hits are heavily penalized (internal cost = -4 actual - 5 aversion = -9)
+        // A 3pt/GW gain over 2 GWs = 6 total, minus 9 internal penalty = -3 net → not worth it
+        $solver = new PathSolver(ftValue: 5.0, depth: 'quick');
         $paths = $solver->solve($squadIds, $predictions, $gameweeks, $playerMap, 5.0, 1);
 
         $this->assertNotEmpty($paths);
 
         $bestPath = $paths[0];
-        $gw30Moves = $bestPath['transfers_by_gw'][30]['moves'] ?? [];
-
-        // Should find GoodMidA (worth the hit) but NOT MarginalMidB
-        $inIds = array_column($gw30Moves, 'in_id');
-        // GoodMidA should appear somewhere in the best path
-        $allInIds = [];
-        foreach ($bestPath['transfers_by_gw'] as $gwData) {
-            foreach ($gwData['moves'] as $m) {
-                $allInIds[] = $m['in_id'];
-            }
-        }
-        // MarginalMidB should NOT appear — not worth a hit
-        $this->assertNotContains(102, $allInIds, 'MarginalMidB should not be worth a hit');
+        // With high ftValue, the best path should not take hits for marginal gains
+        $this->assertEquals(0, $bestPath['total_hits'], 'High ftValue should discourage hits');
     }
 
     // -------------------------------------------------------------------------

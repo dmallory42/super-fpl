@@ -70,10 +70,12 @@ class MinutesProbability
         $startRate = $starts / $teamGames;
 
         // Selection probability when available.
-        // High mins-per-appearance = nailed starter; gap between
-        // appearanceRate and 1.0 is mostly injury, not rotation.
+        // High mins-per-appearance suggests nailed when selected, so we use
+        // a generous multiplier on appearance rate. But very low appearance
+        // rates (e.g. backup GK: 3/24) still produce low selection probability
+        // rather than being treated as nailed starters.
         if ($minsPerAppearance >= 75) {
-            $selectionProb = 0.98;
+            $selectionProb = min(0.98, $appearanceRate * 2.0);
         } elseif ($minsPerAppearance >= 60) {
             $selectionProb = min(0.95, $appearanceRate * 1.2);
         } else {

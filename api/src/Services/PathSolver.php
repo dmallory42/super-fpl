@@ -7,7 +7,6 @@ namespace SuperFPL\Api\Services;
 class PathSolver
 {
     private const HIT_COST = 4;
-    private const HIT_THRESHOLD = 6;
     private const MAX_FT = 5;
 
     // [beamWidth, candidatesPerPos, maxTransfersPerGw]
@@ -266,11 +265,15 @@ class PathSolver
 
                 $gwScore = $this->evaluateSquad($newSquad, $predictions, $gw, $playerMap);
                 $ftOpportunityCost = min($totalTransfers, $ft) * $this->ftValue;
+                // Hits destroy FT flexibility — penalize proportional to ftValue
+                $hitAversion = $hitCost > 0
+                    ? $this->ftValue * ($hitCost / self::HIT_COST)
+                    : 0;
 
                 $newState = $state;
                 $newState['squad_ids'] = $newSquad;
                 $newState['bank'] = round($newBank, 1);
-                $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost;
+                $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost - $hitAversion;
                 $newState['display_score'] += $gwScore - $hitCost;
                 $newState['ft'] = $newFt;
                 $newState['total_hits'] += $hitCost > 0 ? (int)($hitCost / self::HIT_COST) : 0;
@@ -375,26 +378,16 @@ class PathSolver
                             $hitCost = ($numTransfers - $ft) * self::HIT_COST;
                         }
 
-                        // Hit threshold: only allow hits if gain is sufficient
-                        if ($hitCost > 0) {
-                            $remainingGws = array_filter($gameweeks, fn($g) => $g >= $gw);
-                            $totalGainOut1 = 0;
-                            $totalGainOut2 = 0;
-                            foreach ($remainingGws as $g) {
-                                $totalGainOut1 += ($predictions[$inId1][$g] ?? 0) - ($predictions[$outId1][$g] ?? 0);
-                                $totalGainOut2 += ($predictions[$inId2][$g] ?? 0) - ($predictions[$outId2][$g] ?? 0);
-                            }
-                            $totalGain = $totalGainOut1 + $totalGainOut2;
-                            if ($totalGain - $hitCost < self::HIT_THRESHOLD - self::HIT_COST) continue;
-                        }
-
                         $gwScore = $this->evaluateSquad($newSquad, $predictions, $gw, $playerMap);
                         $ftOpportunityCost = min($numTransfers, $ft) * $this->ftValue;
+                        $hitAversion = $hitCost > 0
+                            ? $this->ftValue * ($hitCost / self::HIT_COST)
+                            : 0;
 
                         $newState = $state;
                         $newState['squad_ids'] = $newSquad;
                         $newState['bank'] = round($newBank, 1);
-                        $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost;
+                        $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost - $hitAversion;
                         $newState['display_score'] += $gwScore - $hitCost;
                         $newState['ft'] = $newFt;
                         $newState['total_hits'] += $hitCost > 0 ? (int)($hitCost / self::HIT_COST) : 0;
@@ -512,11 +505,14 @@ class PathSolver
 
         $gwScore = $this->evaluateSquad($squad, $predictions, $gw, $playerMap);
         $ftOpportunityCost = min($numTransfers, $ft) * $this->ftValue;
+        $hitAversion = $hitCost > 0
+            ? $this->ftValue * ($hitCost / self::HIT_COST)
+            : 0;
 
         $newState = $state;
         $newState['squad_ids'] = $squad;
         $newState['bank'] = round($bank, 1);
-        $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost;
+        $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost - $hitAversion;
         $newState['display_score'] += $gwScore - $hitCost;
         $newState['ft'] = $newFt;
         $newState['total_hits'] += $hitCost > 0 ? (int)($hitCost / self::HIT_COST) : 0;
