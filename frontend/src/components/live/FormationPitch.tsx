@@ -460,7 +460,7 @@ const PlayerCard = memo(function PlayerCard({
       </div>
 
       {/* Player name */}
-      <div className="bg-surface/90 backdrop-blur-sm text-foreground text-xs px-2 py-0.5 rounded mt-1.5 max-w-[70px] truncate font-medium">
+      <div className="bg-surface/90 backdrop-blur-sm text-foreground text-xs px-2 py-0.5 rounded mt-1.5 max-w-[80px] md:max-w-[100px] truncate font-medium">
         {player.web_name || `P${player.player_id}`}
       </div>
 

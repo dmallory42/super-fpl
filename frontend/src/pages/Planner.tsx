@@ -21,15 +21,6 @@ import { buildFormation } from '../lib/formation'
 
 const HIT_COST = 4
 
-interface StagedTransfer {
-  out: number
-  in: number
-  outName: string
-  inName: string
-  outPrice: number
-  inPrice: number
-}
-
 function getInitialManagerId(): { id: number | null; input: string } {
   const params = new URLSearchParams(window.location.search)
   const urlManager = params.get('manager')
@@ -65,9 +56,12 @@ export function Planner() {
   const [fixedTransfers, setFixedTransfers] = useState<FixedTransfer[]>([])
 
   // Transfer planning state
-  const [stagedTransfers, setStagedTransfers] = useState<StagedTransfer[]>([])
   const [selectedForTransferOut, setSelectedForTransferOut] = useState<number | null>(null)
   const [replacementSearch, setReplacementSearch] = useState('')
+
+  // UI state
+  const [showHelp, setShowHelp] = useState(false)
+  const [isExplorerExpanded, setIsExplorerExpanded] = useState(false)
 
   // Debounce xMinsOverrides so the optimize API call doesn't fire on every keystroke
   const [debouncedXMins, setDebouncedXMins] = useState<Record<number, number>>(xMinsOverrides)
@@ -86,6 +80,7 @@ export function Planner() {
   const {
     data: optimizeData,
     isLoading: isLoadingOptimize,
+    isFetching: isFetchingOptimize,
     error: optimizeError,
   } = usePlannerOptimize(
     managerId,
@@ -140,40 +135,44 @@ export function Planner() {
     return optimizeData.paths[selectedPathIndex] ?? null
   }, [selectedPathIndex, optimizeData?.paths])
 
-  // Current squad: when a path is selected, use the path's squad for the selected GW;
-  // otherwise use the original squad with staged manual transfers applied
+  // Current squad: when a plan is selected, use the plan's squad for the selected GW;
+  // otherwise use the original squad with fixed transfers applied (optimistic preview)
   const effectiveSquad = useMemo(() => {
     if (!optimizeData?.current_squad?.player_ids) return []
 
-    // Path mode: use the path's squad_ids for the selected GW
+    // Plan mode: use the plan's squad_ids for the selected GW
     if (selectedPath && selectedGameweek !== null) {
       const gwData = selectedPath.transfers_by_gw[selectedGameweek]
       if (gwData?.squad_ids) return gwData.squad_ids
     }
 
-    // Manual mode: original squad + staged transfers
+    // No plan selected: original squad + fixed transfers applied (optimistic preview)
     let squad = [...optimizeData.current_squad.player_ids]
-    for (const transfer of stagedTransfers) {
-      squad = squad.filter((id) => id !== transfer.out)
-      squad.push(transfer.in)
+    for (const ft of fixedTransfers) {
+      squad = squad.filter((id) => id !== ft.out)
+      squad.push(ft.in)
     }
     return squad
-  }, [optimizeData?.current_squad?.player_ids, stagedTransfers, selectedPath, selectedGameweek])
+  }, [optimizeData?.current_squad?.player_ids, fixedTransfers, selectedPath, selectedGameweek])
 
-  // Calculate bank after staged transfers
+  // Calculate bank after fixed transfers
   const effectiveBank = useMemo(() => {
     if (!optimizeData?.current_squad?.bank) return 0
     let bank = optimizeData.current_squad.bank
 
-    for (const transfer of stagedTransfers) {
-      bank += transfer.outPrice - transfer.inPrice
+    for (const ft of fixedTransfers) {
+      const outPlayer = playersData?.players.find((p) => p.id === ft.out)
+      const inPlayer = playersData?.players.find((p) => p.id === ft.in)
+      if (outPlayer && inPlayer) {
+        bank += outPlayer.now_cost / 10 - inPlayer.now_cost / 10
+      }
     }
 
     return Math.round(bank * 10) / 10
-  }, [optimizeData?.current_squad?.bank, stagedTransfers])
+  }, [optimizeData?.current_squad?.bank, fixedTransfers, playersData?.players])
 
-  // Calculate hits for staged transfers
-  const hitsCount = Math.max(0, stagedTransfers.length - freeTransfers)
+  // Calculate hits for fixed transfers
+  const hitsCount = Math.max(0, fixedTransfers.length - freeTransfers)
   const hitsCost = hitsCount * HIT_COST
 
   // Get the player being transferred out
@@ -246,7 +245,6 @@ export function Planner() {
     const id = parseInt(managerInput, 10)
     if (!isNaN(id) && id > 0) {
       setManagerId(id)
-      setStagedTransfers([])
       setSelectedForTransferOut(null)
       setSelectedPathIndex(null)
       setFixedTransfers([])
@@ -265,68 +263,30 @@ export function Planner() {
   }
 
   const handleSelectReplacement = (replacement: PlayerMultiWeekPrediction) => {
-    if (!selectedOutPlayer) return
+    if (!selectedOutPlayer || selectedGameweek === null) return
 
-    if (selectedPath && selectedGameweek !== null) {
-      // Path mode: add as a fixed transfer constraint and re-run solver
-      // If the outgoing player was brought in by an existing fixed transfer for this GW,
-      // update that transfer instead of adding a new one (user is exploring alternatives)
-      const existingIdx = fixedTransfers.findIndex(
-        (ft) => ft.in === selectedOutPlayer.id && ft.gameweek === selectedGameweek
+    // Always add as a fixed transfer constraint — solver re-runs automatically
+    // If the outgoing player was brought in by an existing fixed transfer for this GW,
+    // update that transfer instead of adding a new one (user is exploring alternatives)
+    const existingIdx = fixedTransfers.findIndex(
+      (ft) => ft.in === selectedOutPlayer.id && ft.gameweek === selectedGameweek
+    )
+    if (existingIdx !== -1) {
+      setFixedTransfers((prev) =>
+        prev.map((ft, i) => (i === existingIdx ? { ...ft, in: replacement.player_id } : ft))
       )
-      if (existingIdx !== -1) {
-        setFixedTransfers((prev) =>
-          prev.map((ft, i) => (i === existingIdx ? { ...ft, in: replacement.player_id } : ft))
-        )
-      } else {
-        setFixedTransfers((prev) => [
-          ...prev,
-          { gameweek: selectedGameweek, out: selectedOutPlayer.id, in: replacement.player_id },
-        ])
-      }
-      setSelectedPathIndex(null)
     } else {
-      // Manual mode: if the outgoing player was brought in by an existing staged transfer,
-      // update that transfer instead of adding a new one (user is exploring alternatives)
-      const existingIdx = stagedTransfers.findIndex((t) => t.in === selectedOutPlayer.id)
-      if (existingIdx !== -1) {
-        setStagedTransfers((prev) =>
-          prev.map((t, i) =>
-            i === existingIdx
-              ? {
-                  ...t,
-                  in: replacement.player_id,
-                  inName: replacement.web_name,
-                  inPrice: replacement.now_cost / 10,
-                }
-              : t
-          )
-        )
-      } else {
-        setStagedTransfers([
-          ...stagedTransfers,
-          {
-            out: selectedOutPlayer.id,
-            in: replacement.player_id,
-            outName: selectedOutPlayer.web_name,
-            inName: replacement.web_name,
-            outPrice: selectedOutPlayer.now_cost / 10,
-            inPrice: replacement.now_cost / 10,
-          },
-        ])
-      }
+      setFixedTransfers((prev) => [
+        ...prev,
+        { gameweek: selectedGameweek, out: selectedOutPlayer.id, in: replacement.player_id },
+      ])
     }
-
+    setSelectedPathIndex(null)
     setSelectedForTransferOut(null)
     setReplacementSearch('')
   }
 
-  const handleRemoveTransfer = (index: number) => {
-    setStagedTransfers(stagedTransfers.filter((_, i) => i !== index))
-  }
-
   const handleResetTransfers = () => {
-    setStagedTransfers([])
     setSelectedForTransferOut(null)
     setReplacementSearch('')
     setSelectedPathIndex(null)
@@ -420,14 +380,91 @@ export function Planner() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="animate-fade-in-up">
-        <h2 className="font-display text-2xl font-bold tracking-wider uppercase text-foreground mb-2">
-          Transfer Planner
-        </h2>
-        <p className="font-body text-foreground-muted text-sm mb-4">
-          Plan transfers and see projected points. Click players to swap them out.
-        </p>
+      <div className="animate-fade-in-up flex items-start justify-between">
+        <div>
+          <h2 className="font-display text-2xl font-bold tracking-wider uppercase text-foreground mb-2">
+            Transfer Planner
+          </h2>
+          <p className="font-body text-foreground-muted text-sm mb-4">
+            Plan transfers and see projected points. Click players to swap them out.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowHelp(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display uppercase tracking-wider text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+        >
+          <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] font-bold">
+            ?
+          </span>
+          Help
+        </button>
       </div>
+
+      {/* Help Modal */}
+      {showHelp && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowHelp(false)}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative bg-surface border border-border rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-fade-in-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-border bg-gradient-to-r from-fpl-purple/10 to-transparent">
+              <h3 className="font-display text-lg font-bold tracking-wider uppercase text-foreground">
+                How to Use the Planner
+              </h3>
+            </div>
+            <div className="p-5 space-y-5">
+              <div>
+                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  Recommended Plans
+                </h4>
+                <p className="text-sm text-foreground-muted">
+                  The solver finds optimal multi-gameweek transfer paths. Select a plan to see the
+                  suggested squad at each gameweek, including when to roll transfers.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  Make Your Own Transfers
+                </h4>
+                <p className="text-sm text-foreground-muted">
+                  Click any player on the pitch to transfer them out. Pick a replacement and it
+                  becomes a locked transfer — the solver automatically re-runs to optimize around
+                  your choice.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  Solver Controls
+                </h4>
+                <p className="text-sm text-foreground-muted">
+                  <span className="text-foreground font-medium">FT Value</span> controls hit
+                  aversion — higher values make the solver prefer rolling transfers over taking
+                  hits. <span className="text-foreground font-medium">Depth</span> controls search
+                  thoroughness — deeper finds better plans but takes longer.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  Expected Minutes
+                </h4>
+                <p className="text-sm text-foreground-muted">
+                  Hover over any player and click the edit icon to override their expected minutes.
+                  This adjusts point predictions for that player across all gameweeks.
+                </p>
+              </div>
+            </div>
+            <div className="p-5 border-t border-border">
+              <button onClick={() => setShowHelp(false)} className="btn-primary w-full">
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="grid md:grid-cols-3 gap-4 animate-fade-in-up animation-delay-100">
@@ -467,7 +504,7 @@ export function Planner() {
           </select>
         </div>
 
-        {(stagedTransfers.length > 0 || fixedTransfers.length > 0) && (
+        {fixedTransfers.length > 0 && (
           <div className="flex items-end">
             <button onClick={handleResetTransfers} className="btn-secondary w-full">
               Reset Transfers
@@ -508,7 +545,7 @@ export function Planner() {
               />
               <StatPanel
                 label="Transfers"
-                value={`${stagedTransfers.length} (${hitsCount > 0 ? `-${hitsCost} pts` : 'Free'})`}
+                value={`${fixedTransfers.length} (${hitsCount > 0 ? `-${hitsCost} pts` : 'Free'})`}
                 animationDelay={100}
                 highlight={hitsCount > 0}
               />
@@ -522,8 +559,20 @@ export function Planner() {
 
             {/* Path Selector */}
             {optimizeData.paths && optimizeData.paths.length > 0 && (
-              <BroadcastCard title="Recommended Paths" accentColor="purple" animationDelay={175}>
-                <div className="grid grid-cols-3 gap-3 mb-4">
+              <BroadcastCard
+                title="Recommended Plans"
+                accentColor="purple"
+                animationDelay={175}
+                headerAction={
+                  isFetchingOptimize && !isLoadingOptimize ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-display uppercase tracking-wider text-fpl-purple">
+                      <span className="w-2 h-2 rounded-full bg-fpl-purple animate-pulse" />
+                      Recalculating
+                    </span>
+                  ) : undefined
+                }
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                   {optimizeData.paths.map((path, idx) => {
                     const isSelected = selectedPathIndex === idx
                     const horizon = optimizeData.planning_horizon
@@ -535,7 +584,6 @@ export function Planner() {
                             setSelectedPathIndex(null)
                           } else {
                             setSelectedPathIndex(idx)
-                            setStagedTransfers([])
                             setSelectedForTransferOut(null)
                           }
                         }}
@@ -548,7 +596,7 @@ export function Planner() {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-display text-xs uppercase tracking-wider text-foreground-muted">
-                            Path {path.id}
+                            Plan {path.id}
                           </span>
                           {path.total_hits > 0 && (
                             <span className="text-xs text-destructive font-mono">
@@ -692,7 +740,7 @@ export function Planner() {
               <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
                 <span className="text-xs text-foreground-muted">
                   Total ({predictionsRange?.gameweeks.length ?? 6} GWs)
-                  {selectedPath && ' — Path ' + selectedPath.id}
+                  {selectedPath && ' — Plan ' + selectedPath.id}
                 </span>
                 <span className="font-mono font-bold text-fpl-green text-lg">
                   {selectedPath
@@ -710,8 +758,8 @@ export function Planner() {
             >
               <p className="text-xs text-foreground-muted mb-4">
                 {selectedPath
-                  ? `Path ${selectedPath.id} squad for GW${selectedGameweek ?? '?'}. Click a player to lock in a different transfer — the solver will re-run with your choice.`
-                  : `Click a player to transfer them out. Hover and click ✎ to edit expected minutes. Points shown are for GW${selectedGameweek ?? '?'}.`}
+                  ? `Plan ${selectedPath.id} squad for GW${selectedGameweek ?? '?'}. Click a player to lock in a different transfer — the solver will re-run with your choice.`
+                  : `Click a player to make a transfer — the solver re-runs with your choice. Hover and click ✎ to edit expected minutes. Points shown are for GW${selectedGameweek ?? '?'}.`}
               </p>
               {formationPlayers.length > 0 ? (
                 <FormationPitch
@@ -731,7 +779,7 @@ export function Planner() {
                           const currentSquad = gwData?.squad_ids ?? []
                           return currentSquad.filter((id) => !originalSquad.has(id))
                         })()
-                      : stagedTransfers.map((t) => t.in)
+                      : fixedTransfers.map((ft) => ft.in)
                   }
                   onPlayerClick={handleSelectForTransferOut}
                 />
@@ -799,7 +847,7 @@ export function Planner() {
                 if (!gwData) return null
                 return (
                   <BroadcastCard
-                    title={`Path ${selectedPath.id} — GW${selectedGameweek}`}
+                    title={`Plan ${selectedPath.id} — GW${selectedGameweek}`}
                     accentColor="purple"
                     animationDelay={200}
                   >
@@ -879,7 +927,7 @@ export function Planner() {
                         onClick={() => setSelectedPathIndex(null)}
                         className="btn-secondary w-full"
                       >
-                        Exit Path View
+                        Exit Plan View
                       </button>
                     </div>
                   </BroadcastCard>
@@ -890,7 +938,7 @@ export function Planner() {
             {fixedTransfers.length > 0 && (
               <BroadcastCard title="Locked Transfers" accentColor="highlight" animationDelay={200}>
                 <p className="text-xs text-foreground-muted mb-3">
-                  These transfers are locked in. The solver will build paths around them.
+                  Your chosen transfers. The solver optimizes around these.
                 </p>
                 <div className="space-y-2">
                   {fixedTransfers.map((ft, idx) => {
@@ -923,62 +971,6 @@ export function Planner() {
                         >
                           Remove
                         </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </BroadcastCard>
-            )}
-
-            {/* Staged Transfers — shown in manual mode (no path selected) */}
-            {!selectedPath && stagedTransfers.length > 0 && (
-              <BroadcastCard title="Staged Transfers" accentColor="purple" animationDelay={200}>
-                <div className="space-y-3">
-                  {stagedTransfers.map((transfer, idx) => {
-                    const isFree = idx < freeTransfers
-                    const outPred = playerPredictionsMap.get(transfer.out)
-                    const inPred = playerPredictionsMap.get(transfer.in)
-                    const gain = (inPred?.total_predicted ?? 0) - (outPred?.total_predicted ?? 0)
-
-                    return (
-                      <div
-                        key={idx}
-                        className="p-3 bg-surface-elevated rounded-lg animate-fade-in-up opacity-0"
-                        style={{ animationDelay: `${250 + idx * 50}ms` }}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span
-                            className={`text-xs font-display uppercase ${isFree ? 'text-fpl-green' : 'text-destructive'}`}
-                          >
-                            {isFree ? 'Free Transfer' : `-${HIT_COST} pt Hit`}
-                          </span>
-                          <button
-                            onClick={() => handleRemoveTransfer(idx)}
-                            className="text-xs text-foreground-muted hover:text-destructive"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="text-destructive">{transfer.outName}</span>
-                          <span className="text-foreground-dim">{'\u2192'}</span>
-                          <span className="text-fpl-green">{transfer.inName}</span>
-                        </div>
-                        <div className="flex items-center justify-between mt-1 text-xs text-foreground-muted">
-                          <span>
-                            {'\u00A3'}
-                            {transfer.outPrice.toFixed(1)}m {'\u2192'} {'\u00A3'}
-                            {transfer.inPrice.toFixed(1)}m
-                          </span>
-                          <span
-                            className={
-                              gain > 0 ? 'text-fpl-green' : gain < 0 ? 'text-destructive' : ''
-                            }
-                          >
-                            {gain > 0 ? '+' : ''}
-                            {gain.toFixed(1)} pts
-                          </span>
-                        </div>
                       </div>
                     )
                   })}
@@ -1056,38 +1048,45 @@ export function Planner() {
                 </div>
               </BroadcastCard>
             )}
-
-            {/* Quick Tips when no player selected and no staged/fixed transfers */}
-            {!selectedForTransferOut &&
-              stagedTransfers.length === 0 &&
-              fixedTransfers.length === 0 && (
-                <BroadcastCard title="How to Use" animationDelay={400}>
-                  <ul className="text-sm text-foreground-muted space-y-2">
-                    <li>{'•'} Select a recommended path to see the full multi-GW plan</li>
-                    <li>{'•'} Click GW tabs to see the squad at each point in the path</li>
-                    <li>
-                      {'•'} Click a player while viewing a path to lock in a different transfer
-                    </li>
-                    <li>{'•'} Or click any player to manually plan transfers</li>
-                    <li>{'•'} Adjust FT Value and Depth to tune solver behavior</li>
-                  </ul>
-                </BroadcastCard>
-              )}
           </div>
         </div>
       )}
 
-      {/* Player Explorer - always visible when predictions loaded */}
+      {/* Player Explorer - collapsible */}
       {predictionsRange && (
-        <PlayerExplorer
-          players={predictionsRange.players}
-          gameweeks={predictionsRange.gameweeks}
-          teamsMap={teamsMap}
-          effectiveOwnership={top10kEO}
-          xMinsOverrides={xMinsOverrides}
-          onXMinsChange={handleXMinsChange}
-          onResetXMins={() => setXMinsOverrides({})}
-        />
+        <div className="animate-fade-in-up">
+          <button
+            onClick={() => setIsExplorerExpanded((prev) => !prev)}
+            className="w-full flex items-center justify-between p-4 bg-surface-elevated rounded-lg hover:bg-surface-hover transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <h3 className="font-display text-sm font-bold tracking-wider uppercase text-foreground">
+                Player Explorer
+              </h3>
+              <span className="text-xs text-foreground-muted font-mono">
+                {predictionsRange.players.length} players
+              </span>
+            </div>
+            <span
+              className={`text-foreground-muted transition-transform ${isExplorerExpanded ? 'rotate-180' : ''}`}
+            >
+              ▼
+            </span>
+          </button>
+          {isExplorerExpanded && (
+            <div className="mt-2">
+              <PlayerExplorer
+                players={predictionsRange.players}
+                gameweeks={predictionsRange.gameweeks}
+                teamsMap={teamsMap}
+                effectiveOwnership={top10kEO}
+                xMinsOverrides={xMinsOverrides}
+                onXMinsChange={handleXMinsChange}
+                onResetXMins={() => setXMinsOverrides({})}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {!managerId && (
