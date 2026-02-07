@@ -39,12 +39,19 @@ class TransferOptimizerService
         string $depth = 'standard',
     ): array {
         $currentGw = $this->gameweekService->getCurrentGameweek();
-        $upcomingGws = $this->gameweekService->getUpcomingGameweeks(self::PLANNING_HORIZON);
+        $planFromGw = $this->gameweekService->getNextActionableGameweek();
+        $upcomingGws = $this->gameweekService->getUpcomingGameweeks(self::PLANNING_HORIZON, $planFromGw);
         $fixtureCounts = $this->gameweekService->getFixtureCounts($upcomingGws);
 
-        // Get manager's current squad
+        // Get manager's current squad — use current GW picks so squad matches bank
+        // (last_deadline_bank reflects post-transfer state for the current GW)
         $managerData = $this->fplClient->entry($managerId)->getRaw();
-        $picks = $this->fplClient->entry($managerId)->picks(max(1, $currentGw - 1));
+        try {
+            $picks = $this->fplClient->entry($managerId)->picks($currentGw);
+        } catch (\Throwable $e) {
+            // Current GW picks not yet available (e.g. before first deadline)
+            $picks = $this->fplClient->entry($managerId)->picks(max(1, $currentGw - 1));
+        }
 
         $currentSquad = array_column($picks['picks'] ?? [], 'element');
         $bank = ($managerData['last_deadline_bank'] ?? 0) / 10;
@@ -196,7 +203,7 @@ class TransferOptimizerService
         );
 
         return [
-            'current_gameweek' => $currentGw,
+            'current_gameweek' => $planFromGw,
             'planning_horizon' => $upcomingGws,
             'current_squad' => [
                 'player_ids' => $currentSquad,

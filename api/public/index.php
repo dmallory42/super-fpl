@@ -401,14 +401,14 @@ function handlePredictionAccuracy(Database $db, int $gameweek): void
 function handlePredictionsRange(Database $db): void
 {
     $gwService = new \SuperFPL\Api\Services\GameweekService($db);
-    $currentGw = $gwService->getCurrentGameweek();
+    $actionableGw = $gwService->getNextActionableGameweek();
 
-    // Get gameweek range from query params (default: next 6 gameweeks)
-    $startGw = isset($_GET['start']) ? (int) $_GET['start'] : $currentGw;
+    // Get gameweek range from query params (default: next 6 gameweeks from actionable)
+    $startGw = isset($_GET['start']) ? (int) $_GET['start'] : $actionableGw;
     $endGw = isset($_GET['end']) ? (int) $_GET['end'] : min($startGw + 5, 38);
 
     // Validate range
-    $startGw = max($currentGw, min(38, $startGw));
+    $startGw = max($actionableGw, min(38, $startGw));
     $endGw = max($startGw, min(38, $endGw));
 
     $gameweeks = range($startGw, $endGw);
@@ -497,7 +497,7 @@ function handlePredictionsRange(Database $db): void
 
     echo json_encode([
         'gameweeks' => $gameweeks,
-        'current_gameweek' => $currentGw,
+        'current_gameweek' => $actionableGw,
         'players' => $players,
         'generated_at' => date('c'),
     ]);

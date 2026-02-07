@@ -70,11 +70,11 @@ class GameweekServiceTest extends TestCase
             INSERT INTO fixtures (id, gameweek, home_club_id, away_club_id, kickoff_time, finished) VALUES
             (1, 23, 1, 2, '2024-01-01 15:00:00', 1),
             (2, 23, 3, 4, '2024-01-01 15:00:00', 1),
-            (3, 24, 1, 3, '2024-01-08 15:00:00', 0),
-            (4, 24, 2, 4, '2024-01-08 15:00:00', 0),
-            (5, 25, 1, 4, '2024-01-15 15:00:00', 0),
-            (6, 25, 2, 3, '2024-01-15 15:00:00', 0),
-            (7, 25, 1, 5, '2024-01-15 17:00:00', 0)
+            (3, 24, 1, 3, '2099-06-01 15:00:00', 0),
+            (4, 24, 2, 4, '2099-06-01 15:00:00', 0),
+            (5, 25, 1, 4, '2099-06-08 15:00:00', 0),
+            (6, 25, 2, 3, '2099-06-08 15:00:00', 0),
+            (7, 25, 1, 5, '2099-06-08 17:00:00', 0)
         ");
     }
 
@@ -155,13 +155,27 @@ class GameweekServiceTest extends TestCase
 
     public function testHasGameweekStarted(): void
     {
-        $this->assertTrue($this->service->hasGameweekStarted(23), 'GW23 should have started (has finished fixture)');
-        $this->assertFalse($this->service->hasGameweekStarted(24), 'GW24 should not have started');
+        $this->assertTrue($this->service->hasGameweekStarted(23), 'GW23 should have started (kickoff in the past)');
+        $this->assertFalse($this->service->hasGameweekStarted(24), 'GW24 should not have started (kickoff in the future)');
     }
 
     public function testIsGameweekFinished(): void
     {
         $this->assertTrue($this->service->isGameweekFinished(23), 'GW23 should be finished');
         $this->assertFalse($this->service->isGameweekFinished(24), 'GW24 should not be finished');
+    }
+
+    public function testGetNextActionableGameweek(): void
+    {
+        // Current GW is 24 (first unfinished), kickoff in future → actionable is 24
+        $this->assertEquals(24, $this->service->getNextActionableGameweek());
+    }
+
+    public function testGetNextActionableGameweekSkipsStartedGw(): void
+    {
+        // Move GW24 kickoffs to the past so it counts as started
+        $this->db->getPdo()->exec("UPDATE fixtures SET kickoff_time = '2024-01-01 15:00:00' WHERE gameweek = 24");
+
+        $this->assertEquals(25, $this->service->getNextActionableGameweek());
     }
 }

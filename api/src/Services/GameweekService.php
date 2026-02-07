@@ -27,31 +27,49 @@ class GameweekService
     }
 
     /**
-     * Get the next N gameweeks from current
+     * Get the next N gameweeks starting from the given GW (or current).
      */
-    public function getUpcomingGameweeks(int $count = 6): array
+    public function getUpcomingGameweeks(int $count = 6, ?int $from = null): array
     {
-        $current = $this->getCurrentGameweek();
+        $start = $from ?? $this->getCurrentGameweek();
         $gameweeks = [];
 
-        for ($i = 0; $i < $count && ($current + $i) <= 38; $i++) {
-            $gameweeks[] = $current + $i;
+        for ($i = 0; $i < $count && ($start + $i) <= 38; $i++) {
+            $gameweeks[] = $start + $i;
         }
 
         return $gameweeks;
     }
 
     /**
-     * Check if a gameweek has started (any fixture kicked off)
+     * Check if a gameweek has started (earliest kickoff is in the past).
+     * Once started, transfers are locked — you can't plan for this GW.
      */
     public function hasGameweekStarted(int $gameweek): bool
     {
-        $fixture = $this->db->fetchOne(
-            "SELECT id FROM fixtures WHERE gameweek = ? AND finished = 1 LIMIT 1",
+        $row = $this->db->fetchOne(
+            "SELECT MIN(kickoff_time) as first_kickoff FROM fixtures WHERE gameweek = ?",
             [$gameweek]
         );
 
-        return $fixture !== null;
+        if (!$row || !$row['first_kickoff']) {
+            return false;
+        }
+
+        return strtotime($row['first_kickoff']) <= time();
+    }
+
+    /**
+     * Get the next gameweek you can still make transfers for.
+     * If the current GW has started, returns currentGw + 1.
+     */
+    public function getNextActionableGameweek(): int
+    {
+        $current = $this->getCurrentGameweek();
+        if ($this->hasGameweekStarted($current)) {
+            return min($current + 1, 38);
+        }
+        return $current;
     }
 
     /**
