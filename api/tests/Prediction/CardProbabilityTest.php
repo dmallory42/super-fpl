@@ -71,7 +71,7 @@ class CardProbabilityTest extends TestCase
         $this->assertEqualsWithDelta(-0.55, $result, 0.01);
     }
 
-    public function testZeroMinutesReturnsZero(): void
+    public function testZeroMinutesReturnsBaseline(): void
     {
         $player = [
             'minutes' => 0,
@@ -83,7 +83,28 @@ class CardProbabilityTest extends TestCase
 
         $result = $this->prob->calculate($player);
 
-        $this->assertEquals(0.0, $result);
+        // Zero minutes → league-average baseline deduction
+        $this->assertEqualsWithDelta(-0.20, $result, 0.01);
+    }
+
+    public function testLowMinutesRegressesToBaseline(): void
+    {
+        $player = [
+            'minutes' => 45,
+            'yellow_cards' => 1,
+            'red_cards' => 0,
+            'own_goals' => 0,
+            'penalties_missed' => 0,
+        ];
+
+        $result = $this->prob->calculate($player);
+
+        // Raw: (1/45)*90 = 2.0 yellows/90 → -2.0
+        // Reliability: 45/270 = 0.167
+        // Regressed: (-2.0 * 0.167) + (-0.20 * 0.833) = -0.334 + -0.167 = -0.50
+        // Much less extreme than raw -2.0
+        $this->assertGreaterThan(-0.55, $result);
+        $this->assertLessThan(-0.20, $result);
     }
 
     public function testCleanRecord(): void

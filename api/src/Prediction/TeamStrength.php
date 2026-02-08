@@ -12,6 +12,10 @@ use SuperFPL\Api\Database;
  * Used as a fallback when bookmaker odds are unavailable (e.g. fixtures
  * too far in the future for bookmakers to price). Computes multiplicative
  * fixture adjustments from team xGF/game and xGA/game.
+ *
+ * When historical Understat team data is available, current-season rates
+ * are blended with historical priors. Weight ramps from 0→1 over 19 games
+ * (half-season), so early-season estimates lean on historical data.
  */
 class TeamStrength
 {
@@ -27,10 +31,18 @@ class TeamStrength
     private float $awayPenalty = 0.93;
     private bool $available = false;
 
+    /** Promoted team discount factors (no PL Understat history) */
+    private const PROMOTED_XGF_FACTOR = 0.85;
+    private const PROMOTED_XGA_FACTOR = 1.15;
+
+    /** Half-season ramp for blending historical priors */
+    private const HISTORY_RAMP_GAMES = 19;
+
     public function __construct(Database $db)
     {
         $this->loadTeamXGF($db);
         $this->loadTeamXGA($db);
+        $this->blendWithHistoricalPriors($db);
         $this->computeLeagueAverages();
         $this->computeHomeAdvantage($db);
     }
@@ -134,6 +146,69 @@ class TeamStrength
             $games[(int) $row['club_id']] = (int) $row['games'];
         }
         return $games;
+    }
+
+    /**
+     * Blend current-season xGF/xGA with historical Understat priors.
+     *
+     * Weight: w = min(1.0, gamesPlayed / 19)
+     * effective = (current * w) + (historical * (1 - w))
+     *
+     * For teams with no PL Understat history (newly promoted),
+     * use below-league-average defaults.
+     */
+    private function blendWithHistoricalPriors(Database $db): void
+    {
+        // Load historical team data grouped by club_id
+        $rows = $db->fetchAll(
+            'SELECT club_id, SUM(xgf) as total_xgf, SUM(xga) as total_xga, SUM(games) as total_games
+             FROM understat_team_season
+             WHERE club_id IS NOT NULL
+             GROUP BY club_id'
+        );
+
+        if (empty($rows)) {
+            return; // No historical data available yet
+        }
+
+        $historicalXGF = [];
+        $historicalXGA = [];
+        foreach ($rows as $row) {
+            $clubId = (int) $row['club_id'];
+            $games = (int) $row['total_games'];
+            if ($games > 0) {
+                $historicalXGF[$clubId] = (float) $row['total_xgf'] / $games;
+                $historicalXGA[$clubId] = (float) $row['total_xga'] / $games;
+            }
+        }
+
+        $teamGames = $this->getTeamGames($db);
+
+        foreach ($this->xgfPerGame as $clubId => $currentXGF) {
+            $gamesPlayed = $teamGames[$clubId] ?? 0;
+            $w = min(1.0, $gamesPlayed / self::HISTORY_RAMP_GAMES);
+
+            if (isset($historicalXGF[$clubId])) {
+                $this->xgfPerGame[$clubId] = ($currentXGF * $w) + ($historicalXGF[$clubId] * (1 - $w));
+            } elseif ($w < 1.0) {
+                // Newly promoted: blend toward below-average default
+                $promotedDefault = $this->leagueAvgXGF * self::PROMOTED_XGF_FACTOR;
+                $this->xgfPerGame[$clubId] = ($currentXGF * $w) + ($promotedDefault * (1 - $w));
+            }
+        }
+
+        foreach ($this->xgaPerGame as $clubId => $currentXGA) {
+            $gamesPlayed = $teamGames[$clubId] ?? 0;
+            $w = min(1.0, $gamesPlayed / self::HISTORY_RAMP_GAMES);
+
+            if (isset($historicalXGA[$clubId])) {
+                $this->xgaPerGame[$clubId] = ($currentXGA * $w) + ($historicalXGA[$clubId] * (1 - $w));
+            } elseif ($w < 1.0) {
+                // Newly promoted: blend toward above-average concession
+                $promotedDefault = $this->leagueAvgXGA * self::PROMOTED_XGA_FACTOR;
+                $this->xgaPerGame[$clubId] = ($currentXGA * $w) + ($promotedDefault * (1 - $w));
+            }
+        }
     }
 
     private function computeLeagueAverages(): void

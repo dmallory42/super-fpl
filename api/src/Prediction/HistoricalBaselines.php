@@ -9,9 +9,9 @@ use SuperFPL\Api\Database;
 /**
  * Provides career historical baselines for regression-to-mean.
  *
- * Loads player_season_history and computes career xG/90, xA/90
- * weighted by minutes across seasons. Used to regress current-season
- * rates toward career averages for players with limited sample size.
+ * Prefers Understat non-penalty xG (npxG/90) and xA/90 from
+ * understat_season_history. Falls back to FPL player_season_history
+ * (penalty-inclusive xG) for players without Understat data.
  */
 class HistoricalBaselines
 {
@@ -20,37 +20,12 @@ class HistoricalBaselines
 
     public function __construct(Database $db)
     {
-        $rows = $db->fetchAll(
-            'SELECT player_code, minutes, expected_goals, expected_assists
-             FROM player_season_history
-             WHERE minutes > 0'
-        );
-
-        // Aggregate by player_code
-        $byPlayer = [];
-        foreach ($rows as $row) {
-            $code = (int) $row['player_code'];
-            if (!isset($byPlayer[$code])) {
-                $byPlayer[$code] = ['total_minutes' => 0, 'total_xg' => 0.0, 'total_xa' => 0.0];
-            }
-            $mins = (int) $row['minutes'];
-            $byPlayer[$code]['total_minutes'] += $mins;
-            $byPlayer[$code]['total_xg'] += (float) ($row['expected_goals'] ?? 0);
-            $byPlayer[$code]['total_xa'] += (float) ($row['expected_assists'] ?? 0);
-        }
-
-        foreach ($byPlayer as $code => $data) {
-            $mins = $data['total_minutes'];
-            $this->cache[$code] = [
-                'xg_per_90' => $mins > 0 ? ($data['total_xg'] / $mins) * 90 : 0.0,
-                'xa_per_90' => $mins > 0 ? ($data['total_xa'] / $mins) * 90 : 0.0,
-                'total_minutes' => $mins,
-            ];
-        }
+        $this->loadUnderstatBaselines($db);
+        $this->loadFplFallback($db);
     }
 
     /**
-     * Career xG per 90 across all past seasons.
+     * Career npxG per 90 across all past seasons (non-penalty).
      */
     public function getXgPer90(int $playerCode): float
     {
@@ -81,5 +56,77 @@ class HistoricalBaselines
     {
         $w = $this->getRegressionWeight($currentMinutes);
         return ($currentRate * $w) + ($historicalRate * (1 - $w));
+    }
+
+    /**
+     * Load Understat npxG/xA baselines, keyed by player code.
+     */
+    private function loadUnderstatBaselines(Database $db): void
+    {
+        $rows = $db->fetchAll(
+            'SELECT p.code, h.minutes, h.npxg, h.xa
+             FROM understat_season_history h
+             JOIN players p ON p.understat_id = h.understat_id
+             WHERE h.minutes > 0'
+        );
+
+        $byPlayer = [];
+        foreach ($rows as $row) {
+            $code = (int) $row['code'];
+            if (!isset($byPlayer[$code])) {
+                $byPlayer[$code] = ['total_minutes' => 0, 'total_npxg' => 0.0, 'total_xa' => 0.0];
+            }
+            $mins = (int) $row['minutes'];
+            $byPlayer[$code]['total_minutes'] += $mins;
+            $byPlayer[$code]['total_npxg'] += (float) ($row['npxg'] ?? 0);
+            $byPlayer[$code]['total_xa'] += (float) ($row['xa'] ?? 0);
+        }
+
+        foreach ($byPlayer as $code => $data) {
+            $mins = $data['total_minutes'];
+            $this->cache[$code] = [
+                'xg_per_90' => $mins > 0 ? ($data['total_npxg'] / $mins) * 90 : 0.0,
+                'xa_per_90' => $mins > 0 ? ($data['total_xa'] / $mins) * 90 : 0.0,
+                'total_minutes' => $mins,
+            ];
+        }
+    }
+
+    /**
+     * Load FPL player_season_history as fallback for players without Understat data.
+     * Only fills in players not already loaded from Understat.
+     */
+    private function loadFplFallback(Database $db): void
+    {
+        $rows = $db->fetchAll(
+            'SELECT player_code, minutes, expected_goals, expected_assists
+             FROM player_season_history
+             WHERE minutes > 0'
+        );
+
+        $byPlayer = [];
+        foreach ($rows as $row) {
+            $code = (int) $row['player_code'];
+            // Skip players already loaded from Understat
+            if (isset($this->cache[$code])) {
+                continue;
+            }
+            if (!isset($byPlayer[$code])) {
+                $byPlayer[$code] = ['total_minutes' => 0, 'total_xg' => 0.0, 'total_xa' => 0.0];
+            }
+            $mins = (int) $row['minutes'];
+            $byPlayer[$code]['total_minutes'] += $mins;
+            $byPlayer[$code]['total_xg'] += (float) ($row['expected_goals'] ?? 0);
+            $byPlayer[$code]['total_xa'] += (float) ($row['expected_assists'] ?? 0);
+        }
+
+        foreach ($byPlayer as $code => $data) {
+            $mins = $data['total_minutes'];
+            $this->cache[$code] = [
+                'xg_per_90' => $mins > 0 ? ($data['total_xg'] / $mins) * 90 : 0.0,
+                'xa_per_90' => $mins > 0 ? ($data['total_xa'] / $mins) * 90 : 0.0,
+                'total_minutes' => $mins,
+            ];
+        }
     }
 }

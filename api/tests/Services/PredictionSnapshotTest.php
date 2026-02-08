@@ -69,6 +69,7 @@ class PredictionSnapshotTest extends TestCase
                 penalties_taken INTEGER DEFAULT 0,
                 defensive_contribution INTEGER DEFAULT 0,
                 xmins_override INTEGER DEFAULT NULL,
+                understat_id INTEGER,
                 updated_at TIMESTAMP
             )
         ");
@@ -186,6 +187,37 @@ class PredictionSnapshotTest extends TestCase
                 start_cost INTEGER,
                 end_cost INTEGER,
                 PRIMARY KEY (player_code, season_id)
+            )
+        ");
+
+        $pdo->exec("
+            CREATE TABLE understat_season_history (
+                understat_id INTEGER,
+                season INTEGER,
+                minutes INTEGER,
+                npxg REAL,
+                xa REAL,
+                goals INTEGER,
+                assists INTEGER,
+                shots INTEGER,
+                key_passes INTEGER,
+                PRIMARY KEY (understat_id, season)
+            )
+        ");
+
+        $pdo->exec("
+            CREATE TABLE understat_team_season (
+                team_name TEXT,
+                club_id INTEGER,
+                season INTEGER,
+                games INTEGER,
+                xgf REAL,
+                xga REAL,
+                npxgf REAL,
+                npxga REAL,
+                scored INTEGER,
+                missed INTEGER,
+                PRIMARY KEY (team_name, season)
             )
         ");
     }
