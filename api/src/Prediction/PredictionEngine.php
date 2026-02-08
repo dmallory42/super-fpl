@@ -199,8 +199,17 @@ class PredictionEngine
         $total = $appearancePoints + $goalPoints + $assistPoints + $csPoints
             + $bonusPoints + $gcPenalty + $savePoints + $dcPoints + $cardPoints + $penaltyPoints;
 
-        // Apply calibration adjustment
-        $total = $this->calibrate($total);
+        // Apply calibration adjustment based on "if playing" score.
+        // This prevents doubtful players (low prob_any) from getting artificial bumps —
+        // the calibration targets structural underprediction, not low playing probability.
+        $probAny = $minutes['prob_any'];
+        if ($probAny > 0.1) {
+            $ifPlayingScore = $total / $probAny;
+            $calibratedIfPlaying = $this->calibrate($ifPlayingScore);
+            $total = $calibratedIfPlaying * $probAny;
+        } else {
+            $total = $this->calibrate($total);
+        }
 
         // Calculate confidence based on data quality
         $confidence = $this->calculateConfidence($player, $fixtureOdds, $goalscorerOdds, $assistOdds);
