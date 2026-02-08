@@ -30,6 +30,10 @@ export interface Player {
   news_added: string | null
   chance_of_playing_next_round: number | null
   chance_of_playing_this_round: number | null
+  starts?: number
+  appearances?: number
+  xmins_override?: number | null
+  penalty_order?: number | null
 }
 
 export type Position = 'GKP' | 'DEF' | 'MID' | 'FWD'

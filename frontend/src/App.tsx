@@ -4,6 +4,7 @@ import { TeamAnalyzer } from './pages/TeamAnalyzer'
 import { LeagueAnalyzer } from './pages/LeagueAnalyzer'
 import { Live } from './pages/Live'
 import { Planner } from './pages/Planner'
+import { Admin } from './pages/Admin'
 import { TabNav } from './components/ui/TabNav'
 import { useSyncStatus } from './hooks/useSyncStatus'
 import { GradientText } from './components/ui/GradientText'
@@ -18,7 +19,7 @@ const queryClient = new QueryClient({
   },
 })
 
-type Page = 'season-review' | 'league-analyzer' | 'live' | 'planner'
+type Page = 'season-review' | 'league-analyzer' | 'live' | 'planner' | 'admin'
 
 const tabs = [
   { id: 'season-review', label: 'Season' },
@@ -27,7 +28,7 @@ const tabs = [
   { id: 'planner', label: 'Planner' },
 ]
 
-const validPages = new Set(['season-review', 'league-analyzer', 'live', 'planner'])
+const validPages = new Set(['season-review', 'league-analyzer', 'live', 'planner', 'admin'])
 
 function getInitialPage(): Page {
   const params = new URLSearchParams(window.location.search)
@@ -100,6 +101,7 @@ function App() {
             {page === 'league-analyzer' && <LeagueAnalyzer />}
             {page === 'live' && <Live />}
             {page === 'planner' && <Planner />}
+            {page === 'admin' && <Admin />}
           </div>
         </main>
 

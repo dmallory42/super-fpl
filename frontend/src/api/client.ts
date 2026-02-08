@@ -566,6 +566,7 @@ export interface PathGameweek {
   hit_cost: number
   gw_score: number
   squad_ids: number[]
+  bank: number
 }
 
 export interface TransferPath {
@@ -592,6 +593,7 @@ export interface PlannerOptimizeResponse {
     bank: number
     squad_value: number
     free_transfers: number
+    api_free_transfers: number
     predicted_points: Record<number | 'total', number>
     formations?: Record<number, FormationData>
   }
@@ -602,18 +604,66 @@ export interface PlannerOptimizeResponse {
   paths: TransferPath[]
 }
 
+// Penalty takers
+export interface PenaltyTaker {
+  id: number
+  web_name: string
+  team: number
+  position: number
+  penalty_order: number
+  team_name: string
+  team_short: string
+}
+
+export interface PenaltyTakersResponse {
+  penalty_takers: PenaltyTaker[]
+}
+
+export async function fetchPenaltyTakers(): Promise<PenaltyTakersResponse> {
+  return fetchApi<PenaltyTakersResponse>('/penalty-takers')
+}
+
+export async function setPenaltyOrder(playerId: number, order: number): Promise<void> {
+  await fetch(`${API_BASE}/players/${playerId}/penalty-order`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ penalty_order: order }),
+  })
+}
+
+export async function clearPenaltyOrder(playerId: number): Promise<void> {
+  await fetch(`${API_BASE}/players/${playerId}/penalty-order`, { method: 'DELETE' })
+}
+
+// xMins overrides
+export async function setXMins(playerId: number, mins: number): Promise<void> {
+  await fetch(`${API_BASE}/players/${playerId}/xmins`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expected_mins: mins }),
+  })
+}
+
+export async function clearXMins(playerId: number): Promise<void> {
+  await fetch(`${API_BASE}/players/${playerId}/xmins`, { method: 'DELETE' })
+}
+
 export async function fetchPlannerOptimize(
   managerId: number,
-  freeTransfers: number = 1,
+  freeTransfers: number | null = null,
   chipPlan: ChipPlan = {},
   xMinsOverrides: Record<number, number> = {},
   fixedTransfers: FixedTransfer[] = [],
   ftValue: number = 1.5,
   depth: SolverDepth = 'standard',
+  skipSolve: boolean = false,
 ): Promise<PlannerOptimizeResponse> {
   const params = new URLSearchParams()
   params.set('manager', String(managerId))
-  params.set('ft', String(freeTransfers))
+  // Only send ft when user explicitly overrides; null = auto-detect from API
+  if (freeTransfers !== null) {
+    params.set('ft', String(freeTransfers))
+  }
 
   if (chipPlan.wildcard) params.set('wildcard_gw', String(chipPlan.wildcard))
   if (chipPlan.bench_boost) params.set('bench_boost_gw', String(chipPlan.bench_boost))
@@ -634,6 +684,9 @@ export async function fetchPlannerOptimize(
   }
   if (depth !== 'standard') {
     params.set('depth', depth)
+  }
+  if (skipSolve) {
+    params.set('skip_solve', '1')
   }
 
   return fetchApi<PlannerOptimizeResponse>(`/planner/optimize?${params.toString()}`)

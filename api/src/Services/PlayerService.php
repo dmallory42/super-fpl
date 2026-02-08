@@ -43,8 +43,11 @@ class PlayerService
             bps,
             bonus,
             starts,
+            appearances,
             chance_of_playing as chance_of_playing_next_round,
-            news
+            news,
+            xmins_override,
+            penalty_order
         FROM players';
 
         $conditions = [];
@@ -99,8 +102,11 @@ class PlayerService
                 bps,
                 bonus,
                 starts,
+                appearances,
                 chance_of_playing as chance_of_playing_next_round,
-                news
+                news,
+                xmins_override,
+                penalty_order
             FROM players WHERE id = ?',
             [$id]
         );
