@@ -579,6 +579,9 @@ export interface TransferPath {
 
 export type SolverDepth = 'quick' | 'standard' | 'deep'
 
+// xMins overrides: uniform (number) or per-GW (Record<number, number>)
+export type XMinsOverrides = Record<number, number | Record<number, number>>
+
 export interface FixedTransfer {
   gameweek: number
   out: number
@@ -596,6 +599,7 @@ export interface PlannerOptimizeResponse {
     api_free_transfers: number
     predicted_points: Record<number | 'total', number>
     formations?: Record<number, FormationData>
+    per_gw_xmins?: Record<number, Record<number, number>>
   }
   dgw_teams: Record<number, number[]>
   recommendations: TransferRecommendation[]
@@ -652,7 +656,7 @@ export async function fetchPlannerOptimize(
   managerId: number,
   freeTransfers: number | null = null,
   chipPlan: ChipPlan = {},
-  xMinsOverrides: Record<number, number> = {},
+  xMinsOverrides: XMinsOverrides = {},
   fixedTransfers: FixedTransfer[] = [],
   ftValue: number = 1.5,
   depth: SolverDepth = 'standard',

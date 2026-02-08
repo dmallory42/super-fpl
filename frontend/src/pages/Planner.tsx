@@ -5,9 +5,9 @@ import { usePredictionsRange } from '../hooks/usePredictionsRange'
 import type {
   ChipPlan,
   PlayerMultiWeekPrediction,
-  CaptainCandidate,
   FixedTransfer,
   SolverDepth,
+  XMinsOverrides,
 } from '../api/client'
 import { StatPanel, StatPanelGrid } from '../components/ui/StatPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
@@ -16,6 +16,7 @@ import { SkeletonStatGrid, SkeletonCard } from '../components/ui/SkeletonLoader'
 import { FormationPitch } from '../components/live/FormationPitch'
 import { useLiveSamples } from '../hooks/useLiveSamples'
 import { PlayerExplorer } from '../components/planner/PlayerExplorer'
+import { PlayerDetailPanel } from '../components/planner/PlayerDetailPanel'
 import { buildFormation } from '../lib/formation'
 
 const HIT_COST = 4
@@ -53,7 +54,7 @@ export function Planner() {
   const [managerInput, setManagerInput] = useState(initial.input)
   const [freeTransfers, setFreeTransfers] = useState<number | null>(null)
   const chipPlan: ChipPlan = {}
-  const [xMinsOverrides, setXMinsOverrides] = useState<Record<number, number>>({})
+  const [xMinsOverrides, setXMinsOverrides] = useState<XMinsOverrides>({})
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null)
 
   // Path solver state
@@ -67,9 +68,11 @@ export function Planner() {
   // Solve state — controls whether the solver runs
   const [solveRequested, setSolveRequested] = useState(false)
   const [solveTransfers, setSolveTransfers] = useState<FixedTransfer[]>([])
+  const [showSolveLoader, setShowSolveLoader] = useState(false)
 
-  // Transfer planning state
-  const [selectedForTransferOut, setSelectedForTransferOut] = useState<number | null>(null)
+  // Player detail sidebar state
+  const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
+  const [sidebarTab, setSidebarTab] = useState<'minutes' | 'transfer'>('minutes')
   const [replacementSearch, setReplacementSearch] = useState('')
 
   // Saved plans
@@ -86,7 +89,7 @@ export function Planner() {
   const [isExplorerExpanded, setIsExplorerExpanded] = useState(false)
 
   // Debounce xMinsOverrides so the optimize API call doesn't fire on every keystroke
-  const [debouncedXMins, setDebouncedXMins] = useState<Record<number, number>>(xMinsOverrides)
+  const [debouncedXMins, setDebouncedXMins] = useState<XMinsOverrides>(xMinsOverrides)
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -117,11 +120,7 @@ export function Planner() {
   )
 
   // Solve query — only when requested
-  const {
-    data: solveData,
-    isLoading: isSolving,
-    isFetching: isFetchingSolve,
-  } = usePlannerOptimize(
+  const { data: solveData, isFetching: isFetchingSolve } = usePlannerOptimize(
     solveRequested ? managerId : null, // null disables the query
     freeTransfers,
     chipPlan,
@@ -134,6 +133,8 @@ export function Planner() {
 
   // Stale detection — user changed transfers after solving
   const isStale = solveRequested && JSON.stringify(userTransfers) !== JSON.stringify(solveTransfers)
+
+  const isSolveActive = showSolveLoader || isFetchingSolve
 
   // Merge squad + solve data for display
   const optimizeData = squadData
@@ -269,18 +270,28 @@ export function Planner() {
     : 0
   const hitsCost = hitsCount * HIT_COST
 
-  // Get the player being transferred out
-  const selectedOutPlayer = useMemo(() => {
-    if (!selectedForTransferOut || !playersData?.players) return null
-    return playersData.players.find((p) => p.id === selectedForTransferOut)
-  }, [selectedForTransferOut, playersData?.players])
+  // Get the selected player's data
+  const selectedPlayerData = useMemo(() => {
+    if (!selectedPlayer || !playersData?.players) return null
+    return playersData.players.find((p) => p.id === selectedPlayer) ?? null
+  }, [selectedPlayer, playersData?.players])
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    if (selectedPlayerData) {
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = ''
+      }
+    }
+  }, [selectedPlayerData])
 
   // Available replacements for the selected player
   const availableReplacements = useMemo(() => {
-    if (!selectedOutPlayer || !predictionsRange?.players || !playersData?.players) return []
+    if (!selectedPlayerData || !predictionsRange?.players || !playersData?.players) return []
 
-    const position = selectedOutPlayer.element_type
-    const maxBudget = selectedOutPlayer.now_cost / 10 + effectiveBank
+    const position = selectedPlayerData.element_type
+    const maxBudget = selectedPlayerData.now_cost / 10 + effectiveBank
 
     // Count players per team in effective squad
     const teamCounts = new Map<number, number>()
@@ -298,7 +309,7 @@ export function Planner() {
         if (p.now_cost / 10 > maxBudget) return false
         const currentTeamCount = teamCounts.get(p.team) || 0
         const adjustedCount =
-          p.team === selectedOutPlayer.team ? currentTeamCount - 1 : currentTeamCount
+          p.team === selectedPlayerData.team ? currentTeamCount - 1 : currentTeamCount
         if (adjustedCount >= 3) return false
         if (
           replacementSearch &&
@@ -311,7 +322,7 @@ export function Planner() {
       .sort((a, b) => b.total_predicted - a.total_predicted)
       .slice(0, 50)
   }, [
-    selectedOutPlayer,
+    selectedPlayerData,
     predictionsRange?.players,
     playersData?.players,
     effectiveSquad,
@@ -333,7 +344,7 @@ export function Planner() {
     const id = parseInt(managerInput, 10)
     if (!isNaN(id) && id > 0) {
       setManagerId(id)
-      setSelectedForTransferOut(null)
+      setSelectedPlayer(null)
       setSelectedPathIndex(null)
       setUserTransfers([])
       setSolveRequested(false)
@@ -342,46 +353,52 @@ export function Planner() {
     }
   }
 
-  const handleSelectForTransferOut = (playerId: number) => {
-    if (selectedForTransferOut === playerId) {
-      setSelectedForTransferOut(null)
+  const handlePlayerSelect = (playerId: number) => {
+    if (selectedPlayer === playerId) {
+      setSelectedPlayer(null)
       setReplacementSearch('')
     } else {
-      setSelectedForTransferOut(playerId)
+      setSelectedPlayer(playerId)
+      setSidebarTab('minutes')
       setReplacementSearch('')
     }
   }
 
   const handleSelectReplacement = (replacement: PlayerMultiWeekPrediction) => {
-    if (!selectedOutPlayer || selectedGameweek === null) return
+    if (!selectedPlayerData || selectedGameweek === null) return
 
     let newTransfers = [...userTransfers]
 
     // If the outgoing player was brought in by an existing transfer for this GW,
     // update that transfer instead of adding a new one
     const existingIdx = newTransfers.findIndex(
-      (ft) => ft.in === selectedOutPlayer.id && ft.gameweek === selectedGameweek
+      (ft) => ft.in === selectedPlayerData.id && ft.gameweek === selectedGameweek
     )
     if (existingIdx !== -1) {
-      newTransfers = newTransfers.map((ft, i) =>
-        i === existingIdx ? { ...ft, in: replacement.player_id } : ft
-      )
+      // If replacing back to the original player, the transfer is a no-op — remove it
+      if (newTransfers[existingIdx].out === replacement.player_id) {
+        newTransfers = newTransfers.filter((_, i) => i !== existingIdx)
+      } else {
+        newTransfers = newTransfers.map((ft, i) =>
+          i === existingIdx ? { ...ft, in: replacement.player_id } : ft
+        )
+      }
     } else {
       newTransfers.push({
         gameweek: selectedGameweek,
-        out: selectedOutPlayer.id,
+        out: selectedPlayerData.id,
         in: replacement.player_id,
       })
     }
 
     setUserTransfers(newTransfers)
     setSelectedPathIndex(null)
-    setSelectedForTransferOut(null)
+    setSelectedPlayer(null)
     setReplacementSearch('')
   }
 
   const handleReset = () => {
-    setSelectedForTransferOut(null)
+    setSelectedPlayer(null)
     setReplacementSearch('')
     setSelectedPathIndex(null)
     setUserTransfers([])
@@ -390,8 +407,11 @@ export function Planner() {
   }
 
   const handleFindPlans = () => {
+    setShowSolveLoader(true)
     setSolveTransfers([...userTransfers])
     setSolveRequested(true)
+    // Minimum display time so the skeleton always appears
+    setTimeout(() => setShowSolveLoader(false), 800)
   }
 
   const handleSelectPlan = (idx: number) => {
@@ -411,7 +431,7 @@ export function Planner() {
     }
     setUserTransfers(planTransfers)
     setSelectedPathIndex(idx)
-    setSelectedForTransferOut(null)
+    setSelectedPlayer(null)
   }
 
   const handleSavePlan = () => {
@@ -437,19 +457,50 @@ export function Planner() {
     setSavedPlans((prev) => prev.filter((p) => p.id !== planId))
   }
 
-  const handleXMinsChange = (playerId: number, xMins: number) => {
-    setXMinsOverrides((prev) => ({
-      ...prev,
-      [playerId]: xMins,
-    }))
+  const handleXMinsChange = (playerId: number, xMins: number, gameweek?: number) => {
+    setXMinsOverrides((prev) => {
+      if (gameweek !== undefined) {
+        // Per-GW override
+        const existing = prev[playerId]
+        const gwMap: Record<number, number> =
+          typeof existing === 'object' && existing !== null ? { ...existing } : {}
+        gwMap[gameweek] = xMins
+        return { ...prev, [playerId]: gwMap }
+      }
+      // Uniform override
+      return { ...prev, [playerId]: xMins }
+    })
   }
 
-  // Get captain candidates from API formation data for selected GW
-  const captainCandidates: CaptainCandidate[] = useMemo(() => {
-    if (!optimizeData?.current_squad?.formations || selectedGameweek === null) return []
-    const formation = optimizeData.current_squad.formations?.[selectedGameweek]
-    return formation?.captain_candidates ?? []
-  }, [optimizeData?.current_squad?.formations, selectedGameweek])
+  // Scale a flat prediction by per-GW xMins from the backend
+  // The predictions endpoint uses a single expected_mins for all GWs;
+  // per_gw_xmins from the planner gives the true per-GW minutes.
+  const perGwXMins = optimizeData?.current_squad?.per_gw_xmins
+
+  const scaleByGwXMins = (
+    playerId: number,
+    gw: number,
+    basePts: number,
+    baseXMins: number
+  ): number => {
+    // User override takes priority
+    const override = debouncedXMins[playerId]
+    if (override != null) {
+      if (baseXMins > 0) {
+        const gwMins = typeof override === 'object' ? (override[gw] ?? baseXMins) : override
+        return basePts * (gwMins / baseXMins)
+      }
+      return 0
+    }
+    // Backend per-GW xMins
+    const backendGwMins = perGwXMins?.[playerId]?.[gw]
+    if (backendGwMins !== undefined && baseXMins > 0 && backendGwMins !== baseXMins) {
+      return basePts * (backendGwMins / baseXMins)
+    }
+    // If base expected_mins is 0 but backend per-GW says they'll play, we can't
+    // scale from 0. The predictions are 0 in this case, so fall through.
+    return basePts
+  }
 
   // Build formation players for the selected gameweek
   const formationPlayers = useMemo(() => {
@@ -461,18 +512,28 @@ export function Planner() {
         const pred = playerPredictionsMap.get(playerId)
         if (!player) return null
 
+        const basePts = pred?.predictions[selectedGameweek] ?? 0
+        const baseXMins = pred?.expected_mins ?? 90
+
         return {
           player_id: playerId,
           web_name: player.web_name,
           element_type: player.element_type,
           team: player.team,
-          predicted_points: pred?.predictions[selectedGameweek] ?? 0,
+          predicted_points: scaleByGwXMins(playerId, selectedGameweek, basePts, baseXMins),
         }
       })
       .filter((p): p is NonNullable<typeof p> => p !== null)
 
     return buildFormation(squadWithData)
-  }, [effectiveSquad, playersData?.players, playerPredictionsMap, selectedGameweek])
+  }, [
+    effectiveSquad,
+    playersData?.players,
+    playerPredictionsMap,
+    selectedGameweek,
+    perGwXMins,
+    debouncedXMins,
+  ])
 
   // Calculate predicted points for effective squad (optimal starting XI only)
   const squadPredictions = useMemo(() => {
@@ -499,12 +560,16 @@ export function Planner() {
           const player = playersData.players.find((p) => p.id === playerId)
           const pred = playerPredictionsMap.get(playerId)
           if (!player) return null
+          const basePts = pred?.predictions[gw] ?? 0
+          const baseXMins = pred?.expected_mins ?? 90
+          const pts = scaleByGwXMins(playerId, gw, basePts, baseXMins)
+
           return {
             player_id: playerId,
             web_name: player.web_name,
             element_type: player.element_type,
             team: player.team,
-            predicted_points: pred?.predictions[gw] ?? 0,
+            predicted_points: pts,
           }
         })
         .filter((p): p is NonNullable<typeof p> => p !== null)
@@ -534,6 +599,8 @@ export function Planner() {
     playerPredictionsMap,
     playersData?.players,
     hitsCost,
+    debouncedXMins,
+    perGwXMins,
   ])
 
   // IDs of new transfers visible in the current GW (for highlighting on pitch)
@@ -554,210 +621,148 @@ export function Planner() {
   }, [userTransfers])
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="animate-fade-in-up flex items-start justify-between">
-        <div>
-          <h2 className="font-display text-2xl font-bold tracking-wider uppercase text-foreground mb-2">
-            Transfer Planner
-          </h2>
-          <p className="font-body text-foreground-muted text-sm mb-4">
-            Build your squad, then press Find Plans to see optimized suggestions.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowHelp(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display uppercase tracking-wider text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-colors"
-        >
-          <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] font-bold">
-            ?
-          </span>
-          Help
-        </button>
-      </div>
-
-      {/* Help Modal */}
-      {showHelp && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowHelp(false)}
-        >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div
-            className="relative bg-surface border border-border rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-fade-in-up"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-5 border-b border-border bg-gradient-to-r from-fpl-purple/10 to-transparent">
-              <h3 className="font-display text-lg font-bold tracking-wider uppercase text-foreground">
-                How to Use the Planner
-              </h3>
-            </div>
-            <div className="p-5 space-y-5">
-              <div>
-                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
-                  1. Make Transfers
-                </h4>
-                <p className="text-sm text-foreground-muted">
-                  Click any player on the pitch to transfer them out and pick a replacement. Your
-                  transfers appear in the sidebar.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
-                  2. Find Plans
-                </h4>
-                <p className="text-sm text-foreground-muted">
-                  Press "Find Plans" to run the optimizer. It finds multi-gameweek transfer paths
-                  that maximize points, respecting any transfers you've already made.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
-                  3. Select & Save
-                </h4>
-                <p className="text-sm text-foreground-muted">
-                  Select a plan to auto-apply its transfers to your squad. Save plans you like for
-                  later comparison.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
-                  Solver Controls
-                </h4>
-                <p className="text-sm text-foreground-muted">
-                  <span className="text-foreground font-medium">FT Value</span> controls hit
-                  aversion — higher values make the solver prefer rolling transfers.{' '}
-                  <span className="text-foreground font-medium">Depth</span> controls search
-                  thoroughness.
-                </p>
-              </div>
-            </div>
-            <div className="p-5 border-t border-border">
-              <button onClick={() => setShowHelp(false)} className="btn-primary w-full">
-                Got It
-              </button>
-            </div>
+    <>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="animate-fade-in-up flex items-start justify-between">
+          <div>
+            <h2 className="font-display text-2xl font-bold tracking-wider uppercase text-foreground mb-2">
+              Transfer Planner
+            </h2>
+            <p className="font-body text-foreground-muted text-sm mb-4">
+              Build your squad, then press Find Plans to see optimized suggestions.
+            </p>
           </div>
-        </div>
-      )}
-
-      {/* Controls */}
-      <div className="grid md:grid-cols-4 gap-4 animate-fade-in-up animation-delay-100">
-        <div className="space-y-2">
-          <label className="font-display text-xs uppercase tracking-wider text-foreground-muted">
-            Manager ID
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={managerInput}
-              onChange={(e) => setManagerInput(e.target.value)}
-              placeholder="Enter FPL ID"
-              className="input-broadcast flex-1"
-              onKeyDown={(e) => e.key === 'Enter' && handleLoadManager()}
-            />
-            <button onClick={handleLoadManager} className="btn-primary">
-              Load
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="font-display text-xs uppercase tracking-wider text-foreground-muted">
-            Free Transfers
-          </label>
-          <select
-            value={freeTransfers ?? effectiveFt}
-            onChange={(e) => setFreeTransfers(parseInt(e.target.value, 10))}
-            className="input-broadcast"
-          >
-            {[1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>
-                {n} FT
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-end gap-2">
           <button
-            onClick={handleFindPlans}
-            disabled={isSolving || !managerId}
-            className={`btn-primary flex-1 relative ${isStale ? 'ring-2 ring-yellow-400/50' : ''}`}
+            onClick={() => setShowHelp(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display uppercase tracking-wider text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-colors"
           >
-            {isSolving ? (
-              <span className="inline-flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                Solving...
-              </span>
-            ) : isStale ? (
-              'Re-solve'
-            ) : (
-              'Find Plans'
-            )}
-          </button>
-          {userTransfers.length > 0 && (
-            <button onClick={handleReset} className="btn-secondary">
-              Reset
-            </button>
-          )}
-        </div>
-
-        {/* Solver Controls */}
-        <div className="space-y-2">
-          <label className="font-display text-xs uppercase tracking-wider text-foreground-muted">
-            Solver Settings
-          </label>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-foreground-muted whitespace-nowrap">FT</span>
-            <input
-              type="range"
-              min="0"
-              max="5"
-              step="0.5"
-              value={ftValue}
-              onChange={(e) => setFtValue(parseFloat(e.target.value))}
-              className="flex-1 accent-fpl-purple"
-            />
-            <span className="font-mono text-xs text-foreground w-7 text-right">
-              {ftValue.toFixed(1)}
+            <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] font-bold">
+              ?
             </span>
+            Help
+          </button>
+        </div>
+
+        {/* Help Modal */}
+        {showHelp && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowHelp(false)}
+          >
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div
+              className="relative bg-surface border border-border rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-fade-in-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-border bg-gradient-to-r from-fpl-purple/10 to-transparent">
+                <h3 className="font-display text-lg font-bold tracking-wider uppercase text-foreground">
+                  How to Use the Planner
+                </h3>
+              </div>
+              <div className="p-5 space-y-5">
+                <div>
+                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                    1. Make Transfers
+                  </h4>
+                  <p className="text-sm text-foreground-muted">
+                    Click any player on the pitch to transfer them out and pick a replacement. Your
+                    transfers appear in the sidebar.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                    2. Find Plans
+                  </h4>
+                  <p className="text-sm text-foreground-muted">
+                    Press "Find Plans" to run the optimizer. It finds multi-gameweek transfer paths
+                    that maximize points, respecting any transfers you've already made.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                    3. Select & Save
+                  </h4>
+                  <p className="text-sm text-foreground-muted">
+                    Select a plan to auto-apply its transfers to your squad. Save plans you like for
+                    later comparison.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                    Solver Controls
+                  </h4>
+                  <p className="text-sm text-foreground-muted">
+                    <span className="text-foreground font-medium">FT Value</span> controls hit
+                    aversion — higher values make the solver prefer rolling transfers.{' '}
+                    <span className="text-foreground font-medium">Depth</span> controls search
+                    thoroughness.
+                  </p>
+                </div>
+              </div>
+              <div className="p-5 border-t border-border">
+                <button onClick={() => setShowHelp(false)} className="btn-primary w-full">
+                  Got It
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-1">
-            {(['quick', 'standard', 'deep'] as const).map((d) => (
-              <button
-                key={d}
-                onClick={() => setSolverDepth(d)}
-                className={`px-2 py-0.5 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
-                  solverDepth === d
-                    ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
-                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
-                }`}
-              >
-                {d}
+        )}
+
+        {/* Controls */}
+        <div className="grid md:grid-cols-2 gap-4 animate-fade-in-up animation-delay-100">
+          <div className="space-y-2">
+            <label className="font-display text-xs uppercase tracking-wider text-foreground-muted">
+              Manager ID
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={managerInput}
+                onChange={(e) => setManagerInput(e.target.value)}
+                placeholder="Enter FPL ID"
+                className="input-broadcast flex-1"
+                onKeyDown={(e) => e.key === 'Enter' && handleLoadManager()}
+              />
+              <button onClick={handleLoadManager} className="btn-primary">
+                Load
               </button>
-            ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="font-display text-xs uppercase tracking-wider text-foreground-muted">
+              Free Transfers
+            </label>
+            <select
+              value={freeTransfers ?? effectiveFt}
+              onChange={(e) => setFreeTransfers(parseInt(e.target.value, 10))}
+              className="input-broadcast"
+            >
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n} FT
+                </option>
+              ))}
+            </select>
           </div>
         </div>
-      </div>
 
-      {squadError && (
-        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
-          {squadError.message || 'Failed to load optimization data'}
-        </div>
-      )}
+        {squadError && (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
+            {squadError.message || 'Failed to load optimization data'}
+          </div>
+        )}
 
-      {isLoadingSquad && managerId && (
-        <div className="space-y-6">
-          <SkeletonStatGrid />
-          <SkeletonCard lines={4} />
-        </div>
-      )}
+        {isLoadingSquad && managerId && (
+          <div className="space-y-6">
+            <SkeletonStatGrid />
+            <SkeletonCard lines={4} />
+          </div>
+        )}
 
-      {optimizeData && (
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Content - Squad & Predictions */}
-          <div className="lg:col-span-2 space-y-6">
+        {optimizeData && (
+          <div className="space-y-6">
             {/* Squad Summary */}
             <StatPanelGrid>
               <StatPanel
@@ -802,22 +807,89 @@ export function Planner() {
               />
             </StatPanelGrid>
 
-            {/* Recommended Plans */}
-            {paths.length > 0 && (
-              <BroadcastCard
-                title="Recommended Plans"
-                accentColor="purple"
-                animationDelay={175}
-                headerAction={
-                  isFetchingSolve && !isSolving ? (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-display uppercase tracking-wider text-fpl-purple">
-                      <span className="w-2 h-2 rounded-full bg-fpl-purple animate-pulse" />
-                      Recalculating
+            {/* Solver & Recommended Plans */}
+            <BroadcastCard title="Recommended Plans" accentColor="purple" animationDelay={175}>
+              {/* Solver controls */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-3 mb-4">
+                <div className="flex items-end gap-2 flex-1 min-w-0">
+                  <button
+                    onClick={handleFindPlans}
+                    disabled={isSolveActive || !managerId}
+                    className={`btn-primary relative ${isStale ? 'ring-2 ring-yellow-400/50' : ''}`}
+                  >
+                    {isSolveActive ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        Solving...
+                      </span>
+                    ) : isStale ? (
+                      'Re-solve'
+                    ) : (
+                      'Find Plans'
+                    )}
+                  </button>
+                  {userTransfers.length > 0 && (
+                    <button onClick={handleReset} className="btn-secondary">
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-foreground-muted whitespace-nowrap">FT</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="5"
+                      step="0.5"
+                      value={ftValue}
+                      onChange={(e) => setFtValue(parseFloat(e.target.value))}
+                      className="w-24 accent-fpl-purple"
+                    />
+                    <span className="font-mono text-xs text-foreground w-7 text-right">
+                      {ftValue.toFixed(1)}
                     </span>
-                  ) : undefined
-                }
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  </div>
+                  <div className="flex gap-1">
+                    {(['quick', 'standard', 'deep'] as const).map((d) => (
+                      <button
+                        key={d}
+                        onClick={() => setSolverDepth(d)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
+                          solverDepth === d
+                            ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
+                            : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Loading skeleton */}
+              {isSolveActive && (
+                <div className="pt-3 border-t border-border/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="p-3 rounded-lg bg-surface-elevated animate-pulse">
+                        <div className="h-3 w-16 bg-foreground/10 rounded mb-3" />
+                        <div className="h-6 w-24 bg-fpl-purple/10 rounded mb-3" />
+                        <div className="space-y-1.5">
+                          <div className="h-2.5 w-full bg-foreground/5 rounded" />
+                          <div className="h-2.5 w-3/4 bg-foreground/5 rounded" />
+                          <div className="h-2.5 w-5/6 bg-foreground/5 rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Plan cards — only after solving completes */}
+              {!isSolveActive && paths.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-border/50">
                   {paths.map((path, idx) => {
                     const isSelected = selectedPathIndex === idx
                     const horizon = optimizeData.planning_horizon
@@ -877,8 +949,8 @@ export function Planner() {
                     )
                   })}
                 </div>
-              </BroadcastCard>
-            )}
+              )}
+            </BroadcastCard>
 
             {/* Gameweek Selector */}
             <BroadcastCard title="Select Gameweek" animationDelay={200}>
@@ -959,133 +1031,76 @@ export function Planner() {
               animationDelay={300}
             >
               <p className="text-xs text-foreground-muted mb-4">
-                Click a player to make a transfer. Press Find Plans to see optimized suggestions.
+                Click a player to adjust minutes or make a transfer.
                 {selectedGameweek !== null && ` Showing squad as of GW${selectedGameweek}.`}
               </p>
               {formationPlayers.length > 0 ? (
                 <FormationPitch
                   players={formationPlayers}
                   teams={teamsRecord}
-                  editable
                   xMinsOverrides={xMinsOverrides}
-                  onXMinsChange={handleXMinsChange}
-                  transferMode
-                  selectedForTransfer={selectedForTransferOut}
+                  perGwXMins={optimizeData?.current_squad?.per_gw_xmins}
+                  selectedGw={selectedGameweek ?? undefined}
+                  selectedPlayer={selectedPlayer}
                   newTransferIds={newTransferIds}
-                  onPlayerClick={handleSelectForTransferOut}
+                  onPlayerClick={handlePlayerSelect}
                 />
               ) : (
                 <div className="text-center text-foreground-muted py-8">Loading squad...</div>
               )}
             </BroadcastCard>
 
-            {/* Captain Decision Panel */}
-            {captainCandidates.length > 1 && (
-              <BroadcastCard title="Captain Decision" accentColor="highlight" animationDelay={350}>
-                <p className="text-xs text-foreground-muted mb-3">
-                  Multiple players within 0.5 pts — consider form, fixtures, and gut feel.
-                </p>
-                <div className="space-y-2">
-                  {captainCandidates.map((c, idx) => {
-                    const player = playersData?.players.find((p) => p.id === c.player_id)
-                    if (!player) return null
-                    return (
-                      <div
-                        key={c.player_id}
-                        className={`flex items-center justify-between p-3 rounded-lg animate-fade-in-up opacity-0 ${
-                          idx === 0
-                            ? 'bg-yellow-400/10 border border-yellow-400/30'
-                            : 'bg-surface-elevated'
-                        }`}
-                        style={{ animationDelay: `${400 + idx * 50}ms` }}
-                      >
-                        <div className="flex items-center gap-3">
-                          {idx === 0 && (
-                            <span className="text-yellow-400 font-display text-xs uppercase tracking-wider">
-                              Top
-                            </span>
-                          )}
-                          <span className="text-foreground font-medium">{player.web_name}</span>
-                          <span className="text-xs text-foreground-dim">
-                            {teamsMap.get(player.team)}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-mono font-bold text-fpl-green">
-                            {c.predicted_points.toFixed(1)}
-                          </span>
-                          {c.margin > 0 && (
-                            <span className="text-xs text-foreground-muted ml-2">
-                              -{c.margin.toFixed(1)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </BroadcastCard>
-            )}
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Your Transfers */}
+            {/* Your Transfers — inline bar */}
             {userTransfers.length > 0 && (
               <BroadcastCard title="Your Transfers" accentColor="green" animationDelay={200}>
-                <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 items-center">
                   {Object.entries(transfersByGw)
                     .sort(([a], [b]) => Number(a) - Number(b))
                     .map(([gwStr, transfers]) => (
-                      <div key={gwStr}>
-                        <div className="font-display text-xs uppercase tracking-wider text-foreground-muted mb-1.5">
-                          GW{gwStr}
-                        </div>
-                        <div className="space-y-1.5">
-                          {transfers.map((ft, idx) => {
-                            const outPlayer = playersData?.players.find((p) => p.id === ft.out)
-                            const inPlayer = playersData?.players.find((p) => p.id === ft.in)
-                            return (
-                              <div
-                                key={idx}
-                                className="p-2 bg-surface-elevated rounded-lg flex items-center justify-between animate-fade-in-up opacity-0"
-                                style={{ animationDelay: `${idx * 50}ms` }}
-                              >
-                                <div className="flex items-center gap-2 text-sm min-w-0">
-                                  <span className="text-destructive truncate">
-                                    {outPlayer?.web_name ?? `#${ft.out}`}
-                                  </span>
-                                  <span className="text-foreground-dim">{'\u2192'}</span>
-                                  <span className="text-fpl-green truncate">
-                                    {inPlayer?.web_name ?? `#${ft.in}`}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    setUserTransfers((prev) =>
-                                      prev.filter(
-                                        (t) =>
-                                          !(
-                                            t.gameweek === ft.gameweek &&
-                                            t.out === ft.out &&
-                                            t.in === ft.in
-                                          )
-                                      )
+                      <div key={gwStr} className="flex items-center gap-2">
+                        <span className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                          GW{gwStr}:
+                        </span>
+                        {transfers.map((ft, idx) => {
+                          const outPlayer = playersData?.players.find((p) => p.id === ft.out)
+                          const inPlayer = playersData?.players.find((p) => p.id === ft.in)
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 px-2 py-1 bg-surface-elevated rounded text-sm"
+                            >
+                              <span className="text-destructive truncate max-w-[80px]">
+                                {outPlayer?.web_name ?? `#${ft.out}`}
+                              </span>
+                              <span className="text-foreground-dim">{'\u2192'}</span>
+                              <span className="text-fpl-green truncate max-w-[80px]">
+                                {inPlayer?.web_name ?? `#${ft.in}`}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  setUserTransfers((prev) =>
+                                    prev.filter(
+                                      (t) =>
+                                        !(
+                                          t.gameweek === ft.gameweek &&
+                                          t.out === ft.out &&
+                                          t.in === ft.in
+                                        )
                                     )
-                                    setSelectedPathIndex(null)
-                                  }}
-                                  className="text-xs text-foreground-muted hover:text-destructive ml-2 shrink-0"
-                                >
-                                  {'\u2715'}
-                                </button>
-                              </div>
-                            )
-                          })}
-                        </div>
+                                  )
+                                  setSelectedPathIndex(null)
+                                }}
+                                className="text-xs text-foreground-muted hover:text-destructive ml-1"
+                              >
+                                {'\u2715'}
+                              </button>
+                            </div>
+                          )
+                        })}
                       </div>
                     ))}
                   {selectedPathIndex !== null && (
-                    <button onClick={handleSavePlan} className="btn-secondary w-full">
+                    <button onClick={handleSavePlan} className="btn-secondary text-xs">
                       Save Plan
                     </button>
                   )}
@@ -1093,168 +1108,140 @@ export function Planner() {
               </BroadcastCard>
             )}
 
-            {/* Replacement Picker */}
-            {selectedOutPlayer && (
-              <BroadcastCard
-                title={`Replace ${selectedOutPlayer.web_name}`}
-                accentColor="green"
-                animationDelay={0}
-              >
-                <div className="space-y-3">
-                  <div className="text-xs text-foreground-muted">
-                    Budget: {'\u00A3'}
-                    {(selectedOutPlayer.now_cost / 10 + effectiveBank).toFixed(1)}m
-                  </div>
-                  <input
-                    type="text"
-                    value={replacementSearch}
-                    onChange={(e) => setReplacementSearch(e.target.value)}
-                    placeholder="Search players..."
-                    className="input-broadcast"
-                    autoFocus
-                  />
-                  <div className="max-h-[400px] overflow-y-auto space-y-1">
-                    {availableReplacements.map((player, idx) => {
-                      const currentPred = playerPredictionsMap.get(selectedOutPlayer.id)
-                      const gain = player.total_predicted - (currentPred?.total_predicted ?? 0)
-
-                      return (
-                        <button
-                          key={player.player_id}
-                          onClick={() => handleSelectReplacement(player)}
-                          className="w-full flex items-center gap-2 p-2 rounded hover:bg-surface-hover text-left transition-colors animate-fade-in-up opacity-0"
-                          style={{ animationDelay: `${idx * 20}ms` }}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="text-foreground font-medium text-sm truncate">
-                              {player.web_name}
-                            </div>
-                            <div className="text-xs text-foreground-dim">
-                              {teamsMap.get(player.team)} · {'\u00A3'}
-                              {(player.now_cost / 10).toFixed(1)}m
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-fpl-green font-mono text-sm font-bold">
-                              {player.total_predicted.toFixed(1)}
-                            </div>
-                            <div
-                              className={`text-xs font-mono ${gain > 0 ? 'text-fpl-green' : gain < 0 ? 'text-destructive' : 'text-foreground-muted'}`}
-                            >
-                              {gain > 0 ? '+' : ''}
-                              {gain.toFixed(1)}
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                    {availableReplacements.length === 0 && (
-                      <div className="text-center text-foreground-muted py-4 text-sm">
-                        No replacements found
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setSelectedForTransferOut(null)}
-                    className="btn-secondary w-full"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </BroadcastCard>
-            )}
-
-            {/* Saved Plans */}
+            {/* Saved Plans — inline */}
             {savedPlans.length > 0 && (
               <BroadcastCard title="Saved Plans" accentColor="purple" animationDelay={250}>
-                <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
                   {savedPlans.map((plan) => (
                     <div
                       key={plan.id}
-                      className="p-3 bg-surface-elevated rounded-lg animate-fade-in-up opacity-0"
+                      className="flex items-center gap-3 px-3 py-2 bg-surface-elevated rounded-lg"
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-display text-xs uppercase tracking-wider text-foreground">
-                          {plan.name}
-                        </span>
-                        <span
-                          className={`font-mono text-sm font-bold ${plan.scoreVsHold > 0 ? 'text-fpl-green' : 'text-foreground'}`}
-                        >
-                          {plan.scoreVsHold > 0 ? '+' : ''}
-                          {plan.scoreVsHold.toFixed(1)}
-                        </span>
-                      </div>
-                      <div className="text-xs text-foreground-muted mb-2">
-                        {plan.transfers.length} transfer{plan.transfers.length !== 1 ? 's' : ''} ·{' '}
-                        {plan.score.toFixed(1)} pts
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleLoadSavedPlan(plan)}
-                          className="text-xs text-fpl-green hover:text-fpl-green/80 transition-colors"
-                        >
-                          Load
-                        </button>
-                        <button
-                          onClick={() => handleDeleteSavedPlan(plan.id)}
-                          className="text-xs text-foreground-muted hover:text-destructive transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <span className="font-display text-xs uppercase tracking-wider text-foreground">
+                        {plan.name}
+                      </span>
+                      <span
+                        className={`font-mono text-sm font-bold ${plan.scoreVsHold > 0 ? 'text-fpl-green' : 'text-foreground'}`}
+                      >
+                        {plan.scoreVsHold > 0 ? '+' : ''}
+                        {plan.scoreVsHold.toFixed(1)}
+                      </span>
+                      <span className="text-xs text-foreground-muted">
+                        {plan.transfers.length} transfer{plan.transfers.length !== 1 ? 's' : ''}
+                      </span>
+                      <button
+                        onClick={() => handleLoadSavedPlan(plan)}
+                        className="text-xs text-fpl-green hover:text-fpl-green/80 transition-colors"
+                      >
+                        Load
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSavedPlan(plan.id)}
+                        className="text-xs text-foreground-muted hover:text-destructive transition-colors"
+                      >
+                        Delete
+                      </button>
                     </div>
                   ))}
                 </div>
               </BroadcastCard>
             )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Player Explorer - collapsible */}
-      {predictionsRange && (
-        <div className="animate-fade-in-up">
-          <button
-            onClick={() => setIsExplorerExpanded((prev) => !prev)}
-            className="w-full flex items-center justify-between p-4 bg-surface-elevated rounded-lg hover:bg-surface-hover transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <h3 className="font-display text-sm font-bold tracking-wider uppercase text-foreground">
-                Player Explorer
-              </h3>
-              <span className="text-xs text-foreground-muted font-mono">
-                {predictionsRange.players.length} players
-              </span>
-            </div>
-            <span
-              className={`text-foreground-muted transition-transform ${isExplorerExpanded ? 'rotate-180' : ''}`}
+        {/* Player Explorer - collapsible */}
+        {predictionsRange && (
+          <div className="animate-fade-in-up">
+            <button
+              onClick={() => setIsExplorerExpanded((prev) => !prev)}
+              className="w-full flex items-center justify-between p-4 bg-surface-elevated rounded-lg hover:bg-surface-hover transition-colors"
             >
-              {'\u25BC'}
-            </span>
-          </button>
-          {isExplorerExpanded && (
-            <div className="mt-2">
-              <PlayerExplorer
-                players={predictionsRange.players}
-                gameweeks={predictionsRange.gameweeks}
-                teamsMap={teamsMap}
-                effectiveOwnership={top10kEO}
+              <div className="flex items-center gap-3">
+                <h3 className="font-display text-sm font-bold tracking-wider uppercase text-foreground">
+                  Player Explorer
+                </h3>
+                <span className="text-xs text-foreground-muted font-mono">
+                  {predictionsRange.players.length} players
+                </span>
+              </div>
+              <span
+                className={`text-foreground-muted transition-transform ${isExplorerExpanded ? 'rotate-180' : ''}`}
+              >
+                {'\u25BC'}
+              </span>
+            </button>
+            {isExplorerExpanded && (
+              <div className="mt-2">
+                <PlayerExplorer
+                  players={predictionsRange.players}
+                  gameweeks={predictionsRange.gameweeks}
+                  teamsMap={teamsMap}
+                  effectiveOwnership={top10kEO}
+                  xMinsOverrides={xMinsOverrides}
+                  perGwXMins={perGwXMins}
+                  onXMinsChange={handleXMinsChange}
+                  onResetXMins={() => setXMinsOverrides({})}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {!managerId && (
+          <EmptyState
+            icon={<ChartIcon size={64} />}
+            title="Enter Your Manager ID"
+            description="Plan transfers and see projected points for your squad."
+          />
+        )}
+      </div>
+
+      {/* Player Detail Drawer — rendered outside space-y-6 to avoid margin artifacts */}
+      {selectedPlayerData && (
+        <div className="fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 animate-fade-in"
+            onClick={() => {
+              setSelectedPlayer(null)
+              setReplacementSearch('')
+            }}
+          />
+
+          {/* Drawer panel */}
+          <div className="absolute top-0 right-0 h-full w-full max-w-sm bg-surface border-l border-fpl-green/20 shadow-2xl shadow-black/50 flex flex-col animate-drawer-slide-in">
+            <div className="flex-1 overflow-y-auto">
+              <PlayerDetailPanel
+                player={selectedPlayerData}
+                teamName={teamsMap.get(selectedPlayerData.team) ?? '???'}
+                activeTab={sidebarTab}
+                onTabChange={setSidebarTab}
+                onClose={() => {
+                  setSelectedPlayer(null)
+                  setReplacementSearch('')
+                }}
+                perGwXMins={optimizeData?.current_squad?.per_gw_xmins?.[selectedPlayerData.id]}
+                gameweeks={predictionsRange?.gameweeks ?? []}
+                selectedGw={selectedGameweek}
                 xMinsOverrides={xMinsOverrides}
                 onXMinsChange={handleXMinsChange}
-                onResetXMins={() => setXMinsOverrides({})}
+                baseExpectedMins={
+                  playerPredictionsMap.get(selectedPlayerData.id)?.expected_mins ?? 90
+                }
+                budget={selectedPlayerData.now_cost / 10 + effectiveBank}
+                replacementSearch={replacementSearch}
+                onReplacementSearchChange={setReplacementSearch}
+                availableReplacements={availableReplacements}
+                currentPlayerPredicted={
+                  playerPredictionsMap.get(selectedPlayerData.id)?.total_predicted ?? 0
+                }
+                teamsMap={teamsMap}
+                onSelectReplacement={handleSelectReplacement}
               />
             </div>
-          )}
+          </div>
         </div>
       )}
-
-      {!managerId && (
-        <EmptyState
-          icon={<ChartIcon size={64} />}
-          title="Enter Your Manager ID"
-          description="Plan transfers and see projected points for your squad."
-        />
-      )}
-    </div>
+    </>
   )
 }

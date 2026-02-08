@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '../../test/utils'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '../../test/utils'
 import { FormationPitch } from './FormationPitch'
 
 const mockTeams = {
@@ -132,6 +132,39 @@ describe('FormationPitch', () => {
     render(<FormationPitch players={players} teams={mockTeams} />)
 
     expect(screen.getByText('P123')).toBeInTheDocument()
+  })
+
+  describe('player selection', () => {
+    it('calls onPlayerClick when player is clicked', () => {
+      const onPlayerClick = vi.fn()
+      const players = [
+        createPlayer({ player_id: 1, web_name: 'Salah', element_type: 3, team: 10, position: 1 }),
+      ]
+
+      render(<FormationPitch players={players} teams={mockTeams} onPlayerClick={onPlayerClick} />)
+
+      // Click the player name — event bubbles up to the clickable shirt container
+      fireEvent.click(screen.getByText('Salah'))
+      // onPlayerClick is bound to the shirt container (parent of name), not the name div itself
+      // The name div is outside the click target, so click directly on the team shirt area
+      // Let's find the cursor-pointer element which is the click target
+      const clickableElements = document.querySelectorAll('.cursor-pointer')
+      expect(clickableElements.length).toBeGreaterThan(0)
+      fireEvent.click(clickableElements[0])
+      expect(onPlayerClick).toHaveBeenCalledWith(1)
+    })
+
+    it('shows selection ring for selected player', () => {
+      const players = [
+        createPlayer({ player_id: 1, web_name: 'Salah', element_type: 3, team: 10, position: 1 }),
+      ]
+
+      const { container } = render(
+        <FormationPitch players={players} teams={mockTeams} selectedPlayer={1} />
+      )
+
+      expect(container.querySelector('.border-fpl-green\\/60')).toBeInTheDocument()
+    })
   })
 
   describe('effective ownership display', () => {

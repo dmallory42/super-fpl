@@ -96,7 +96,7 @@ function App() {
 
         {/* Main Content */}
         <main className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="animate-fade-in-up animation-delay-200">
+          <div>
             {page === 'season-review' && <TeamAnalyzer />}
             {page === 'league-analyzer' && <LeagueAnalyzer />}
             {page === 'live' && <Live />}

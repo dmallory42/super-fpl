@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
-import type { PlayerMultiWeekPrediction } from '../../api/client'
+import type { PlayerMultiWeekPrediction, XMinsOverrides } from '../../api/client'
 import { BroadcastCard } from '../ui/BroadcastCard'
 import { PositionBadge } from '../common/PositionBadge'
 
@@ -8,8 +8,9 @@ interface PlayerExplorerProps {
   gameweeks: number[]
   teamsMap: Map<number, string>
   effectiveOwnership?: Record<string, number>
-  xMinsOverrides?: Record<number, number>
-  onXMinsChange?: (playerId: number, xMins: number) => void
+  xMinsOverrides?: XMinsOverrides
+  perGwXMins?: Record<number, Record<number, number>>
+  onXMinsChange?: (playerId: number, xMins: number, gameweek?: number) => void
   onResetXMins?: () => void
 }
 
@@ -101,6 +102,7 @@ export function PlayerExplorer({
   teamsMap,
   effectiveOwnership,
   xMinsOverrides,
+  perGwXMins,
   onXMinsChange,
   onResetXMins,
 }: PlayerExplorerProps) {
@@ -184,7 +186,7 @@ export function PlayerExplorer({
   const visiblePlayers = filteredAndSorted.slice(0, visibleCount)
 
   return (
-    <BroadcastCard title="Player Explorer" accentColor="purple" animationDelay={500}>
+    <BroadcastCard accentColor="purple" animationDelay={500}>
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <input
@@ -287,9 +289,11 @@ export function PlayerExplorer({
             {visiblePlayers.map((player) => {
               const eo = effectiveOwnership?.[String(player.player_id)]
               const baseXMins = player.expected_mins ?? 90
-              const sessionXMins = xMinsOverrides?.[player.player_id]
+              const rawOverride = xMinsOverrides?.[player.player_id]
+              // Extract uniform value: number => use directly, per-GW object => use first GW or undefined
+              const sessionXMins = typeof rawOverride === 'number' ? rawOverride : undefined
               const scale = sessionXMins != null ? sessionXMins / baseXMins : 1
-              const hasOverride = sessionXMins != null
+              const hasOverride = rawOverride != null
 
               return (
                 <tr
@@ -312,23 +316,44 @@ export function PlayerExplorer({
                     {eo != null ? `${eo.toFixed(0)}%` : '-'}
                   </td>
                   <td className="px-1 py-0.5 text-center">
-                    <XMinsInput
-                      playerId={player.player_id}
-                      baseXMins={baseXMins}
-                      committedValue={sessionXMins}
-                      onChange={onXMinsChange}
-                    />
+                    <div className="flex items-center gap-0.5">
+                      <XMinsInput
+                        playerId={player.player_id}
+                        baseXMins={baseXMins}
+                        committedValue={sessionXMins}
+                        onChange={onXMinsChange}
+                      />
+                      {typeof rawOverride === 'object' && rawOverride !== null && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-fpl-green shrink-0"
+                          title="Has per-GW overrides"
+                        />
+                      )}
+                    </div>
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
                     {player.total_points}
                   </td>
                   {gameweeks.map((gw) => {
                     const basePts = player.predictions[gw] ?? 0
-                    const pts = basePts * scale
+                    // Per-GW scaling: user override > backend per-GW xMins > 1
+                    let gwScale = scale
+                    if (typeof rawOverride === 'object' && rawOverride !== null) {
+                      const gwMins = rawOverride[gw]
+                      gwScale = gwMins != null ? gwMins / baseXMins : 1
+                    } else if (sessionXMins == null && baseXMins > 0) {
+                      // No user override — apply backend per-GW xMins if available
+                      const backendGwMins = perGwXMins?.[player.player_id]?.[gw]
+                      if (backendGwMins !== undefined && backendGwMins !== baseXMins) {
+                        gwScale = backendGwMins / baseXMins
+                      }
+                    }
+                    const pts = basePts * gwScale
+                    const isBackendScaled = !hasOverride && perGwXMins?.[player.player_id] != null
                     return (
                       <td
                         key={gw}
-                        className={`px-2 py-1.5 text-right font-mono text-xs rounded-sm ${getHeatClass(pts)} ${hasOverride ? 'italic' : ''}`}
+                        className={`px-2 py-1.5 text-right font-mono text-xs rounded-sm ${getHeatClass(pts)} ${hasOverride || isBackendScaled ? 'italic' : ''}`}
                       >
                         {pts.toFixed(1)}
                       </td>
@@ -337,7 +362,36 @@ export function PlayerExplorer({
                   <td
                     className={`px-3 py-1.5 text-right font-mono font-bold text-fpl-green ${hasOverride ? 'italic' : ''}`}
                   >
-                    {(player.total_predicted * scale).toFixed(1)}
+                    {(() => {
+                      if (typeof rawOverride === 'object' && rawOverride !== null) {
+                        // Sum per-GW scaled predictions (user per-GW overrides)
+                        let total = 0
+                        for (const gw of gameweeks) {
+                          const basePts = player.predictions[gw] ?? 0
+                          const gwMins = rawOverride[gw]
+                          const gwScale = gwMins != null ? gwMins / baseXMins : 1
+                          total += basePts * gwScale
+                        }
+                        return total.toFixed(1)
+                      }
+                      if (sessionXMins != null) {
+                        return (player.total_predicted * scale).toFixed(1)
+                      }
+                      // No user override — sum with backend per-GW scaling
+                      const backendMins = perGwXMins?.[player.player_id]
+                      if (backendMins && baseXMins > 0) {
+                        let total = 0
+                        for (const gw of gameweeks) {
+                          const basePts = player.predictions[gw] ?? 0
+                          const gwMins = backendMins[gw]
+                          const gwScale =
+                            gwMins !== undefined && gwMins !== baseXMins ? gwMins / baseXMins : 1
+                          total += basePts * gwScale
+                        }
+                        return total.toFixed(1)
+                      }
+                      return player.total_predicted.toFixed(1)
+                    })()}
                   </td>
                 </tr>
               )

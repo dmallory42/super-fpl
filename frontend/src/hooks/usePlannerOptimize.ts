@@ -5,13 +5,14 @@ import {
   type ChipPlan,
   type FixedTransfer,
   type SolverDepth,
+  type XMinsOverrides,
 } from '../api/client'
 
 export function usePlannerOptimize(
   managerId: number | null,
   freeTransfers: number | null = null,
   chipPlan: ChipPlan = {},
-  xMinsOverrides: Record<number, number> = {},
+  xMinsOverrides: XMinsOverrides = {},
   fixedTransfers: FixedTransfer[] = [],
   ftValue: number = 1.5,
   depth: SolverDepth = 'standard',
