@@ -47,10 +47,12 @@ class TransferOptimizerService
         // Get manager's current squad — use current GW picks so squad matches bank
         // (last_deadline_bank reflects post-transfer state for the current GW)
         $managerData = $this->fplClient->entry($managerId)->getRaw();
-        try {
+        $gwStarted = $this->gameweekService->hasGameweekStarted($currentGw);
+        if ($gwStarted) {
+            // GW has started — picks endpoint exists for current GW
             $picks = $this->fplClient->entry($managerId)->picks($currentGw);
-        } catch (\Throwable $e) {
-            // Current GW picks not yet available (e.g. before first deadline)
+        } else {
+            // GW hasn't started — picks only exist for previous GW
             $picks = $this->fplClient->entry($managerId)->picks(max(1, $currentGw - 1));
         }
 
@@ -84,72 +86,23 @@ class TransferOptimizerService
             }
         }
 
-        // Model injury recovery for squad players
-        // Their predictions should ramp up over the planning horizon as they recover
-        foreach ($currentSquad as $playerId) {
-            $player = $playerMap[$playerId] ?? null;
-            if (!$player || !isset($predictions[$playerId])) {
-                continue;
-            }
-
-            $chanceOfPlaying = $player['chance_of_playing'] ?? null;
-            $news = $player['news'] ?? '';
-
-            // Skip if fully fit (null/100)
-            if ($chanceOfPlaying === null || $chanceOfPlaying >= 100) {
-                continue;
-            }
-
-            // Try to parse expected return date from news (e.g., "Expected back 21 Feb")
-            $recoveryWeeks = $this->estimateRecoveryWeeks($chanceOfPlaying, $news);
-
-            // If player has no return date and chance = 0, they might be long-term injured
-            // In this case, keep predictions at 0 for the full horizon
-            if ($recoveryWeeks === null) {
-                continue;
-            }
-
-            // Scale predictions based on expected recovery timeline
-            $gwIndex = 0;
-            foreach ($predictions[$playerId] as $gw => &$points) {
-                if ($gwIndex < $recoveryWeeks) {
-                    // Still injured - scale down heavily
-                    // First week(s): near 0, gradually increasing
-                    $availability = max(0, ($gwIndex / $recoveryWeeks) * 0.5);
-                    $points = round($points * $availability, 2);
-                }
-                // After recovery weeks, use full prediction
-                $gwIndex++;
-            }
-            unset($points);
+        // Fetch team games played for xMins computation
+        $teamGamesRows = $this->db->fetchAll(
+            "SELECT club_id, COUNT(*) as games FROM (
+                SELECT home_club_id as club_id FROM fixtures WHERE finished = 1
+                UNION ALL
+                SELECT away_club_id as club_id FROM fixtures WHERE finished = 1
+            ) GROUP BY club_id"
+        );
+        $teamGames = [];
+        foreach ($teamGamesRows as $row) {
+            $teamGames[(int) $row['club_id']] = (int) $row['games'];
         }
 
-        // Apply xMins overrides to predictions for squad players
-        // If user sets a player to 0 mins (injured), their predictions should be scaled to ~0
-        // User overrides take precedence over automatic injury recovery modeling
-        if (!empty($xMinsOverrides)) {
-            foreach ($xMinsOverrides as $playerId => $xMins) {
-                $playerId = (int) $playerId;
-                if (!isset($predictions[$playerId])) {
-                    continue;
-                }
-
-                // Get player's baseline expected mins (when fit)
-                $player = $playerMap[$playerId] ?? null;
-                $baseXMins = $player ? $this->calculateExpectedMins($player, true) : 80;
-
-                // Scale predictions proportionally
-                // e.g., if base is 80 mins and user sets 0, multiply by 0
-                // if base is 80 mins and user sets 40, multiply by 0.5
-                $scaleFactor = $baseXMins > 0 ? ($xMins / $baseXMins) : 0;
-                $scaleFactor = max(0, min(1.5, $scaleFactor)); // Cap at 1.5x
-
-                foreach ($predictions[$playerId] as $gw => &$points) {
-                    $points = round($points * $scaleFactor, 2);
-                }
-                unset($points);
-            }
-        }
+        // Unified per-GW xMins pipeline: decay + injury modeling + user overrides
+        $perGwXMins = $this->computePerGwXMins($playerMap, $upcomingGws, $teamGames, $xMinsOverrides);
+        $squadXMins = array_intersect_key($perGwXMins, array_flip($currentSquad));
+        $predictions = $this->applyPerGwXMinsToPredictions($predictions, $squadXMins, $playerMap, $teamGames);
 
         // Identify DGW opportunities (teams with 2 fixtures)
         $dgwTeams = [];
@@ -194,7 +147,7 @@ class TransferOptimizerService
         // Build formation data for all gameweeks in planning horizon
         $formations = [];
         foreach ($upcomingGws as $gw) {
-            $formations[$gw] = $this->buildFormationData($currentSquad, $predictions, $gw, $playerMap);
+            $formations[$gw] = $this->buildFormationData($currentSquad, $predictions, $gw, $playerMap, $perGwXMins);
         }
 
         // Run beam search path solver (skip when only squad data is needed)
@@ -223,6 +176,7 @@ class TransferOptimizerService
                 'api_free_transfers' => $apiFreeTransfers,
                 'predicted_points' => $currentSquadPredictions,
                 'formations' => $formations,
+                'per_gw_xmins' => array_intersect_key($perGwXMins, array_flip($currentSquad)),
             ],
             'dgw_teams' => $dgwTeams,
             'recommendations' => $recommendations,
@@ -300,7 +254,8 @@ class TransferOptimizerService
         array $squadIds,
         array $predictions,
         int $gameweek,
-        array $playerMap
+        array $playerMap,
+        array $perGwXMins = []
     ): array {
         // Group players by position with their predictions
         $byPosition = [1 => [], 2 => [], 3 => [], 4 => []];
@@ -364,7 +319,7 @@ class TransferOptimizerService
                         'team' => (int) $player['club_id'],
                         'position' => $positionCounter++,
                         'predicted_points' => round($p['pred'], 1),
-                        'expected_mins' => $this->calculateExpectedMins($player),
+                        'expected_mins' => $perGwXMins[$p['id']][$gameweek] ?? $this->calculateExpectedMins($player),
                         'multiplier' => $p['id'] === $captainId ? 2 : 1,
                         'is_captain' => $p['id'] === $captainId,
                         'is_vice_captain' => $p['id'] === $viceCaptainId,
@@ -408,7 +363,7 @@ class TransferOptimizerService
                 'team' => (int) $player['club_id'],
                 'position' => $positionCounter++,
                 'predicted_points' => round($bp['pred'], 1),
-                'expected_mins' => $this->calculateExpectedMins($player),
+                'expected_mins' => $perGwXMins[$bp['id']][$gameweek] ?? $this->calculateExpectedMins($player),
                 'multiplier' => 0,
                 'is_captain' => false,
                 'is_vice_captain' => false,
@@ -699,9 +654,181 @@ class TransferOptimizerService
     }
 
     /**
-     * Calculate expected minutes for a player based on their stats.
-     * Uses same logic as MinutesProbability for consistency.
+     * Compute per-GW expected minutes for each player.
+     *
+     * Pipeline:
+     * 1. Base fit xMins from calculateExpectedMins($player, whenFit: true)
+     * 2. Decay: base × 0.97^gwOffset
+     * 3. Injury modeling: 0 for GWs before return, base after
+     * 4. User overrides (highest priority)
+     *
+     * @param array $playerMap Player ID => player data
+     * @param array $upcomingGws List of upcoming gameweek numbers
+     * @param array $teamGames Team ID => games played
+     * @param array $userOverrides Player ID => int (uniform) or array (per-GW)
+     * @return array Player ID => [gw => xMins]
      */
+    protected function computePerGwXMins(
+        array $playerMap,
+        array $upcomingGws,
+        array $teamGames,
+        array $userOverrides = []
+    ): array {
+        $result = [];
+        $decayRate = 0.97;
+
+        foreach ($playerMap as $playerId => $player) {
+            $baseFitXMins = $this->calculateExpectedMins($player, true);
+            $chanceOfPlaying = $player['chance_of_playing'] ?? null;
+            $news = $player['news'] ?? '';
+
+            // Determine injury state
+            $isInjured = $chanceOfPlaying !== null && (int) $chanceOfPlaying < 100;
+            $recoveryWeeks = null;
+
+            if ($isInjured) {
+                $recoveryWeeks = $this->estimateRecoveryWeeks(
+                    $chanceOfPlaying !== null ? (int) $chanceOfPlaying : null,
+                    $news
+                );
+            }
+
+            $perGw = [];
+            foreach ($upcomingGws as $idx => $gw) {
+                $decayed = (int) round($baseFitXMins * pow($decayRate, $idx));
+
+                if (!$isInjured) {
+                    // Fully fit
+                    $perGw[$gw] = $decayed;
+                } elseif ($recoveryWeeks === null) {
+                    // Long-term injury (no return date)
+                    $perGw[$gw] = 0;
+                } elseif ((int) $chanceOfPlaying === 0) {
+                    // Confirmed out — 0 until recovery, then base
+                    if ($idx < $recoveryWeeks) {
+                        $perGw[$gw] = 0;
+                    } else {
+                        $perGw[$gw] = $decayed;
+                    }
+                } else {
+                    // Partially available (chance_of_playing 25-75) — linear ramp
+                    if ($idx < $recoveryWeeks) {
+                        $rampFraction = ($idx + 1) / $recoveryWeeks;
+                        $perGw[$gw] = (int) round($baseFitXMins * $rampFraction * pow($decayRate, $idx));
+                    } else {
+                        $perGw[$gw] = $decayed;
+                    }
+                }
+            }
+
+            // Apply user overrides (highest priority)
+            $override = $userOverrides[$playerId] ?? null;
+            if ($override !== null) {
+                if (is_array($override)) {
+                    // Per-GW overrides: only replace specified GWs
+                    foreach ($override as $owGw => $owVal) {
+                        $owGw = (int) $owGw;
+                        if (isset($perGw[$owGw])) {
+                            $perGw[$owGw] = (int) $owVal;
+                        }
+                    }
+                } else {
+                    // Uniform override: all GWs get the same value
+                    foreach ($perGw as $gw => &$val) {
+                        $val = (int) $override;
+                    }
+                    unset($val);
+                }
+            }
+
+            $result[$playerId] = $perGw;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Apply per-GW xMins to cached predictions.
+     *
+     * For non-zero cached predictions: scale by gw_xMins / naturalXMins
+     * For zero cached predictions (injured at prediction time): estimate "fit" prediction
+     * as total_points / max(1, appearances), then scale by gw_xMins / baseFitXMins
+     *
+     * @param array $predictions Player ID => [gw => predicted_points]
+     * @param array $perGwXMins Player ID => [gw => xMins]
+     * @param array $playerMap Player ID => player data
+     * @param array $teamGames Team ID => games played
+     * @return array Adjusted predictions (same structure)
+     */
+    protected function applyPerGwXMinsToPredictions(
+        array $predictions,
+        array $perGwXMins,
+        array $playerMap,
+        array $teamGames
+    ): array {
+        $minutesProb = new \SuperFPL\Api\Prediction\MinutesProbability();
+
+        foreach ($perGwXMins as $playerId => $gwXMins) {
+            if (!isset($predictions[$playerId])) {
+                continue;
+            }
+
+            $player = $playerMap[$playerId] ?? null;
+            if (!$player) {
+                continue;
+            }
+
+            $clubId = (int) ($player['club_id'] ?? 0);
+            $tGames = $teamGames[$clubId] ?? 24;
+
+            // Get natural xMins (what MinutesProbability would compute with current data)
+            $minsResult = $minutesProb->calculate($player, $tGames);
+            $naturalXMins = $minsResult['expected_mins'];
+
+            // Get baseFitXMins for zero-prediction recovery
+            $baseFitXMins = $this->calculateExpectedMins($player, true);
+
+            // Check if all cached predictions are zero (injured at prediction time)
+            $allZero = true;
+            foreach ($predictions[$playerId] as $pts) {
+                if ($pts > 0) {
+                    $allZero = false;
+                    break;
+                }
+            }
+
+            foreach ($predictions[$playerId] as $gw => &$points) {
+                $gwMins = $gwXMins[$gw] ?? 0;
+
+                if ($gwMins <= 0) {
+                    $points = 0.0;
+                    continue;
+                }
+
+                if (!$allZero && $naturalXMins > 0) {
+                    // Non-zero cached: scale proportionally
+                    $scale = $gwMins / $naturalXMins;
+                    $scale = max(0, min(1.5, $scale));
+                    $points = round($points * $scale, 2);
+                } elseif ($allZero) {
+                    // Zero cached (injured at prediction time): use fit estimate
+                    $appearances = max(1, (int) ($player['appearances'] ?? 1));
+                    $totalPoints = (int) ($player['total_points'] ?? 0);
+                    $fitEstimate = $totalPoints / $appearances;
+
+                    if ($baseFitXMins > 0) {
+                        $scale = $gwMins / $baseFitXMins;
+                        $scale = max(0, min(1.5, $scale));
+                        $points = round($fitEstimate * $scale, 2);
+                    }
+                }
+            }
+            unset($points);
+        }
+
+        return $predictions;
+    }
+
     /**
      * Estimate how many gameweeks until a player recovers from injury.
      *
@@ -709,7 +836,7 @@ class TransferOptimizerService
      * @param string $news News/injury description from FPL
      * @return int|null Number of weeks to recovery, or null if unknown/long-term
      */
-    private function estimateRecoveryWeeks(?int $chanceOfPlaying, string $news): ?int
+    protected function estimateRecoveryWeeks(?int $chanceOfPlaying, string $news): ?int
     {
         // Try to parse expected return date from news
         // Common formats: "Expected back 21 Feb", "Expected back early March"
@@ -764,7 +891,7 @@ class TransferOptimizerService
      * @param array $player Player data
      * @param bool $whenFit If true, calculate expected mins when fully fit (ignores current injury)
      */
-    private function calculateExpectedMins(array $player, bool $whenFit = false): int
+    protected function calculateExpectedMins(array $player, bool $whenFit = false): int
     {
         $minutes = (int) ($player['minutes'] ?? 0);
         $appearances = (int) ($player['appearances'] ?? 0);

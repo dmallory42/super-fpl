@@ -1030,12 +1030,20 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
         $chipPlan['triple_captain'] = (int) $_GET['triple_captain_gw'];
     }
 
-    // Parse xMins overrides (JSON-encoded player_id -> expected_mins)
+    // Parse xMins overrides (JSON-encoded player_id -> expected_mins or per-GW map)
     $xMinsOverrides = [];
     if (isset($_GET['xmins'])) {
         $decoded = json_decode($_GET['xmins'], true);
         if (is_array($decoded)) {
-            $xMinsOverrides = array_map('intval', $decoded);
+            foreach ($decoded as $playerId => $value) {
+                if (is_array($value)) {
+                    // Per-GW: {"26": 0, "27": 0, "28": 75}
+                    $xMinsOverrides[(int) $playerId] = array_map('intval', $value);
+                } else {
+                    // Uniform: 75 (backwards compat)
+                    $xMinsOverrides[(int) $playerId] = (int) $value;
+                }
+            }
         }
     }
 
