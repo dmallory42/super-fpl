@@ -15,10 +15,12 @@ namespace SuperFPL\Api\Prediction;
 class AssistProbability
 {
     private ?HistoricalBaselines $baselines;
+    private ?TeamStrength $teamStrength;
 
-    public function __construct(?HistoricalBaselines $baselines = null)
+    public function __construct(?HistoricalBaselines $baselines = null, ?TeamStrength $teamStrength = null)
     {
         $this->baselines = $baselines;
+        $this->teamStrength = $teamStrength;
     }
 
     /**
@@ -64,6 +66,8 @@ class AssistProbability
             // Fixture adjustment using match odds
             if ($fixture !== null && $fixtureOdds !== null) {
                 $xaPer90 = $this->adjustForFixtureFromOdds($xaPer90, $player, $fixture, $fixtureOdds);
+            } elseif ($fixture !== null && $this->teamStrength !== null && $this->teamStrength->isAvailable()) {
+                $xaPer90 = $this->adjustForFixtureFromStrength($xaPer90, $player, $fixture);
             }
 
             return round(min(1.5, $xaPer90), 4);
@@ -107,6 +111,25 @@ class AssistProbability
         }
 
         return $currentRate;
+    }
+
+    /**
+     * Fixture adjustment using team strength (fallback when no odds).
+     */
+    private function adjustForFixtureFromStrength(float $baseXA, array $player, array $fixture): float
+    {
+        $clubId = $player['club_id'] ?? $player['team'] ?? 0;
+        $isHome = ($fixture['home_club_id'] ?? 0) === $clubId;
+        $opponentId = $isHome ? ($fixture['away_club_id'] ?? 0) : ($fixture['home_club_id'] ?? 0);
+
+        $teamXG = $this->teamStrength->getExpectedGoals($clubId, $opponentId, $isHome);
+        $leagueAvg = $this->teamStrength->getLeagueAvgXGF();
+        $rawMultiplier = $teamXG / $leagueAvg;
+
+        // Shrink toward 1.0 — xG-based strength is noisier than odds
+        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.5;
+
+        return min(2.0, $baseXA * $multiplier);
     }
 
     /**

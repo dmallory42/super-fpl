@@ -16,6 +16,13 @@ namespace SuperFPL\Api\Prediction;
  */
 class CleanSheetProbability
 {
+    private ?TeamStrength $teamStrength;
+
+    public function __construct(?TeamStrength $teamStrength = null)
+    {
+        $this->teamStrength = $teamStrength;
+    }
+
     /**
      * Calculate clean sheet probability for a player's team.
      *
@@ -49,6 +56,14 @@ class CleanSheetProbability
             $oppXG = $this->deriveOpponentGoals($fixtureOdds, $isHome);
             $derivedCsProb = exp(-$oppXG);
             return round(min(0.6, max(0.05, $derivedCsProb)), 4);
+        }
+
+        // Method 2b: Team strength fallback (no odds, but fixture known)
+        if ($fixture !== null && $this->teamStrength !== null && $this->teamStrength->isAvailable()) {
+            $opponentId = $isHome ? ($fixture['away_club_id'] ?? 0) : ($fixture['home_club_id'] ?? 0);
+            $oppXG = $this->teamStrength->getExpectedGoalsAgainst($clubId, $opponentId, $isHome);
+            $csProb = exp(-$oppXG);
+            return round(min(0.6, max(0.05, $csProb)), 4);
         }
 
         // Method 3: Historical CS rate from actuals (no home/away boost)

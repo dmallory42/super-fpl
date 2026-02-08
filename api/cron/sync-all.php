@@ -22,7 +22,9 @@ use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
 use SuperFPL\Api\Sync\OddsSync;
+use SuperFPL\Api\Sync\UnderstatSync;
 use SuperFPL\Api\Clients\OddsApiClient;
+use SuperFPL\Api\Clients\UnderstatClient;
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\SampleService;
@@ -110,6 +112,22 @@ $syncOdds = function () use ($db, $config, $cacheDir) {
     }
 };
 
+$syncUnderstat = function () use ($db, $cacheDir) {
+    $understatCacheDir = $cacheDir . '/understat';
+    if (!is_dir($understatCacheDir)) {
+        mkdir($understatCacheDir, 0755, true);
+    }
+    // Current season: year of August start (2025 for 2025-26 season)
+    $season = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
+    $client = new UnderstatClient($understatCacheDir);
+    $sync = new UnderstatSync($db, $client);
+    $result = $sync->sync($season);
+    echo "  Matched: {$result['matched']}/{$result['total']}, Unmatched: {$result['unmatched']}\n";
+    if (!empty($result['unmatched_players'])) {
+        echo "  Unmatched: " . implode(', ', array_slice($result['unmatched_players'], 0, 10)) . "\n";
+    }
+};
+
 $syncManagers = function () use ($db, $fplClient) {
     $sync = new ManagerSync($db, $fplClient);
     $result = $sync->syncAll();
@@ -185,6 +203,7 @@ switch ($phase) {
             'players'     => $syncPlayers,
             'appearances' => $syncAppearances,
             'odds'        => $syncOdds,
+            'understat'   => $syncUnderstat,
             'snapshot'    => $snapshotPrevGw,
             'predictions' => $generatePredictions,
             'managers'    => $syncManagers,
@@ -218,6 +237,7 @@ switch ($phase) {
             'fixtures'       => $syncFixtures,
             'players'        => $syncPlayers,
             'odds'           => $syncOdds,
+            'understat'      => $syncUnderstat,
             'snapshot'       => $snapshotPrevGw,
             'predictions'    => $generatePredictions,
             'managers'       => $syncManagers,

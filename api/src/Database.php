@@ -67,6 +67,8 @@ class Database
             'ALTER TABLE players ADD COLUMN goals_conceded INTEGER DEFAULT 0',
             // players table - xMins override for manual expected minutes
             'ALTER TABLE players ADD COLUMN xmins_override INTEGER DEFAULT NULL',
+            // players table - penalty taker order (user-set)
+            'ALTER TABLE players ADD COLUMN penalty_order INTEGER DEFAULT NULL',
             // player_season_history - new columns
             'ALTER TABLE player_season_history ADD COLUMN expected_goals_conceded REAL',
             'ALTER TABLE player_season_history ADD COLUMN starts INTEGER',

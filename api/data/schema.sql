@@ -46,7 +46,17 @@ CREATE TABLE players (
     penalties_missed INTEGER DEFAULT 0,
     penalties_saved INTEGER DEFAULT 0,
     goals_conceded INTEGER DEFAULT 0,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    -- Understat data (synced separately)
+    understat_id INTEGER,
+    npxg REAL,                         -- Non-penalty expected goals
+    npg INTEGER DEFAULT 0,             -- Non-penalty goals scored
+    understat_shots INTEGER DEFAULT 0,
+    understat_key_passes INTEGER DEFAULT 0,
+    xg_chain REAL,                     -- xG involvement (goals + assists chain)
+    xg_buildup REAL,                   -- xG buildup play contribution
+    -- Penalty taker model (user-set)
+    penalty_order INTEGER DEFAULT NULL -- 1=primary taker, 2=backup, 3=third choice
 );
 
 CREATE TABLE fixtures (

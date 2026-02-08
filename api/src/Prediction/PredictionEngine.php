@@ -29,17 +29,21 @@ class PredictionEngine
     private BonusProbability $bonusProb;
     private DefensiveContributionProbability $dcProb;
     private CardProbability $cardProb;
+    private PenaltyProbability $penaltyProb;
+    private ?TeamStrength $teamStrength;
 
     public function __construct(?Database $db = null)
     {
         $baselines = $db !== null ? new HistoricalBaselines($db) : null;
+        $this->teamStrength = $db !== null ? new TeamStrength($db) : null;
         $this->minutesProb = new MinutesProbability();
-        $this->goalProb = new GoalProbability($baselines);
-        $this->assistProb = new AssistProbability($baselines);
-        $this->csProb = new CleanSheetProbability();
+        $this->goalProb = new GoalProbability($baselines, $this->teamStrength);
+        $this->assistProb = new AssistProbability($baselines, $this->teamStrength);
+        $this->csProb = new CleanSheetProbability($this->teamStrength);
         $this->bonusProb = new BonusProbability();
         $this->dcProb = new DefensiveContributionProbability();
         $this->cardProb = new CardProbability();
+        $this->penaltyProb = new PenaltyProbability();
     }
 
     /**
@@ -111,7 +115,7 @@ class PredictionEngine
         // Save points (GK only)
         $savePoints = 0;
         if ($position === 1) {
-            $savePoints = $this->calculateSavePoints($player, $fixtureOdds, $minutes['prob_60']);
+            $savePoints = $this->calculateSavePoints($player, $fixture, $fixtureOdds, $minutes['prob_60']);
         }
         $breakdown['saves'] = round($savePoints, 2);
 
@@ -131,9 +135,13 @@ class PredictionEngine
         $cardPoints = $cardDeductions * $minutesFraction;
         $breakdown['cards'] = round($cardPoints, 2);
 
+        // Penalty taker points (based on penalty_order, scales with playing time)
+        $penaltyPoints = $this->penaltyProb->calculate($player) * $minutesFraction;
+        $breakdown['penalties'] = round($penaltyPoints, 2);
+
         // Total predicted points
         $total = $appearancePoints + $goalPoints + $assistPoints + $csPoints
-            + $bonusPoints + $gcPenalty + $savePoints + $dcPoints + $cardPoints;
+            + $bonusPoints + $gcPenalty + $savePoints + $dcPoints + $cardPoints + $penaltyPoints;
 
         // Apply calibration adjustment
         $total = $this->calibrate($total);
@@ -176,6 +184,13 @@ class PredictionEngine
             $expectedGA = $isHome
                 ? $totalGoals * (1 - $homeShare)
                 : $totalGoals * $homeShare;
+        } elseif ($fixture !== null && $this->teamStrength !== null && $this->teamStrength->isAvailable()) {
+            $clubId = $player['club_id'] ?? $player['team'] ?? 0;
+            $isHome = $fixture && ($fixture['home_club_id'] ?? 0) === $clubId;
+            $opponentId = $isHome ? ($fixture['away_club_id'] ?? 0) : ($fixture['home_club_id'] ?? 0);
+            $rawGA = $this->teamStrength->getExpectedGoalsAgainst($clubId, $opponentId, $isHome);
+            // Shrink toward league average
+            $expectedGA = $expectedGA + ($rawGA - $expectedGA) * 0.5;
         }
 
         // -1 point per 2 goals conceded
@@ -188,7 +203,7 @@ class PredictionEngine
      * Calculate expected save points for goalkeepers.
      * +1 point per 3 saves
      */
-    private function calculateSavePoints(array $player, ?array $fixtureOdds, float $prob60): float
+    private function calculateSavePoints(array $player, ?array $fixture, ?array $fixtureOdds, float $prob60): float
     {
         $saves = (int) ($player['saves'] ?? 0);
         $minutes = (int) ($player['minutes'] ?? 0);
@@ -204,6 +219,14 @@ class PredictionEngine
             $totalGoals = (float) $fixtureOdds['expected_total_goals'];
             // More expected goals = more shots = more saves
             $goalsMultiplier = $totalGoals / 2.5; // Normalize around league average
+            $savesPer90 *= $goalsMultiplier;
+        } elseif ($fixture !== null && $this->teamStrength !== null && $this->teamStrength->isAvailable()) {
+            $clubId = $player['club_id'] ?? $player['team'] ?? 0;
+            $isHome = $fixture && ($fixture['home_club_id'] ?? 0) === $clubId;
+            $opponentId = $isHome ? ($fixture['away_club_id'] ?? 0) : ($fixture['home_club_id'] ?? 0);
+            $oppXG = $this->teamStrength->getExpectedGoalsAgainst($clubId, $opponentId, $isHome);
+            $rawMultiplier = $oppXG / $this->teamStrength->getLeagueAvgXGF();
+            $goalsMultiplier = 1.0 + ($rawMultiplier - 1.0) * 0.5;
             $savesPer90 *= $goalsMultiplier;
         }
 
@@ -268,6 +291,8 @@ class PredictionEngine
         // Odds data available
         if ($fixtureOdds !== null) {
             $confidence += 0.1;
+        } elseif ($this->teamStrength !== null && $this->teamStrength->isAvailable()) {
+            $confidence += 0.05; // Less than odds since team strength is weaker signal
         }
         if ($goalscorerOdds !== null) {
             $confidence += 0.05;

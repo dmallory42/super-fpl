@@ -15,10 +15,12 @@ namespace SuperFPL\Api\Prediction;
 class GoalProbability
 {
     private ?HistoricalBaselines $baselines;
+    private ?TeamStrength $teamStrength;
 
-    public function __construct(?HistoricalBaselines $baselines = null)
+    public function __construct(?HistoricalBaselines $baselines = null, ?TeamStrength $teamStrength = null)
     {
         $this->baselines = $baselines;
+        $this->teamStrength = $teamStrength;
     }
 
     /**
@@ -41,6 +43,10 @@ class GoalProbability
         $goalsScored = (int) ($player['goals_scored'] ?? 0);
         $playerCode = (int) ($player['code'] ?? 0);
 
+        // Use non-penalty xG from Understat when available
+        $npxg = isset($player['npxg']) ? (float) $player['npxg'] : null;
+        $openPlayXG = ($npxg !== null && $npxg > 0) ? $npxg : $xg;
+
         // Method 1: Use bookmaker odds (most accurate, odds-first)
         if ($goalscorerOdds !== null && isset($goalscorerOdds['anytime_scorer_prob'])) {
             $oddsProb = (float) $goalscorerOdds['anytime_scorer_prob'];
@@ -48,8 +54,8 @@ class GoalProbability
             // Convert P(>=1 goal) back to expected goals: λ = -ln(1 - p)
             $oddsXG = $oddsProb < 0.99 ? -log(1 - $oddsProb) : 2.5;
 
-            // Calculate season xG/90 regressed to career baseline
-            $seasonXgPer90 = $this->getRegressedXgPer90($xg, $minutes, $playerCode);
+            // Calculate season npxG/90 regressed to career baseline
+            $seasonXgPer90 = $this->getRegressedXgPer90($openPlayXG, $minutes, $playerCode);
 
             // Blend: 90% bookmaker-derived, 10% season xG (regressed)
             $expectedGoals = ($oddsXG * 0.9) + ($seasonXgPer90 * 0.1);
@@ -59,13 +65,15 @@ class GoalProbability
             ];
         }
 
-        // Method 2: Use xG per 90, regressed to career baseline, fixture-adjusted
-        if ($minutes > 0 && $xg > 0) {
-            $xgPer90 = $this->getRegressedXgPer90($xg, $minutes, $playerCode);
+        // Method 2: Use npxG per 90, regressed to career baseline, fixture-adjusted
+        if ($minutes > 0 && $openPlayXG > 0) {
+            $xgPer90 = $this->getRegressedXgPer90($openPlayXG, $minutes, $playerCode);
 
             // Fixture adjustment using match odds (no arbitrary multiplier)
             if ($fixture !== null && $fixtureOdds !== null) {
                 $xgPer90 = $this->adjustForFixtureFromOdds($xgPer90, $player, $fixture, $fixtureOdds);
+            } elseif ($fixture !== null && $this->teamStrength !== null && $this->teamStrength->isAvailable()) {
+                $xgPer90 = $this->adjustForFixtureFromStrength($xgPer90, $player, $fixture);
             }
 
             return [
@@ -115,6 +123,25 @@ class GoalProbability
         }
 
         return $currentRate;
+    }
+
+    /**
+     * Fixture adjustment using team strength (fallback when no odds).
+     */
+    private function adjustForFixtureFromStrength(float $baseXG, array $player, array $fixture): float
+    {
+        $clubId = $player['club_id'] ?? $player['team'] ?? 0;
+        $isHome = ($fixture['home_club_id'] ?? 0) === $clubId;
+        $opponentId = $isHome ? ($fixture['away_club_id'] ?? 0) : ($fixture['home_club_id'] ?? 0);
+
+        $teamXG = $this->teamStrength->getExpectedGoals($clubId, $opponentId, $isHome);
+        $leagueAvg = $this->teamStrength->getLeagueAvgXGF();
+        $rawMultiplier = $teamXG / $leagueAvg;
+
+        // Shrink toward 1.0 — xG-based strength is noisier than odds
+        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.5;
+
+        return min(2.0, $baseXG * $multiplier);
     }
 
     /**

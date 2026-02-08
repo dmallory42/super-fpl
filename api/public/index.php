@@ -19,7 +19,9 @@ use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
 use SuperFPL\Api\Sync\OddsSync;
+use SuperFPL\Api\Sync\UnderstatSync;
 use SuperFPL\Api\Clients\OddsApiClient;
+use SuperFPL\Api\Clients\UnderstatClient;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\Cache\FileCache;
 
@@ -74,9 +76,14 @@ try {
         $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
         $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
         $uri === '/sync/odds' => handleSyncOdds($db, $config),
+        $uri === '/sync/understat' => handleSyncUnderstat($db, $config),
         $uri === '/sync/season-history' => handleSyncSeasonHistory($db, $fplClient),
         preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetXMins($db, (int) $m[1]),
         preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'DELETE' => handleClearXMins($db, (int) $m[1]),
+        preg_match('#^/players/(\d+)/penalty-order$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetPenaltyOrder($db, (int) $m[1]),
+        preg_match('#^/players/(\d+)/penalty-order$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'DELETE' => handleClearPenaltyOrder($db, (int) $m[1]),
+        preg_match('#^/teams/(\d+)/penalty-takers$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetTeamPenaltyTakers($db, (int) $m[1]),
+        $uri === '/penalty-takers' && $_SERVER['REQUEST_METHOD'] === 'GET' => handleGetPenaltyTakers($db),
         preg_match('#^/players/(\d+)$#', $uri, $m) === 1 => handlePlayer($db, (int) $m[1]),
         preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, (int) $m[1]),
         preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, (int) $m[1], (int) $m[2]),
@@ -264,6 +271,27 @@ function handleSyncOdds(Database $db, array $config): void
             'players_synced' => $assistResult['players'],
         ],
         'api_quota' => $client->getQuota(),
+    ]);
+}
+
+function handleSyncUnderstat(Database $db, array $config): void
+{
+    $cacheDir = ($config['cache']['path'] ?? '/tmp') . '/understat';
+    if (!is_dir($cacheDir)) {
+        mkdir($cacheDir, 0755, true);
+    }
+    $season = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
+    $client = new UnderstatClient($cacheDir);
+    $sync = new UnderstatSync($db, $client);
+    $result = $sync->sync($season);
+
+    echo json_encode([
+        'success' => true,
+        'season' => $season,
+        'total_players' => $result['total'],
+        'matched' => $result['matched'],
+        'unmatched' => $result['unmatched'],
+        'unmatched_players' => $result['unmatched_players'],
     ]);
 }
 
@@ -984,7 +1012,8 @@ function handleTransferTargets(Database $db, FplClient $fplClient): void
 function handlePlannerOptimize(Database $db, FplClient $fplClient): void
 {
     $managerId = isset($_GET['manager']) ? (int) $_GET['manager'] : null;
-    $freeTransfers = isset($_GET['ft']) ? (int) $_GET['ft'] : 1;
+    // ft=0 means "auto-detect from FPL API"; omitting ft also auto-detects
+    $freeTransfers = isset($_GET['ft']) ? (int) $_GET['ft'] : 0;
 
     // Parse chip plan from query params
     $chipPlan = [];
@@ -1029,6 +1058,9 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
         $depth = 'standard';
     }
 
+    // Parse skip_solve flag (return squad data without running PathSolver)
+    $skipSolve = isset($_GET['skip_solve']) && $_GET['skip_solve'] === '1';
+
     if ($managerId === null) {
         http_response_code(400);
         echo json_encode(['error' => 'Missing manager parameter']);
@@ -1054,6 +1086,7 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
             $fixedTransfers,
             $ftValue,
             $depth,
+            $skipSolve,
         );
         echo json_encode($plan);
     } catch (\Throwable $e) {
@@ -1087,6 +1120,80 @@ function handleClearXMins(Database $db, int $playerId): void
     $db->query('UPDATE players SET xmins_override = NULL WHERE id = ?', [$playerId]);
 
     echo json_encode(['success' => true, 'player_id' => $playerId, 'expected_mins' => 90]);
+}
+
+function handleSetPenaltyOrder(Database $db, int $playerId): void
+{
+    $body = json_decode(file_get_contents('php://input'), true);
+    $order = $body['penalty_order'] ?? null;
+
+    if ($order === null || !is_numeric($order) || (int) $order < 1 || (int) $order > 5) {
+        http_response_code(400);
+        echo json_encode(['error' => 'penalty_order must be 1-5 (1=primary taker, 2=backup, etc)']);
+        return;
+    }
+
+    $order = (int) $order;
+    $db->query('UPDATE players SET penalty_order = ? WHERE id = ?', [$order, $playerId]);
+
+    echo json_encode(['success' => true, 'player_id' => $playerId, 'penalty_order' => $order]);
+}
+
+function handleClearPenaltyOrder(Database $db, int $playerId): void
+{
+    $db->query('UPDATE players SET penalty_order = NULL WHERE id = ?', [$playerId]);
+
+    echo json_encode(['success' => true, 'player_id' => $playerId, 'penalty_order' => null]);
+}
+
+function handleSetTeamPenaltyTakers(Database $db, int $teamId): void
+{
+    $body = json_decode(file_get_contents('php://input'), true);
+    $takers = $body['takers'] ?? [];
+
+    if (!is_array($takers) || empty($takers)) {
+        http_response_code(400);
+        echo json_encode([
+            'error' => 'Body must contain "takers" array of {player_id, order}',
+            'example' => ['takers' => [['player_id' => 123, 'order' => 1], ['player_id' => 456, 'order' => 2]]],
+        ]);
+        return;
+    }
+
+    // Clear existing penalty orders for this team
+    $db->query('UPDATE players SET penalty_order = NULL WHERE club_id = ?', [$teamId]);
+
+    $updated = [];
+    foreach ($takers as $taker) {
+        $playerId = (int) ($taker['player_id'] ?? 0);
+        $order = (int) ($taker['order'] ?? 0);
+
+        if ($playerId <= 0 || $order < 1 || $order > 5) {
+            continue;
+        }
+
+        $db->query(
+            'UPDATE players SET penalty_order = ? WHERE id = ? AND club_id = ?',
+            [$order, $playerId, $teamId]
+        );
+        $updated[] = ['player_id' => $playerId, 'order' => $order];
+    }
+
+    echo json_encode(['success' => true, 'team_id' => $teamId, 'updated' => $updated]);
+}
+
+function handleGetPenaltyTakers(Database $db): void
+{
+    $takers = $db->fetchAll(
+        'SELECT p.id, p.web_name, p.club_id as team, p.position, p.penalty_order,
+                c.name as team_name, c.short_name as team_short
+         FROM players p
+         JOIN clubs c ON p.club_id = c.id
+         WHERE p.penalty_order IS NOT NULL
+         ORDER BY p.club_id, p.penalty_order'
+    );
+
+    echo json_encode(['penalty_takers' => $takers]);
 }
 
 function handleNotFound(): void
