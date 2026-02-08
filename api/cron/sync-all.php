@@ -186,6 +186,19 @@ $syncSeasonHistory = function () use ($db, $fplClient) {
     echo "  Records synced: {$count}\n";
 };
 
+$syncUnderstatHistory = function () use ($db, $cacheDir) {
+    $understatCacheDir = $cacheDir . '/understat';
+    if (!is_dir($understatCacheDir)) {
+        mkdir($understatCacheDir, 0755, true);
+    }
+    $season = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
+    $client = new UnderstatClient($understatCacheDir);
+    $sync = new UnderstatSync($db, $client);
+    $result = $sync->syncHistory($season);
+    echo "  Seasons: " . implode(', ', $result['seasons']) . "\n";
+    echo "  Player records: {$result['player_records']}, Team records: {$result['team_records']}\n";
+};
+
 $syncSamples = function () use ($db, $fplClient, $cacheDir) {
     $gwService = new GameweekService($db);
     $currentGw = $gwService->getCurrentGameweek();
@@ -221,8 +234,9 @@ switch ($phase) {
 
     case 'slow':
         $tasks = [
-            'appearances'    => $syncAppearances,
-            'season-history' => $syncSeasonHistory,
+            'appearances'       => $syncAppearances,
+            'season-history'    => $syncSeasonHistory,
+            'understat-history' => $syncUnderstatHistory,
         ];
         break;
 
@@ -234,16 +248,17 @@ switch ($phase) {
 
     case 'all':
         $tasks = [
-            'fixtures'       => $syncFixtures,
-            'players'        => $syncPlayers,
-            'odds'           => $syncOdds,
-            'understat'      => $syncUnderstat,
-            'snapshot'       => $snapshotPrevGw,
-            'predictions'    => $generatePredictions,
-            'managers'       => $syncManagers,
-            'appearances'    => $syncAppearances,
-            'season-history' => $syncSeasonHistory,
-            'samples'        => $syncSamples,
+            'fixtures'          => $syncFixtures,
+            'players'           => $syncPlayers,
+            'odds'              => $syncOdds,
+            'understat'         => $syncUnderstat,
+            'snapshot'          => $snapshotPrevGw,
+            'predictions'       => $generatePredictions,
+            'managers'          => $syncManagers,
+            'appearances'       => $syncAppearances,
+            'season-history'    => $syncSeasonHistory,
+            'understat-history' => $syncUnderstatHistory,
+            'samples'           => $syncSamples,
         ];
         break;
 }

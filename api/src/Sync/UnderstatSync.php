@@ -281,7 +281,8 @@ class UnderstatSync
                 understat_shots = ?,
                 understat_key_passes = ?,
                 xg_chain = ?,
-                xg_buildup = ?
+                xg_buildup = ?,
+                understat_xa = ?
              WHERE id = ?',
             [
                 (int) $understatData['id'],
@@ -291,8 +292,144 @@ class UnderstatSync
                 (int) ($understatData['key_passes'] ?? 0),
                 round((float) ($understatData['xGChain'] ?? 0), 4),
                 round((float) ($understatData['xGBuildup'] ?? 0), 4),
+                round((float) ($understatData['xA'] ?? 0), 4),
                 $playerId,
             ]
         );
+    }
+
+    /**
+     * Sync historical Understat data for players and teams.
+     *
+     * @return array{player_records: int, team_records: int, seasons: int[]}
+     */
+    public function syncHistory(int $currentSeason, int $seasonsBack = 3): array
+    {
+        $playerRecords = 0;
+        $teamRecords = 0;
+        $seasons = [];
+
+        // Build lookup of known understat_ids
+        $knownIds = [];
+        $rows = $this->db->fetchAll('SELECT understat_id FROM players WHERE understat_id IS NOT NULL');
+        foreach ($rows as $row) {
+            $knownIds[(int) $row['understat_id']] = true;
+        }
+
+        // Build club name map for team matching
+        $clubNames = $this->db->fetchAll('SELECT id, name FROM clubs');
+        $clubNameMap = [];
+        foreach ($clubNames as $c) {
+            $clubNameMap[(int) $c['id']] = $c['name'];
+        }
+
+        for ($i = 1; $i <= $seasonsBack; $i++) {
+            $season = $currentSeason - $i;
+            $seasons[] = $season;
+
+            // --- Player history ---
+            $players = $this->client->getPlayerStats($season);
+            foreach ($players as $up) {
+                $understatId = (int) ($up['id'] ?? 0);
+                if ($understatId <= 0 || !isset($knownIds[$understatId])) {
+                    continue;
+                }
+
+                $minutes = (int) ($up['time'] ?? 0);
+                if ($minutes <= 0) {
+                    continue;
+                }
+
+                $this->db->query(
+                    'INSERT INTO understat_season_history
+                        (understat_id, season, minutes, npxg, xa, goals, assists, shots, key_passes)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(understat_id, season) DO UPDATE SET
+                        minutes = excluded.minutes,
+                        npxg = excluded.npxg,
+                        xa = excluded.xa,
+                        goals = excluded.goals,
+                        assists = excluded.assists,
+                        shots = excluded.shots,
+                        key_passes = excluded.key_passes',
+                    [
+                        $understatId,
+                        $season,
+                        $minutes,
+                        round((float) ($up['npxG'] ?? 0), 4),
+                        round((float) ($up['xA'] ?? 0), 4),
+                        (int) ($up['goals'] ?? 0),
+                        (int) ($up['assists'] ?? 0),
+                        (int) ($up['shots'] ?? 0),
+                        (int) ($up['key_passes'] ?? 0),
+                    ]
+                );
+                $playerRecords++;
+            }
+
+            // --- Team history ---
+            $teamsData = $this->client->getTeamStats($season);
+            foreach ($teamsData as $teamId => $team) {
+                $teamName = $team['title'] ?? '';
+                if (empty($teamName) || empty($team['history'])) {
+                    continue;
+                }
+
+                // Aggregate per-match history into season totals
+                $games = 0;
+                $xgf = 0.0;
+                $xga = 0.0;
+                $npxgf = 0.0;
+                $npxga = 0.0;
+                $scored = 0;
+                $missed = 0;
+
+                foreach ($team['history'] as $match) {
+                    $games++;
+                    $xgf += (float) ($match['xG'] ?? 0);
+                    $xga += (float) ($match['xGA'] ?? 0);
+                    $npxgf += (float) ($match['npxG'] ?? 0);
+                    $npxga += (float) ($match['npxGA'] ?? 0);
+                    $scored += (int) ($match['scored'] ?? 0);
+                    $missed += (int) ($match['missed'] ?? 0);
+                }
+
+                $clubId = $this->resolveClubId($teamName, $clubNameMap);
+
+                $this->db->query(
+                    'INSERT INTO understat_team_season
+                        (team_name, club_id, season, games, xgf, xga, npxgf, npxga, scored, missed)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     ON CONFLICT(team_name, season) DO UPDATE SET
+                        club_id = excluded.club_id,
+                        games = excluded.games,
+                        xgf = excluded.xgf,
+                        xga = excluded.xga,
+                        npxgf = excluded.npxgf,
+                        npxga = excluded.npxga,
+                        scored = excluded.scored,
+                        missed = excluded.missed',
+                    [
+                        $teamName,
+                        $clubId,
+                        $season,
+                        $games,
+                        round($xgf, 4),
+                        round($xga, 4),
+                        round($npxgf, 4),
+                        round($npxga, 4),
+                        $scored,
+                        $missed,
+                    ]
+                );
+                $teamRecords++;
+            }
+        }
+
+        return [
+            'player_records' => $playerRecords,
+            'team_records' => $teamRecords,
+            'seasons' => $seasons,
+        ];
     }
 }

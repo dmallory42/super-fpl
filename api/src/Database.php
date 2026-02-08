@@ -72,6 +72,8 @@ class Database
             // player_season_history - new columns
             'ALTER TABLE player_season_history ADD COLUMN expected_goals_conceded REAL',
             'ALTER TABLE player_season_history ADD COLUMN starts INTEGER',
+            // players table - Understat xA
+            'ALTER TABLE players ADD COLUMN understat_xa REAL',
         ];
 
         foreach ($migrations as $sql) {
@@ -106,6 +108,37 @@ class Database
                 model_version TEXT,
                 snapped_at TIMESTAMP,
                 PRIMARY KEY (player_id, gameweek)
+            )
+        ");
+
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS understat_season_history (
+                understat_id INTEGER,
+                season INTEGER,
+                minutes INTEGER,
+                npxg REAL,
+                xa REAL,
+                goals INTEGER,
+                assists INTEGER,
+                shots INTEGER,
+                key_passes INTEGER,
+                PRIMARY KEY (understat_id, season)
+            )
+        ");
+
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS understat_team_season (
+                team_name TEXT,
+                club_id INTEGER,
+                season INTEGER,
+                games INTEGER,
+                xgf REAL,
+                xga REAL,
+                npxgf REAL,
+                npxga REAL,
+                scored INTEGER,
+                missed INTEGER,
+                PRIMARY KEY (team_name, season)
             )
         ");
     }

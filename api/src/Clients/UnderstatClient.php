@@ -115,4 +115,82 @@ class UnderstatClient
 
         return $players;
     }
+
+    /**
+     * Get team stats for a given EPL season via the league data endpoint.
+     *
+     * Returns teamsData keyed by team ID, each containing:
+     * - title: team name
+     * - history: array of per-match stats (xG, npxG, xGA, npxGA, scored, missed, etc.)
+     *
+     * @param int $season Season start year (e.g. 2025 for 2025-26)
+     * @return array<string, array{title: string, history: array}>
+     */
+    public function getTeamStats(int $season): array
+    {
+        $cacheKey = "understat_teams_epl_{$season}";
+        $cacheFile = $this->cacheDir . "/{$cacheKey}.json";
+
+        // Check cache
+        if (file_exists($cacheFile)) {
+            $cacheAge = time() - filemtime($cacheFile);
+            if ($cacheAge < $this->cacheTtl) {
+                $cached = json_decode(file_get_contents($cacheFile), true);
+                if ($cached !== null) {
+                    error_log("UnderstatClient: Using cached team data ({$cacheAge}s old)");
+                    return $cached;
+                }
+            }
+        }
+
+        $url = self::BASE_URL . "/league/EPL/{$season}";
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => implode("\r\n", [
+                    'X-Requested-With: XMLHttpRequest',
+                    'Accept-Encoding: gzip',
+                ]),
+                'timeout' => 30,
+            ],
+        ]);
+
+        $response = @file_get_contents($url, false, $context);
+
+        if ($response === false) {
+            error_log("UnderstatClient: Failed to fetch team data from API");
+            return [];
+        }
+
+        // Handle gzip encoding
+        if (substr($response, 0, 2) === "\x1f\x8b") {
+            $response = gzdecode($response);
+            if ($response === false) {
+                error_log("UnderstatClient: Failed to decode gzip team response");
+                return [];
+            }
+        }
+
+        // The league page returns HTML with embedded JSON in script tags
+        // Extract teamsData from: var teamsData = JSON.parse('...')
+        if (!preg_match("/var\s+teamsData\s*=\s*JSON\.parse\('(.+?)'\)/", $response, $matches)) {
+            error_log("UnderstatClient: Could not extract teamsData from response");
+            return [];
+        }
+
+        $jsonStr = stripcslashes($matches[1]);
+        $teamsData = json_decode($jsonStr, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("UnderstatClient: Invalid teamsData JSON");
+            return [];
+        }
+
+        // Cache successful response
+        file_put_contents($cacheFile, json_encode($teamsData));
+        error_log("UnderstatClient: Fetched " . count($teamsData) . " teams, cached for {$this->cacheTtl}s");
+
+        return $teamsData;
+    }
 }

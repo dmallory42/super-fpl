@@ -55,6 +55,7 @@ CREATE TABLE players (
     understat_key_passes INTEGER DEFAULT 0,
     xg_chain REAL,                     -- xG involvement (goals + assists chain)
     xg_buildup REAL,                   -- xG buildup play contribution
+    understat_xa REAL,                 -- Expected assists (from Understat)
     -- Penalty taker model (user-set)
     penalty_order INTEGER DEFAULT NULL -- 1=primary taker, 2=backup, 3=third choice
 );
@@ -220,6 +221,34 @@ CREATE TABLE sample_picks (
 );
 
 CREATE INDEX idx_sample_picks_gw_tier ON sample_picks(gameweek, tier);
+
+-- Understat historical data
+CREATE TABLE understat_season_history (
+    understat_id INTEGER,
+    season INTEGER,
+    minutes INTEGER,
+    npxg REAL,
+    xa REAL,
+    goals INTEGER,
+    assists INTEGER,
+    shots INTEGER,
+    key_passes INTEGER,
+    PRIMARY KEY (understat_id, season)
+);
+
+CREATE TABLE understat_team_season (
+    team_name TEXT,
+    club_id INTEGER,
+    season INTEGER,
+    games INTEGER,
+    xgf REAL,
+    xga REAL,
+    npxgf REAL,
+    npxga REAL,
+    scored INTEGER,
+    missed INTEGER,
+    PRIMARY KEY (team_name, season)
+);
 
 -- Indexes for common queries
 CREATE INDEX idx_players_club ON players(club_id);
