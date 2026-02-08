@@ -53,8 +53,11 @@ class PlayerMetricsServiceTest extends TestCase
                 bps INTEGER,
                 bonus INTEGER,
                 starts INTEGER,
+                appearances INTEGER DEFAULT 0,
                 chance_of_playing INTEGER,
-                news TEXT
+                news TEXT,
+                xmins_override INTEGER DEFAULT NULL,
+                penalty_order INTEGER DEFAULT NULL
             )
         ");
     }

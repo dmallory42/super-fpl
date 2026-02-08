@@ -49,6 +49,9 @@ class PredictionService
         $assistOdds = $this->getAssistOdds($gameweek);
         $teamGames = $this->getTeamGames();
 
+        // Pre-compute penalty taker chains for all teams
+        $this->engine->precomputePenaltyTakers($players, $teamGames);
+
         $predictions = [];
 
         foreach ($players as $player) {
@@ -158,6 +161,13 @@ class PredictionService
         $assistOdds = $this->getAssistOdds($gameweek);
         $teamGames = $this->getTeamGames();
         $playerTeamGames = $teamGames[(int) $player['club_id']] ?? 24;
+
+        // Pre-compute penalty takers for the player's team
+        $teamPlayers = $this->db->fetchAll(
+            'SELECT * FROM players WHERE club_id = ? AND penalty_order IS NOT NULL ORDER BY penalty_order',
+            [(int) $player['club_id']]
+        );
+        $this->engine->precomputePenaltyTakers($teamPlayers, $teamGames);
 
         if (empty($playerFixtures)) {
             $prediction = $this->engine->predict($player, null, null, null, null, $playerTeamGames);

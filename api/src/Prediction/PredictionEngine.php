@@ -32,6 +32,9 @@ class PredictionEngine
     private PenaltyProbability $penaltyProb;
     private ?TeamStrength $teamStrength;
 
+    /** @var array<int, array<int, array{player_id: int, expected_mins: float}>> Team ID → ordered takers */
+    private array $teamPenaltyTakers = [];
+
     public function __construct(?Database $db = null)
     {
         $baselines = $db !== null ? new HistoricalBaselines($db) : null;
@@ -44,6 +47,55 @@ class PredictionEngine
         $this->dcProb = new DefensiveContributionProbability();
         $this->cardProb = new CardProbability();
         $this->penaltyProb = new PenaltyProbability();
+    }
+
+    /**
+     * Pre-compute penalty taker chains for all teams.
+     *
+     * Must be called before predict() for penalty points to use the chain model.
+     * Each team's takers are ordered by penalty_order with their expected_mins
+     * pre-computed via MinutesProbability.
+     *
+     * @param array<int, array<string, mixed>> $allPlayers All players from DB
+     * @param array<int, int> $teamGames Club ID → games played
+     */
+    public function precomputePenaltyTakers(array $allPlayers, array $teamGames): void
+    {
+        // Collect players with penalty_order, grouped by team
+        $byTeam = [];
+        foreach ($allPlayers as $player) {
+            $penOrder = $player['penalty_order'] ?? null;
+            if ($penOrder === null || (int) $penOrder <= 0) {
+                continue;
+            }
+
+            $clubId = (int) ($player['club_id'] ?? $player['team'] ?? 0);
+            $playerId = (int) $player['id'];
+
+            // Calculate expected minutes for this taker
+            $tg = $teamGames[$clubId] ?? 24;
+            $minutes = $this->minutesProb->calculate($player, $tg);
+            $expectedMins = $minutes['expected_mins'];
+
+            // Apply xmins_override if set
+            if (isset($player['xmins_override']) && $player['xmins_override'] !== null) {
+                $expectedMins = (float) $player['xmins_override'];
+            }
+
+            $byTeam[$clubId][] = [
+                'player_id' => $playerId,
+                'expected_mins' => $expectedMins,
+                'penalty_order' => (int) $penOrder,
+            ];
+        }
+
+        // Sort each team's takers by penalty_order
+        foreach ($byTeam as $clubId => &$takers) {
+            usort($takers, fn($a, $b) => $a['penalty_order'] <=> $b['penalty_order']);
+        }
+        unset($takers);
+
+        $this->teamPenaltyTakers = $byTeam;
     }
 
     /**
@@ -135,8 +187,12 @@ class PredictionEngine
         $cardPoints = $cardDeductions * $minutesFraction;
         $breakdown['cards'] = round($cardPoints, 2);
 
-        // Penalty taker points (based on penalty_order, scales with playing time)
-        $penaltyPoints = $this->penaltyProb->calculate($player) * $minutesFraction;
+        // Penalty taker points (chain model: depends on takers above being off pitch)
+        $clubId = (int) ($player['club_id'] ?? $player['team'] ?? 0);
+        $teamTakers = $this->teamPenaltyTakers[$clubId] ?? [];
+        $penaltyPoints = $this->penaltyProb->calculate($player, $teamTakers);
+        // penaltyPoints already accounts for on-pitch probability via the chain model,
+        // so we don't multiply by minutesFraction again
         $breakdown['penalties'] = round($penaltyPoints, 2);
 
         // Total predicted points
