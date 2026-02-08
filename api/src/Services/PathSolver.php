@@ -58,10 +58,35 @@ class PathSolver
             $fixedByGw[$ft['gameweek']][] = $ft;
         }
 
-        // Calculate hold score (no transfers at all) for score_vs_hold
+        // Calculate hold score — apply only fixed transfers (mandatory constraints),
+        // no additional solver moves. This makes score_vs_hold show marginal value only.
         $holdScore = 0.0;
+        $holdSquad = $squadIds;
+        $holdFt = $freeTransfers;
         foreach ($gameweeks as $gw) {
-            $holdScore += $this->evaluateSquad($squadIds, $predictions, $gw, $playerMap);
+            $fixed = $fixedByGw[$gw] ?? [];
+
+            foreach ($fixed as $ft) {
+                $outId = $ft['out'];
+                $inId = $ft['in'];
+                if (in_array($outId, $holdSquad)) {
+                    $holdSquad = array_values(array_diff($holdSquad, [$outId]));
+                    $holdSquad[] = $inId;
+                }
+            }
+
+            $numFixed = count($fixed);
+            $hitCost = max(0, $numFixed - $holdFt) * self::HIT_COST;
+            $holdScore += $this->evaluateSquad($holdSquad, $predictions, $gw, $playerMap) - $hitCost;
+
+            // Update FT for next GW
+            if ($numFixed === 0) {
+                $holdFt = min(self::MAX_FT, $holdFt + 1);
+            } elseif ($numFixed <= $holdFt) {
+                $holdFt = min(self::MAX_FT, $holdFt - $numFixed + 1);
+            } else {
+                $holdFt = 1;
+            }
         }
 
         // Initialize beam with starting state
@@ -194,6 +219,7 @@ class PathSolver
             'hit_cost' => 0,
             'gw_score' => round($gwScore, 1),
             'squad_ids' => $state['squad_ids'],
+            'bank' => $state['bank'],
         ];
 
         return $newState;
@@ -273,29 +299,62 @@ class PathSolver
                 $newState = $state;
                 $newState['squad_ids'] = $newSquad;
                 $newState['bank'] = round($newBank, 1);
-                $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost - $hitAversion;
-                $newState['display_score'] += $gwScore - $hitCost;
                 $newState['ft'] = $newFt;
-                $newState['total_hits'] += $hitCost > 0 ? (int)($hitCost / self::HIT_COST) : 0;
+
+                $newMove = [
+                    'out_id' => $outId,
+                    'out_name' => $outPlayer['web_name'],
+                    'out_team' => (int)$outPlayer['club_id'],
+                    'out_price' => round($outPrice, 1),
+                    'in_id' => $inId,
+                    'in_name' => $playerMap[$inId]['web_name'] ?? '',
+                    'in_team' => (int)($playerMap[$inId]['club_id'] ?? 0),
+                    'in_price' => round($inPrice, 1),
+                    'gain' => round(($predictions[$inId][$gw] ?? 0) - ($predictions[$outId][$gw] ?? 0), 1),
+                    'is_free' => $hitCost === 0,
+                ];
+
+                if ($isAdditional) {
+                    // The state already has this GW scored from applyFixedTransfers.
+                    // Replace the GW contribution instead of adding to avoid double-counting.
+                    $prevGwData = $state['transfers_by_gw'][$gw] ?? [];
+                    $prevGwScore = $prevGwData['gw_score'] ?? 0;
+                    $prevHitCost = $prevGwData['hit_cost'] ?? 0;
+                    $prevRawScore = $prevGwScore + $prevHitCost;
+                    $prevNumMoves = count($prevGwData['moves'] ?? []);
+                    $prevFtAvail = $prevGwData['ft_available'] ?? $ft;
+                    $prevFtOpp = min($prevNumMoves, $prevFtAvail) * $this->ftValue;
+                    $prevHitAversion = $prevHitCost > 0 ? $this->ftValue * ($prevHitCost / self::HIT_COST) : 0;
+
+                    $prevInternalContrib = $prevRawScore - $prevHitCost - $prevFtOpp - $prevHitAversion;
+                    $newInternalContrib = $gwScore - $hitCost - $ftOpportunityCost - $hitAversion;
+
+                    $newState['score'] += $newInternalContrib - $prevInternalContrib;
+                    $newState['display_score'] += ($gwScore - $hitCost) - $prevGwScore;
+
+                    $prevHits = $prevHitCost > 0 ? (int)($prevHitCost / self::HIT_COST) : 0;
+                    $newHits = $hitCost > 0 ? (int)($hitCost / self::HIT_COST) : 0;
+                    $newState['total_hits'] += $newHits - $prevHits;
+
+                    // Merge fixed moves with the additional move
+                    $allMoves = $prevGwData['moves'] ?? [];
+                    $allMoves[] = $newMove;
+                } else {
+                    $newState['score'] += $gwScore - $hitCost - $ftOpportunityCost - $hitAversion;
+                    $newState['display_score'] += $gwScore - $hitCost;
+                    $newState['total_hits'] += $hitCost > 0 ? (int)($hitCost / self::HIT_COST) : 0;
+                    $allMoves = [$newMove];
+                }
+
                 $newState['transfers_by_gw'][$gw] = [
                     'action' => 'transfer',
-                    'ft_available' => $ft,
+                    'ft_available' => $isAdditional ? ($state['transfers_by_gw'][$gw]['ft_available'] ?? $ft) : $ft,
                     'ft_after' => $newFt,
-                    'moves' => [[
-                        'out_id' => $outId,
-                        'out_name' => $outPlayer['web_name'],
-                        'out_team' => (int)$outPlayer['club_id'],
-                        'out_price' => round($outPrice, 1),
-                        'in_id' => $inId,
-                        'in_name' => $playerMap[$inId]['web_name'] ?? '',
-                        'in_team' => (int)($playerMap[$inId]['club_id'] ?? 0),
-                        'in_price' => round($inPrice, 1),
-                        'gain' => round(($predictions[$inId][$gw] ?? 0) - ($predictions[$outId][$gw] ?? 0), 1),
-                        'is_free' => $hitCost === 0,
-                    ]],
+                    'moves' => $allMoves,
                     'hit_cost' => $hitCost,
                     'gw_score' => round($gwScore - $hitCost, 1),
                     'squad_ids' => $newSquad,
+                    'bank' => round($newBank, 1),
                 ];
 
                 $children[] = $newState;
@@ -424,6 +483,7 @@ class PathSolver
                             'hit_cost' => $hitCost,
                             'gw_score' => round($gwScore - $hitCost, 1),
                             'squad_ids' => $newSquad,
+                            'bank' => round($newBank, 1),
                         ];
 
                         $children[] = $newState;
@@ -524,6 +584,7 @@ class PathSolver
             'hit_cost' => $hitCost,
             'gw_score' => round($gwScore - $hitCost, 1),
             'squad_ids' => $squad,
+            'bank' => round($bank, 1),
         ];
 
         return $newState;

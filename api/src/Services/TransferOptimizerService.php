@@ -37,6 +37,7 @@ class TransferOptimizerService
         array $fixedTransfers = [],
         float $ftValue = 1.5,
         string $depth = 'standard',
+        bool $skipSolve = false,
     ): array {
         $currentGw = $this->gameweekService->getCurrentGameweek();
         $planFromGw = $this->gameweekService->getNextActionableGameweek();
@@ -56,6 +57,12 @@ class TransferOptimizerService
         $currentSquad = array_column($picks['picks'] ?? [], 'element');
         $bank = ($managerData['last_deadline_bank'] ?? 0) / 10;
         $squadValue = ($managerData['last_deadline_value'] ?? 1000) / 10;
+
+        // Derive FT count from manager history if caller didn't specify
+        $apiFreeTransfers = $this->calculateFreeTransfers($managerId, $currentGw);
+        if ($freeTransfers <= 0) {
+            $freeTransfers = $apiFreeTransfers;
+        }
 
         // Get player data with predictions for all upcoming GWs
         $players = $this->db->fetchAll("SELECT * FROM players");
@@ -190,17 +197,20 @@ class TransferOptimizerService
             $formations[$gw] = $this->buildFormationData($currentSquad, $predictions, $gw, $playerMap);
         }
 
-        // Run beam search path solver
-        $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
-        $paths = $pathSolver->solve(
-            $currentSquad,
-            $predictions,
-            $upcomingGws,
-            $playerMap,
-            $bank,
-            $freeTransfers,
-            $fixedTransfers,
-        );
+        // Run beam search path solver (skip when only squad data is needed)
+        $paths = [];
+        if (!$skipSolve) {
+            $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
+            $paths = $pathSolver->solve(
+                $currentSquad,
+                $predictions,
+                $upcomingGws,
+                $playerMap,
+                $bank,
+                $freeTransfers,
+                $fixedTransfers,
+            );
+        }
 
         return [
             'current_gameweek' => $planFromGw,
@@ -210,6 +220,7 @@ class TransferOptimizerService
                 'bank' => $bank,
                 'squad_value' => $squadValue,
                 'free_transfers' => $freeTransfers,
+                'api_free_transfers' => $apiFreeTransfers,
                 'predicted_points' => $currentSquadPredictions,
                 'formations' => $formations,
             ],
@@ -784,5 +795,74 @@ class TransferOptimizerService
         $expectedMins = $appearanceRate * $minsPerAppearance;
 
         return (int) round(min(95, $expectedMins));
+    }
+
+    /**
+     * Calculate free transfers available for the next actionable gameweek
+     * by replaying the manager's transfer history.
+     *
+     * Rules:
+     * - GW1 has unlimited transfers (initial squad selection); FT tracking starts at GW2 with 1 FT
+     * - Each GW: if 0 transfers made, bank +1 FT (max 5)
+     * - If transfers made: consume FTs, then reset to 1 for next GW
+     * - If hit taken (event_transfers_cost > 0): used more than available, reset to 1
+     * - Wildcard/Free Hit: unlimited transfers that GW, FT does NOT bank — stays same as before chip
+     * - GW16 (2024-25 season): all managers received a boost to 5 FTs
+     */
+    private function calculateFreeTransfers(int $managerId, int $currentGw): int
+    {
+        try {
+            $history = $this->fplClient->entry($managerId)->history();
+        } catch (\Throwable $e) {
+            return 1; // Safe default
+        }
+
+        $gwHistory = $history['current'] ?? [];
+        $chips = $history['chips'] ?? [];
+
+        // Index chips by gameweek
+        $chipsByGw = [];
+        foreach ($chips as $chip) {
+            $chipsByGw[(int) $chip['event']] = $chip['name'];
+        }
+
+        $ft = 1; // Start with 1 FT at GW2
+
+        foreach ($gwHistory as $gw) {
+            $event = (int) $gw['event'];
+
+            // Skip GW1 — unlimited transfers for initial squad
+            if ($event <= 1) {
+                continue;
+            }
+
+            // GW16 boost: all managers set to 5 FTs
+            if ($event === 16) {
+                $ft = 5;
+            }
+
+            $chip = $chipsByGw[$event] ?? null;
+            $transfers = (int) $gw['event_transfers'];
+            $hitCost = (int) $gw['event_transfers_cost'];
+
+            // Wildcard or Free Hit: unlimited transfers, FT stays unchanged for next GW
+            if ($chip === 'wildcard' || $chip === 'freehit') {
+                // FT carries over unchanged — no banking, no consuming
+                continue;
+            }
+
+            if ($transfers === 0) {
+                // No transfers: bank +1 FT (max 5)
+                $ft = min(5, $ft + 1);
+            } elseif ($hitCost > 0) {
+                // Took a hit: used more FTs than available, reset to 1
+                $ft = 1;
+            } else {
+                // Used some/all free transfers without a hit
+                $ft = max(1, $ft - $transfers + 1);
+            }
+        }
+
+        return max(1, min(5, $ft));
     }
 }

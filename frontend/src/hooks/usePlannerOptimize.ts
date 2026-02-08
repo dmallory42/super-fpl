@@ -9,12 +9,13 @@ import {
 
 export function usePlannerOptimize(
   managerId: number | null,
-  freeTransfers: number = 1,
+  freeTransfers: number | null = null,
   chipPlan: ChipPlan = {},
   xMinsOverrides: Record<number, number> = {},
   fixedTransfers: FixedTransfer[] = [],
   ftValue: number = 1.5,
-  depth: SolverDepth = 'standard'
+  depth: SolverDepth = 'standard',
+  skipSolve: boolean = false
 ) {
   return useQuery<PlannerOptimizeResponse>({
     queryKey: [
@@ -26,6 +27,7 @@ export function usePlannerOptimize(
       JSON.stringify(fixedTransfers),
       ftValue,
       depth,
+      skipSolve,
     ],
     queryFn: () =>
       fetchPlannerOptimize(
@@ -35,7 +37,8 @@ export function usePlannerOptimize(
         xMinsOverrides,
         fixedTransfers,
         ftValue,
-        depth
+        depth,
+        skipSolve
       ),
     enabled: managerId !== null && managerId > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes
