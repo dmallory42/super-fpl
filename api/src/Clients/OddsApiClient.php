@@ -304,7 +304,7 @@ class OddsApiClient
 
             if (!empty($h2hOdds)) {
                 $avgOdds = $this->averageOdds($h2hOdds);
-                $probs = $this->oddsToProb($avgOdds);
+                $probs = $this->oddsToProb($avgOdds, $event['home_team'] ?? '', $event['away_team'] ?? '');
 
                 $fixture['home_win_prob'] = $probs['home'] ?? 0;
                 $fixture['draw_prob'] = $probs['draw'] ?? 0;
@@ -401,10 +401,15 @@ class OddsApiClient
     /**
      * Convert decimal odds to probabilities (with overround removal).
      *
-     * @param array<string, float> $odds ['Home Team' => 2.1, 'Draw' => 3.5, 'Away Team' => 3.8]
+     * Outcomes from the API are keyed by team name (e.g. "Liverpool", "Draw", "Sunderland").
+     * We match them against the event's home/away team names to assign correctly.
+     *
+     * @param array<string, float> $odds ['Liverpool' => 1.6, 'Draw' => 3.5, 'Sunderland' => 5.5]
+     * @param string $homeTeam The home team name from the API event
+     * @param string $awayTeam The away team name from the API event
      * @return array<string, float> ['home' => 0.45, 'draw' => 0.28, 'away' => 0.27]
      */
-    private function oddsToProb(array $odds): array
+    private function oddsToProb(array $odds, string $homeTeam, string $awayTeam): array
     {
         if (count($odds) < 3) {
             return [];
@@ -425,16 +430,35 @@ class OddsApiClient
             $normalized[$outcome] = $prob / $overround;
         }
 
-        // Map to standard keys
+        // Match outcome names to home/away using team names from the event.
+        // The API returns outcome names that exactly match event home_team/away_team.
+        $homeTeamLower = strtolower($homeTeam);
+        $awayTeamLower = strtolower($awayTeam);
+
         $result = [];
         foreach ($normalized as $outcome => $prob) {
             $lower = strtolower($outcome);
             if (str_contains($lower, 'draw')) {
                 $result['draw'] = round($prob, 4);
-            } elseif (isset($result['home'])) {
-                $result['away'] = round($prob, 4);
-            } else {
+            } elseif ($lower === $homeTeamLower) {
                 $result['home'] = round($prob, 4);
+            } elseif ($lower === $awayTeamLower) {
+                $result['away'] = round($prob, 4);
+            }
+        }
+
+        // Fallback: if name matching failed (shouldn't happen), use iteration order
+        if (!isset($result['home']) || !isset($result['away'])) {
+            $result = [];
+            foreach ($normalized as $outcome => $prob) {
+                $lower = strtolower($outcome);
+                if (str_contains($lower, 'draw')) {
+                    $result['draw'] = round($prob, 4);
+                } elseif (!isset($result['home'])) {
+                    $result['home'] = round($prob, 4);
+                } else {
+                    $result['away'] = round($prob, 4);
+                }
             }
         }
 
