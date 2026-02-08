@@ -199,17 +199,8 @@ class PredictionEngine
         $total = $appearancePoints + $goalPoints + $assistPoints + $csPoints
             + $bonusPoints + $gcPenalty + $savePoints + $dcPoints + $cardPoints + $penaltyPoints;
 
-        // Apply calibration adjustment based on "if playing" score.
-        // This prevents doubtful players (low prob_any) from getting artificial bumps —
-        // the calibration targets structural underprediction, not low playing probability.
-        $probAny = $minutes['prob_any'];
-        if ($probAny > 0.1) {
-            $ifPlayingScore = $total / $probAny;
-            $calibratedIfPlaying = $this->calibrate($ifPlayingScore);
-            $total = $calibratedIfPlaying * $probAny;
-        } else {
-            $total = $this->calibrate($total);
-        }
+        // No post-hoc calibration — collect snapshots vs actuals to identify
+        // systematic bias empirically before adding any correction.
 
         // Calculate confidence based on data quality
         $confidence = $this->calculateConfidence($player, $fixtureOdds, $goalscorerOdds, $assistOdds);
@@ -297,36 +288,6 @@ class PredictionEngine
 
         // +1 point per 3 saves, conditional on playing
         return ($savesPer90 / 3) * $prob60;
-    }
-
-    /**
-     * Apply piecewise linear calibration adjustment.
-     *
-     * Conservative initial curve:
-     * - < 1.0: no change (includes 0.0 unavailable)
-     * - >= 5.0: no change (already well-calibrated)
-     * - 1.0-5.0: smooth upward bump centered at ~3.0, peak +0.8
-     *
-     * This accounts for appearance floor being deflated by conservative prob_any estimates.
-     */
-    private function calibrate(float $rawPoints): float
-    {
-        if ($rawPoints < 1.0 || $rawPoints >= 5.0) {
-            return $rawPoints;
-        }
-
-        // Smooth bump using a triangular function centered at 3.0
-        // Ramps up from 0 at 1.0 to 0.8 at 3.0, then back down to 0 at 5.0
-        $center = 3.0;
-        $peak = 0.8;
-
-        if ($rawPoints <= $center) {
-            $bump = $peak * ($rawPoints - 1.0) / ($center - 1.0);
-        } else {
-            $bump = $peak * (5.0 - $rawPoints) / (5.0 - $center);
-        }
-
-        return $rawPoints + $bump;
     }
 
     /**
