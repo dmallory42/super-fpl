@@ -490,29 +490,20 @@ export function Planner() {
     })
   }
 
-  // Scale predictions using the unified if-fit formula.
-  // effectiveMins priority: user override > backend per-GW xMins > player expected_mins
-  const perGwXMins = optimizeData?.current_squad?.per_gw_xmins
-
-  const scaleByGwXMins = (playerId: number, gw: number): number => {
+  // Get effective points: raw predictions by default, scaled only with user xMins override
+  const getEffectivePoints = (playerId: number, gw: number): number => {
     const pred = playerPredictionsMap.get(playerId)
     // No fixture in this GW = blank gameweek, no points
     if (pred && !predictionsRange?.fixtures?.[pred.team]?.[gw]?.length) return 0
-    const ifFitPts = pred?.if_fit_predictions?.[gw] ?? pred?.predictions[gw] ?? 0
-    const ifFitMins = pred?.expected_mins_if_fit ?? pred?.expected_mins ?? 90
 
-    // User override takes priority (always per-GW object now)
     const override = debouncedXMins[playerId]
     if (typeof override === 'object' && override !== null && override[gw] != null) {
+      const ifFitPts = pred?.if_fit_predictions?.[gw] ?? pred?.predictions[gw] ?? 0
+      const ifFitMins = pred?.expected_mins_if_fit ?? pred?.expected_mins ?? 90
       return scalePoints(ifFitPts, ifFitMins, override[gw])
     }
-    // Backend per-GW xMins fallback
-    const backendGwMins = perGwXMins?.[playerId]?.[gw]
-    if (backendGwMins !== undefined) {
-      return scalePoints(ifFitPts, ifFitMins, backendGwMins)
-    }
-    // Default: use player's actual expected_mins
-    return scalePoints(ifFitPts, ifFitMins, pred?.expected_mins ?? 0)
+
+    return pred?.predictions[gw] ?? 0
   }
 
   // Build formation players for the selected gameweek
@@ -534,7 +525,7 @@ export function Planner() {
           web_name: player.web_name,
           element_type: player.element_type,
           team: player.team,
-          predicted_points: scaleByGwXMins(playerId, selectedGameweek),
+          predicted_points: getEffectivePoints(playerId, selectedGameweek),
           fixture,
         }
       })
@@ -546,7 +537,6 @@ export function Planner() {
     playersData?.players,
     playerPredictionsMap,
     selectedGameweek,
-    perGwXMins,
     debouncedXMins,
     predictionsRange?.fixtures,
   ])
@@ -575,7 +565,7 @@ export function Planner() {
         .map((playerId) => {
           const player = playersData.players.find((p) => p.id === playerId)
           if (!player) return null
-          const pts = scaleByGwXMins(playerId, gw)
+          const pts = getEffectivePoints(playerId, gw)
 
           return {
             player_id: playerId,
@@ -613,7 +603,6 @@ export function Planner() {
     playersData?.players,
     hitsCost,
     debouncedXMins,
-    perGwXMins,
   ])
 
   // IDs of new transfers visible in the current GW (for highlighting on pitch)
@@ -1190,7 +1179,6 @@ export function Planner() {
                   teamsMap={teamsMap}
                   effectiveOwnership={top10kEO}
                   xMinsOverrides={xMinsOverrides}
-                  perGwXMins={perGwXMins}
                   fixtures={predictionsRange.fixtures}
                   onXMinsChange={handleXMinsChange}
                   onResetXMins={() => setXMinsOverrides({})}
@@ -1235,7 +1223,6 @@ export function Planner() {
                   setReplacementSearch('')
                 }}
                 playerPrediction={playerPredictionsMap.get(selectedPlayerData.id)}
-                perGwXMins={optimizeData?.current_squad?.per_gw_xmins?.[selectedPlayerData.id]}
                 gameweeks={predictionsRange?.gameweeks ?? []}
                 selectedGw={selectedGameweek}
                 xMinsOverrides={xMinsOverrides}

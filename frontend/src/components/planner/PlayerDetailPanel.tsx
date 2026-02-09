@@ -32,7 +32,6 @@ interface PlayerDetailPanelProps {
   onClose: () => void
   // Projections tab
   playerPrediction?: PlayerMultiWeekPrediction
-  perGwXMins?: Record<number, number>
   gameweeks: number[]
   selectedGw: number | null
   xMinsOverrides: XMinsOverrides
@@ -118,7 +117,6 @@ export function PlayerDetailPanel({
   onTabChange,
   onClose,
   playerPrediction,
-  perGwXMins,
   gameweeks,
   selectedGw,
   xMinsOverrides,
@@ -154,23 +152,25 @@ export function PlayerDetailPanel({
   const isGkp = player.element_type === 1
   const isDef = player.element_type === 2
 
-  // Compute scaled xPts per-GW using unified if-fit formula
+  // Compute xPts per-GW: raw predictions by default, scaled only with user override
   const scaledXPts = (gw: number): number | null => {
-    // No fixture in this GW = blank gameweek, no points
     if (!fixtures?.[gw]?.length) return 0
-    const ifFitPts = playerPrediction?.if_fit_predictions?.[gw] ?? playerPrediction?.predictions[gw]
-    if (ifFitPts == null) return null
-    const ifFitMins = playerPrediction?.expected_mins_if_fit ?? baseExpectedMins
     const override = getGwOverride(gw)
-    const effectiveMins = override ?? perGwXMins?.[gw] ?? playerPrediction?.expected_mins ?? 0
-    return scalePoints(ifFitPts, ifFitMins, effectiveMins)
+    if (override != null) {
+      const ifFitPts =
+        playerPrediction?.if_fit_predictions?.[gw] ?? playerPrediction?.predictions[gw]
+      if (ifFitPts == null) return null
+      const ifFitMins = playerPrediction?.expected_mins_if_fit ?? baseExpectedMins
+      return scalePoints(ifFitPts, ifFitMins, override)
+    }
+    return playerPrediction?.predictions[gw] ?? null
   }
 
   // Compute total xMins and total scaled xPts across gameweeks
   const totalXMins = gameweeks.reduce((sum, gw) => {
     const override = getGwOverride(gw)
     if (override != null) return sum + override
-    return sum + (perGwXMins?.[gw] ?? baseExpectedMins)
+    return sum + baseExpectedMins
   }, 0)
 
   const totalScaledXPts = gameweeks.reduce((sum, gw) => {
@@ -340,8 +340,7 @@ export function PlayerDetailPanel({
             {/* GW rows */}
             <div className="divide-y divide-border/10">
               {gameweeks.map((gw, idx) => {
-                const backendMins = perGwXMins?.[gw]
-                const displayMins = backendMins ?? baseExpectedMins
+                const displayMins = baseExpectedMins
                 const isCurrentGw = gw === selectedGw
                 const xPts = scaledXPts(gw)
 

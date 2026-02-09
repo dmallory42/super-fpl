@@ -10,7 +10,6 @@ interface PlayerExplorerProps {
   teamsMap: Map<number, string>
   effectiveOwnership?: Record<string, number>
   xMinsOverrides?: XMinsOverrides
-  perGwXMins?: Record<number, Record<number, number>>
   fixtures?: Record<number, Record<number, FixtureOpponent[]>>
   onXMinsChange?: (playerId: number, xMins: number, gameweek?: number) => void
   onResetXMins?: () => void
@@ -105,7 +104,6 @@ export function PlayerExplorer({
   teamsMap,
   effectiveOwnership,
   xMinsOverrides,
-  perGwXMins,
   fixtures,
   onXMinsChange,
   onResetXMins,
@@ -116,6 +114,37 @@ export function PlayerExplorer({
   const [positionFilter, setPositionFilter] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(50)
+
+  // Pre-compute effective points per player (raw predictions by default, scaled with user overrides)
+  const effectivePoints = useMemo(() => {
+    const map = new Map<number, { perGw: Record<number, number>; total: number }>()
+    for (const player of players) {
+      const rawOverride = xMinsOverrides?.[player.player_id]
+      const gwOverride =
+        typeof rawOverride === 'object' && rawOverride !== null ? rawOverride : null
+
+      const perGw: Record<number, number> = {}
+      let total = 0
+      for (const gw of gameweeks) {
+        const hasFixture = !!fixtures?.[player.team]?.[gw]?.length
+        if (!hasFixture) {
+          perGw[gw] = 0
+          continue
+        }
+
+        if (gwOverride && gwOverride[gw] != null) {
+          const ifFitPts = player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
+          const ifFitMins = player.expected_mins_if_fit ?? player.expected_mins ?? 90
+          perGw[gw] = scalePoints(ifFitPts, ifFitMins, gwOverride[gw])
+        } else {
+          perGw[gw] = player.predictions[gw] ?? 0
+        }
+        total += perGw[gw]
+      }
+      map.set(player.player_id, { perGw, total: Math.round(total * 10) / 10 })
+    }
+    return map
+  }, [players, gameweeks, fixtures, xMinsOverrides])
 
   const filteredAndSorted = useMemo(() => {
     let filtered = players
@@ -141,8 +170,8 @@ export function PlayerExplorer({
         bVal = effectiveOwnership?.[String(b.player_id)] ?? 0
       } else if (sortField.startsWith('gw_')) {
         const gw = parseInt(sortField.slice(3), 10)
-        aVal = a.predictions[gw] ?? 0
-        bVal = b.predictions[gw] ?? 0
+        aVal = effectivePoints.get(a.player_id)?.perGw[gw] ?? 0
+        bVal = effectivePoints.get(b.player_id)?.perGw[gw] ?? 0
       } else if (sortField === 'now_cost') {
         aVal = a.now_cost
         bVal = b.now_cost
@@ -150,8 +179,8 @@ export function PlayerExplorer({
         aVal = a.total_points
         bVal = b.total_points
       } else {
-        aVal = a.total_predicted
-        bVal = b.total_predicted
+        aVal = effectivePoints.get(a.player_id)?.total ?? 0
+        bVal = effectivePoints.get(b.player_id)?.total ?? 0
       }
 
       if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -162,7 +191,15 @@ export function PlayerExplorer({
       const numB = typeof bVal === 'number' ? bVal : 0
       return sortDir === 'asc' ? numA - numB : numB - numA
     })
-  }, [players, positionFilter, searchQuery, sortField, sortDir, effectiveOwnership])
+  }, [
+    players,
+    positionFilter,
+    searchQuery,
+    sortField,
+    sortDir,
+    effectiveOwnership,
+    effectivePoints,
+  ])
 
   const handleSort = (field: SortField) => {
     if (field === sortField) {
@@ -336,23 +373,8 @@ export function PlayerExplorer({
                     {player.total_points}
                   </td>
                   {gameweeks.map((gw) => {
-                    // No fixture = blank gameweek, no points
-                    const hasFixture = !!fixtures?.[player.team]?.[gw]?.length
-                    const ifFitPts = hasFixture
-                      ? (player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0)
-                      : 0
-                    const ifFitMins = player.expected_mins_if_fit ?? baseXMins
-                    let effectiveMins: number
-                    if (gwOverride && gwOverride[gw] != null) {
-                      effectiveMins = gwOverride[gw]
-                    } else if (!hasOverride) {
-                      effectiveMins =
-                        perGwXMins?.[player.player_id]?.[gw] ?? player.expected_mins ?? 0
-                    } else {
-                      effectiveMins = player.expected_mins ?? 0
-                    }
-                    const pts = scalePoints(ifFitPts, ifFitMins, effectiveMins)
-                    const isScaled = hasOverride || perGwXMins?.[player.player_id] != null
+                    const pts = effectivePoints.get(player.player_id)?.perGw[gw] ?? 0
+                    const isScaled = hasOverride
                     return (
                       <td
                         key={gw}
@@ -363,29 +385,9 @@ export function PlayerExplorer({
                     )
                   })}
                   <td
-                    className={`px-3 py-1.5 text-right font-mono font-bold text-fpl-green ${hasOverride || perGwXMins?.[player.player_id] ? 'italic' : ''}`}
+                    className={`px-3 py-1.5 text-right font-mono font-bold text-fpl-green ${hasOverride ? 'italic' : ''}`}
                   >
-                    {(() => {
-                      const ifFitMins = player.expected_mins_if_fit ?? baseXMins
-                      let total = 0
-                      for (const gw of gameweeks) {
-                        const hasFixture = !!fixtures?.[player.team]?.[gw]?.length
-                        const ifFitPts = hasFixture
-                          ? (player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0)
-                          : 0
-                        let effectiveMins: number
-                        if (gwOverride && gwOverride[gw] != null) {
-                          effectiveMins = gwOverride[gw]
-                        } else if (!hasOverride) {
-                          effectiveMins =
-                            perGwXMins?.[player.player_id]?.[gw] ?? player.expected_mins ?? 0
-                        } else {
-                          effectiveMins = player.expected_mins ?? 0
-                        }
-                        total += scalePoints(ifFitPts, ifFitMins, effectiveMins)
-                      }
-                      return total.toFixed(1)
-                    })()}
+                    {(effectivePoints.get(player.player_id)?.total ?? 0).toFixed(1)}
                   </td>
                 </tr>
               )

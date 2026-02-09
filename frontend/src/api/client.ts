@@ -607,7 +607,6 @@ export interface PlannerOptimizeResponse {
     api_free_transfers: number
     predicted_points: Record<number | 'total', number>
     formations?: Record<number, FormationData>
-    per_gw_xmins?: Record<number, Record<number, number>>
   }
   dgw_teams: Record<number, number[]>
   recommendations: TransferRecommendation[]
