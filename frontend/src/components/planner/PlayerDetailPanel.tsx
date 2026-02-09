@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
-import type { PlayerMultiWeekPrediction, XMinsOverrides } from '../../api/client'
+import type { PlayerMultiWeekPrediction, XMinsOverrides, FixtureOpponent } from '../../api/client'
 import { PositionBadge } from '../common/PositionBadge'
 import { GradientText } from '../ui/GradientText'
 import { scalePoints } from '../../lib/predictions'
@@ -38,6 +38,7 @@ interface PlayerDetailPanelProps {
   xMinsOverrides: XMinsOverrides
   onXMinsChange: (playerId: number, xMins: number, gameweek?: number) => void
   baseExpectedMins: number
+  fixtures?: Record<number, FixtureOpponent[]>
   // Transfer tab
   budget: number
   replacementSearch: string
@@ -123,6 +124,7 @@ export function PlayerDetailPanel({
   xMinsOverrides,
   onXMinsChange,
   baseExpectedMins,
+  fixtures,
   budget,
   replacementSearch,
   onReplacementSearchChange,
@@ -143,11 +145,19 @@ export function PlayerDetailPanel({
     { id: 'transfer', label: 'Transfer' },
   ]
 
+  const formatGwFixture = (gw: number): string => {
+    const gwFixtures = fixtures?.[gw]
+    if (!gwFixtures?.length) return '-'
+    return gwFixtures.map((f) => (f.is_home ? f.opponent : f.opponent.toLowerCase())).join(', ')
+  }
+
   const isGkp = player.element_type === 1
   const isDef = player.element_type === 2
 
   // Compute scaled xPts per-GW using unified if-fit formula
   const scaledXPts = (gw: number): number | null => {
+    // No fixture in this GW = blank gameweek, no points
+    if (!fixtures?.[gw]?.length) return 0
     const ifFitPts = playerPrediction?.if_fit_predictions?.[gw] ?? playerPrediction?.predictions[gw]
     if (ifFitPts == null) return null
     const ifFitMins = playerPrediction?.expected_mins_if_fit ?? baseExpectedMins
@@ -316,6 +326,9 @@ export function PlayerDetailPanel({
               <span className="w-12 font-display text-[10px] uppercase tracking-widest text-foreground-dim">
                 GW
               </span>
+              <span className="w-16 font-display text-[10px] uppercase tracking-widest text-foreground-dim text-center">
+                Fix
+              </span>
               <span className="flex-1 font-display text-[10px] uppercase tracking-widest text-foreground-dim text-right pr-3">
                 xMins
               </span>
@@ -349,6 +362,9 @@ export function PlayerDetailPanel({
                       }`}
                     >
                       GW{gw}
+                    </span>
+                    <span className="w-16 text-center text-xs font-mono text-foreground-muted">
+                      {formatGwFixture(gw)}
                     </span>
                     <div className="flex-1 flex justify-end pr-3">
                       <GwXMinsInput
@@ -385,6 +401,7 @@ export function PlayerDetailPanel({
               <span className="w-12 text-xs font-display uppercase tracking-wider text-foreground-muted">
                 Total
               </span>
+              <span className="w-16" />
               <span className="flex-1 text-right pr-3 text-sm font-mono font-bold text-foreground-muted">
                 {totalXMins}
               </span>

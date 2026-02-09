@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
-import type { PlayerMultiWeekPrediction, XMinsOverrides } from '../../api/client'
+import type { PlayerMultiWeekPrediction, XMinsOverrides, FixtureOpponent } from '../../api/client'
 import { BroadcastCard } from '../ui/BroadcastCard'
 import { PositionBadge } from '../common/PositionBadge'
 import { scalePoints } from '../../lib/predictions'
@@ -11,6 +11,7 @@ interface PlayerExplorerProps {
   effectiveOwnership?: Record<string, number>
   xMinsOverrides?: XMinsOverrides
   perGwXMins?: Record<number, Record<number, number>>
+  fixtures?: Record<number, Record<number, FixtureOpponent[]>>
   onXMinsChange?: (playerId: number, xMins: number, gameweek?: number) => void
   onResetXMins?: () => void
   onPlayerClick?: (playerId: number) => void
@@ -105,6 +106,7 @@ export function PlayerExplorer({
   effectiveOwnership,
   xMinsOverrides,
   perGwXMins,
+  fixtures,
   onXMinsChange,
   onResetXMins,
   onPlayerClick,
@@ -334,7 +336,11 @@ export function PlayerExplorer({
                     {player.total_points}
                   </td>
                   {gameweeks.map((gw) => {
-                    const ifFitPts = player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
+                    // No fixture = blank gameweek, no points
+                    const hasFixture = !!fixtures?.[player.team]?.[gw]?.length
+                    const ifFitPts = hasFixture
+                      ? (player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0)
+                      : 0
                     const ifFitMins = player.expected_mins_if_fit ?? baseXMins
                     let effectiveMins: number
                     if (gwOverride && gwOverride[gw] != null) {
@@ -363,8 +369,10 @@ export function PlayerExplorer({
                       const ifFitMins = player.expected_mins_if_fit ?? baseXMins
                       let total = 0
                       for (const gw of gameweeks) {
-                        const ifFitPts =
-                          player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
+                        const hasFixture = !!fixtures?.[player.team]?.[gw]?.length
+                        const ifFitPts = hasFixture
+                          ? (player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0)
+                          : 0
                         let effectiveMins: number
                         if (gwOverride && gwOverride[gw] != null) {
                           effectiveMins = gwOverride[gw]

@@ -125,10 +125,16 @@ export interface PlayerMultiWeekPrediction {
   total_predicted: number
 }
 
+export interface FixtureOpponent {
+  opponent: string
+  is_home: boolean
+}
+
 export interface PredictionsRangeResponse {
   gameweeks: number[]
   current_gameweek: number
   players: PlayerMultiWeekPrediction[]
+  fixtures: Record<number, Record<number, FixtureOpponent[]>>
   generated_at: string
 }
 

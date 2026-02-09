@@ -15,6 +15,7 @@ interface Player {
   predicted_points?: number
   expected_mins?: number
   effective_points?: number
+  fixture?: string
   stats?: {
     total_points?: number
   }
@@ -255,8 +256,8 @@ const PlayerCard = memo(function PlayerCard({
         {player.web_name || `P${player.player_id}`}
       </div>
 
-      {/* Team */}
-      <div className="text-white/70 text-xs">{teamName}</div>
+      {/* Team / fixture opponent */}
+      <div className="text-white/70 text-xs">{player.fixture ?? teamName}</div>
 
       {/* xMins indicator when user has overridden */}
       {hasOverride && <div className="text-fpl-green text-xs font-mono mt-0.5">{customXMins}m</div>}

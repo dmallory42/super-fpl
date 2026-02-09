@@ -533,10 +533,32 @@ function handlePredictionsRange(Database $db): void
     // Sort by total predicted points descending
     usort($players, fn($a, $b) => $b['total_predicted'] <=> $a['total_predicted']);
 
+    // Build fixtures map: club_id -> gameweek -> [{opponent, is_home}]
+    $fixtureRows = $db->fetchAll(
+        "SELECT f.gameweek, f.home_club_id, f.away_club_id,
+                h.short_name as home_short, a.short_name as away_short
+         FROM fixtures f
+         JOIN clubs h ON f.home_club_id = h.id
+         JOIN clubs a ON f.away_club_id = a.id
+         WHERE f.gameweek IN ($placeholders)",
+        $gameweeks
+    );
+
+    $fixturesMap = [];
+    foreach ($fixtureRows as $row) {
+        $gw = (int) $row['gameweek'];
+        $homeId = (int) $row['home_club_id'];
+        $awayId = (int) $row['away_club_id'];
+
+        $fixturesMap[$homeId][$gw][] = ['opponent' => $row['away_short'], 'is_home' => true];
+        $fixturesMap[$awayId][$gw][] = ['opponent' => $row['home_short'], 'is_home' => false];
+    }
+
     echo json_encode([
         'gameweeks' => $gameweeks,
         'current_gameweek' => $actionableGw,
         'players' => $players,
+        'fixtures' => $fixturesMap,
         'generated_at' => date('c'),
     ]);
 }

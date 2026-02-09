@@ -13,6 +13,7 @@ export interface SquadPlayer {
   element_type: number
   team: number
   predicted_points: number
+  fixture?: string
 }
 
 export interface FormationPlayer extends SquadPlayer {

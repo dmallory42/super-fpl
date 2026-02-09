@@ -8,6 +8,7 @@ import type {
   FixedTransfer,
   SolverDepth,
   XMinsOverrides,
+  FixtureOpponent,
 } from '../api/client'
 import { StatPanel, StatPanelGrid } from '../components/ui/StatPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
@@ -21,6 +22,10 @@ import { buildFormation } from '../lib/formation'
 import { scalePoints } from '../lib/predictions'
 
 const HIT_COST = 4
+
+function formatFixtures(fixtures: FixtureOpponent[]): string {
+  return fixtures.map((f) => (f.is_home ? f.opponent : f.opponent.toLowerCase())).join(', ')
+}
 
 interface SavedPlan {
   id: string
@@ -491,6 +496,8 @@ export function Planner() {
 
   const scaleByGwXMins = (playerId: number, gw: number): number => {
     const pred = playerPredictionsMap.get(playerId)
+    // No fixture in this GW = blank gameweek, no points
+    if (pred && !predictionsRange?.fixtures?.[pred.team]?.[gw]?.length) return 0
     const ifFitPts = pred?.if_fit_predictions?.[gw] ?? pred?.predictions[gw] ?? 0
     const ifFitMins = pred?.expected_mins_if_fit ?? pred?.expected_mins ?? 90
 
@@ -512,10 +519,15 @@ export function Planner() {
   const formationPlayers = useMemo(() => {
     if (!effectiveSquad.length || !playersData?.players || selectedGameweek === null) return []
 
+    const fixturesData = predictionsRange?.fixtures
+
     const squadWithData = effectiveSquad
       .map((playerId) => {
         const player = playersData.players.find((p) => p.id === playerId)
         if (!player) return null
+
+        const teamFixtures = fixturesData?.[player.team]?.[selectedGameweek]
+        const fixture = teamFixtures ? formatFixtures(teamFixtures) : undefined
 
         return {
           player_id: playerId,
@@ -523,6 +535,7 @@ export function Planner() {
           element_type: player.element_type,
           team: player.team,
           predicted_points: scaleByGwXMins(playerId, selectedGameweek),
+          fixture,
         }
       })
       .filter((p): p is NonNullable<typeof p> => p !== null)
@@ -535,6 +548,7 @@ export function Planner() {
     selectedGameweek,
     perGwXMins,
     debouncedXMins,
+    predictionsRange?.fixtures,
   ])
 
   // Calculate predicted points for effective squad (optimal starting XI only)
@@ -1177,6 +1191,7 @@ export function Planner() {
                   effectiveOwnership={top10kEO}
                   xMinsOverrides={xMinsOverrides}
                   perGwXMins={perGwXMins}
+                  fixtures={predictionsRange.fixtures}
                   onXMinsChange={handleXMinsChange}
                   onResetXMins={() => setXMinsOverrides({})}
                   onPlayerClick={handlePlayerSelect}
@@ -1228,6 +1243,7 @@ export function Planner() {
                 baseExpectedMins={
                   playerPredictionsMap.get(selectedPlayerData.id)?.expected_mins ?? 90
                 }
+                fixtures={predictionsRange?.fixtures?.[selectedPlayerData.team]}
                 budget={selectedPlayerData.now_cost / 10 + effectiveBank}
                 replacementSearch={replacementSearch}
                 onReplacementSearchChange={setReplacementSearch}
