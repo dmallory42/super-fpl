@@ -24,6 +24,7 @@
     "sync:samples": "docker-compose exec -T php php cron/sync-all.php --phase=samples",
     "sync:all": "docker-compose exec -T php php cron/sync-all.php --phase=all",
     "sync:snapshot": "docker-compose exec -T php php cron/snapshot-predictions.php",
+    "xpts": "docker-compose exec -T php php scripts/xpts-breakdown.php",
     "format": "prettier --write \"frontend/src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"frontend/src/**/*.{ts,tsx}\"",
     "lint:php": "docker-compose exec -T php vendor/bin/phpcs --standard=PSR12 src/",
