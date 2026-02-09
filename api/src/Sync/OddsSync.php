@@ -324,11 +324,35 @@ class OddsSync
             return $player;
         }
 
-        // Try last part of name
         $parts = explode(' ', $name);
         $lastName = end($parts);
         $strippedLastName = strtolower($this->stripAccents($lastName));
 
+        // Try first + last name combination (accent-insensitive) — most precise,
+        // avoids collisions between e.g. "Bruno Fernandes" and "Mateus Fernandes".
+        // DB first_name can be multi-word ("Mateus Gonçalo") so check if it starts
+        // with the API first name. DB second_name can also be multi-word
+        // ("Borges Fernandes") so search with %lastName%.
+        if (count($parts) >= 2) {
+            $firstName = $parts[0];
+            $strippedFirstName = strtolower($this->stripAccents($firstName));
+            $candidates = $this->db->fetchAll(
+                'SELECT id, first_name, second_name FROM players WHERE second_name LIKE ?',
+                ['%' . $lastName . '%']
+            );
+            foreach ($candidates as $candidate) {
+                $candidateSecond = strtolower($this->stripAccents($candidate['second_name']));
+                $candidateFirst = strtolower($this->stripAccents($candidate['first_name']));
+                if (
+                    str_contains($candidateSecond, $strippedLastName)
+                    && str_starts_with($candidateFirst, $strippedFirstName)
+                ) {
+                    return $candidate;
+                }
+            }
+        }
+
+        // Try exact last-name match on web_name
         $player = $this->db->fetchOne(
             'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
             [$lastName]
@@ -337,45 +361,30 @@ class OddsSync
             return $player;
         }
 
-        // Try second_name match (accent-insensitive via PHP)
-        // Use prefix LIKE to narrow candidates, then compare with accents stripped
+        // Try second_name match (accent-insensitive) — only if unique
         $prefix = mb_substr($lastName, 0, 3);
         $candidates = $this->db->fetchAll(
             'SELECT id, second_name FROM players WHERE second_name LIKE ?',
             [$prefix . '%']
         );
+        $secondNameMatches = [];
         foreach ($candidates as $candidate) {
             $strippedSecondName = strtolower($this->stripAccents($candidate['second_name']));
             if ($strippedSecondName === $strippedLastName) {
-                return $candidate;
+                $secondNameMatches[] = $candidate;
             }
         }
+        if (count($secondNameMatches) === 1) {
+            return $secondNameMatches[0];
+        }
 
-        // Try fuzzy matching with LIKE
-        $player = $this->db->fetchOne(
+        // Try fuzzy matching with LIKE — only if unique
+        $likeMatches = $this->db->fetchAll(
             'SELECT id FROM players WHERE LOWER(web_name) LIKE LOWER(?)',
             ['%' . $lastName . '%']
         );
-        if ($player !== null) {
-            return $player;
-        }
-
-        // Try first + last name combination (accent-insensitive)
-        if (count($parts) >= 2) {
-            $firstName = $parts[0];
-            $strippedFirstName = strtolower($this->stripAccents($firstName));
-            $candidates = $this->db->fetchAll(
-                'SELECT id, first_name, second_name FROM players WHERE first_name LIKE ?',
-                [mb_substr($firstName, 0, 3) . '%']
-            );
-            foreach ($candidates as $candidate) {
-                if (
-                    strtolower($this->stripAccents($candidate['first_name'])) === $strippedFirstName
-                    && strtolower($this->stripAccents($candidate['second_name'])) === $strippedLastName
-                ) {
-                    return $candidate;
-                }
-            }
+        if (count($likeMatches) === 1) {
+            return $likeMatches[0];
         }
 
         return null;
