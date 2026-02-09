@@ -72,7 +72,7 @@ export function Planner() {
 
   // Player detail sidebar state
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
-  const [sidebarTab, setSidebarTab] = useState<'minutes' | 'transfer'>('minutes')
+  const [sidebarTab, setSidebarTab] = useState<'projections' | 'transfer'>('projections')
   const [replacementSearch, setReplacementSearch] = useState('')
 
   // Saved plans
@@ -359,7 +359,7 @@ export function Planner() {
       setReplacementSearch('')
     } else {
       setSelectedPlayer(playerId)
-      setSidebarTab('minutes')
+      setSidebarTab('projections')
       setReplacementSearch('')
     }
   }
@@ -457,18 +457,30 @@ export function Planner() {
     setSavedPlans((prev) => prev.filter((p) => p.id !== planId))
   }
 
+  const applyDecay = (baseMins: number, gws: number[]): Record<number, number> => {
+    const result: Record<number, number> = {}
+    for (let i = 0; i < gws.length; i++) {
+      result[gws[i]] = Math.round(baseMins * Math.pow(0.97, i))
+    }
+    return result
+  }
+
   const handleXMinsChange = (playerId: number, xMins: number, gameweek?: number) => {
     setXMinsOverrides((prev) => {
+      const existing =
+        typeof prev[playerId] === 'object' && prev[playerId] !== null
+          ? { ...(prev[playerId] as Record<number, number>) }
+          : {}
       if (gameweek !== undefined) {
-        // Per-GW override
-        const existing = prev[playerId]
-        const gwMap: Record<number, number> =
-          typeof existing === 'object' && existing !== null ? { ...existing } : {}
-        gwMap[gameweek] = xMins
-        return { ...prev, [playerId]: gwMap }
+        // Per-GW override from drawer — replace just this GW
+        existing[gameweek] = xMins
+      } else {
+        // Explorer override — apply with 0.97 decay to all GWs
+        const gws = predictionsRange?.gameweeks ?? []
+        const decayed = applyDecay(xMins, gws)
+        Object.assign(existing, decayed)
       }
-      // Uniform override
-      return { ...prev, [playerId]: xMins }
+      return { ...prev, [playerId]: existing }
     })
   }
 
@@ -483,22 +495,23 @@ export function Planner() {
     basePts: number,
     baseXMins: number
   ): number => {
-    // User override takes priority
+    const pred = playerPredictionsMap.get(playerId)
+    const per90 = pred?.per_90_predictions?.[gw]
+
+    // User override takes priority (always per-GW object now)
     const override = debouncedXMins[playerId]
-    if (override != null) {
-      if (baseXMins > 0) {
-        const gwMins = typeof override === 'object' ? (override[gw] ?? baseXMins) : override
-        return basePts * (gwMins / baseXMins)
-      }
+    if (typeof override === 'object' && override !== null && override[gw] != null) {
+      if (per90) return per90 * (override[gw] / 90)
+      if (baseXMins > 0) return basePts * (override[gw] / baseXMins)
       return 0
     }
-    // Backend per-GW xMins
+    // Backend per-GW xMins fallback
     const backendGwMins = perGwXMins?.[playerId]?.[gw]
-    if (backendGwMins !== undefined && baseXMins > 0 && backendGwMins !== baseXMins) {
-      return basePts * (backendGwMins / baseXMins)
+    if (backendGwMins !== undefined && backendGwMins !== baseXMins) {
+      if (per90) return per90 * (backendGwMins / 90)
+      if (baseXMins > 0) return basePts * (backendGwMins / baseXMins)
+      return 0
     }
-    // If base expected_mins is 0 but backend per-GW says they'll play, we can't
-    // scale from 0. The predictions are 0 in this case, so fall through.
     return basePts
   }
 
@@ -1039,7 +1052,6 @@ export function Planner() {
                   players={formationPlayers}
                   teams={teamsRecord}
                   xMinsOverrides={xMinsOverrides}
-                  perGwXMins={optimizeData?.current_squad?.per_gw_xmins}
                   selectedGw={selectedGameweek ?? undefined}
                   selectedPlayer={selectedPlayer}
                   newTransferIds={newTransferIds}
@@ -1181,6 +1193,7 @@ export function Planner() {
                   perGwXMins={perGwXMins}
                   onXMinsChange={handleXMinsChange}
                   onResetXMins={() => setXMinsOverrides({})}
+                  onPlayerClick={handlePlayerSelect}
                 />
               </div>
             )}
@@ -1220,6 +1233,7 @@ export function Planner() {
                   setSelectedPlayer(null)
                   setReplacementSearch('')
                 }}
+                playerPrediction={playerPredictionsMap.get(selectedPlayerData.id)}
                 perGwXMins={optimizeData?.current_squad?.per_gw_xmins?.[selectedPlayerData.id]}
                 gameweeks={predictionsRange?.gameweeks ?? []}
                 selectedGw={selectedGameweek}

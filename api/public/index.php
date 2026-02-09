@@ -28,6 +28,7 @@ use SuperFPL\FplClient\Cache\FileCache;
 // CORS headers
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json');
 
@@ -463,6 +464,7 @@ function handlePredictionsRange(Database $db): void
             pp.player_id,
             pp.gameweek,
             pp.predicted_points,
+            pp.predicted_per_90,
             pp.confidence,
             p.web_name,
             p.club_id as team,
@@ -507,10 +509,12 @@ function handlePredictionsRange(Database $db): void
                 'total_points' => (int) $pred['total_points'],
                 'expected_mins' => $xMins,
                 'predictions' => [],
+                'per_90_predictions' => [],
                 'total_predicted' => 0,
             ];
         }
         $playerMap[$playerId]['predictions'][(int) $pred['gameweek']] = round((float) $pred['predicted_points'], 1);
+        $playerMap[$playerId]['per_90_predictions'][(int) $pred['gameweek']] = round((float) ($pred['predicted_per_90'] ?? 0), 2);
         $playerMap[$playerId]['total_predicted'] += (float) $pred['predicted_points'];
     }
 

@@ -36,8 +36,6 @@ interface FormationPitchProps {
   teams: Record<number, Team>
   showEffectiveOwnership?: boolean
   xMinsOverrides?: XMinsOverrides
-  // Per-GW xMins from backend (used for adjusted points display)
-  perGwXMins?: Record<number, Record<number, number>>
   selectedGw?: number
   // Player selection
   selectedPlayer?: number | null
@@ -45,49 +43,11 @@ interface FormationPitchProps {
   onPlayerClick?: (playerId: number) => void
 }
 
-// Default expected minutes by position when not provided
-const DEFAULT_EXPECTED_MINS: Record<number, number> = {
-  1: 90, // GK
-  2: 85, // DEF
-  3: 80, // MID
-  4: 75, // FWD
-}
-
-// FPL scoring thresholds
-const MINS_THRESHOLD = 60
-const APPEARANCE_POINTS_FULL = 2
-const APPEARANCE_POINTS_PARTIAL = 1
-const CS_POINTS: Record<number, number> = {
-  1: 4, // GK
-  2: 4, // DEF
-  3: 1, // MID
-  4: 0, // FWD
-}
-
-// Estimate clean sheet points from total predicted points
-// Higher for defenders, lower for mids, zero for forwards
-function estimateCSPoints(position: number, totalPoints: number): number {
-  const csPointsForPosition = CS_POINTS[position] ?? 0
-  if (csPointsForPosition === 0) return 0
-
-  // Estimate CS probability from total points (rough heuristic)
-  // Defenders typically have 0.3-0.8 pts from CS, mids have 0.05-0.2
-  if (position === 1 || position === 2) {
-    // GK/DEF: estimate ~15-25% of points from CS
-    return Math.min(csPointsForPosition * 0.4, totalPoints * 0.2)
-  } else if (position === 3) {
-    // MID: estimate ~3-5% of points from CS
-    return Math.min(csPointsForPosition * 0.3, totalPoints * 0.05)
-  }
-  return 0
-}
-
 export function FormationPitch({
   players,
   teams,
   showEffectiveOwnership = false,
   xMinsOverrides = {},
-  perGwXMins,
   selectedGw,
   selectedPlayer = null,
   newTransferIds = [],
@@ -101,62 +61,6 @@ export function FormationPitch({
 
     return { starting, bench }
   }, [players])
-
-  // Calculate adjusted points based on xMins overrides
-  // Accounts for FPL thresholds: 60+ mins for full appearance and CS eligibility
-  const getAdjustedPoints = (player: Player): number => {
-    const basePoints = player.predicted_points ?? player.points ?? 0
-    const baseXMins = player.expected_mins ?? DEFAULT_EXPECTED_MINS[player.element_type ?? 3] ?? 80
-    const position = player.element_type ?? 3
-
-    // Resolve xMins: per-GW backend data > user overrides > base
-    const rawOverride = xMinsOverrides[player.player_id]
-    let customXMins: number | undefined
-    if (typeof rawOverride === 'object' && rawOverride !== null && selectedGw !== undefined) {
-      customXMins = rawOverride[selectedGw]
-    } else if (typeof rawOverride === 'number') {
-      customXMins = rawOverride
-    }
-    // If no user override, use backend per-GW xMins for selected GW
-    if (customXMins === undefined && perGwXMins && selectedGw !== undefined) {
-      const backendGwMins = perGwXMins[player.player_id]?.[selectedGw]
-      if (backendGwMins !== undefined && backendGwMins !== baseXMins) {
-        customXMins = backendGwMins
-      }
-    }
-
-    if (customXMins === undefined || customXMins === baseXMins) {
-      return basePoints
-    }
-
-    // Estimate baseline component breakdown (approximate)
-    // These estimates assume a typical prediction structure
-    const baseAppearancePts = baseXMins >= MINS_THRESHOLD ? 1.8 : 0.9
-    const baseCsPts = baseXMins >= MINS_THRESHOLD ? estimateCSPoints(position, basePoints) : 0
-    const baseOtherPts = Math.max(0, basePoints - baseAppearancePts - baseCsPts)
-
-    // Calculate new components based on adjusted xMins
-    let newAppearancePts: number
-    if (customXMins === 0) {
-      newAppearancePts = 0
-    } else if (customXMins >= MINS_THRESHOLD) {
-      // Full appearance points, scaled slightly by time
-      newAppearancePts = APPEARANCE_POINTS_FULL * Math.min(1, customXMins / 90)
-    } else {
-      // Partial appearance points
-      newAppearancePts = APPEARANCE_POINTS_PARTIAL * (customXMins / MINS_THRESHOLD)
-    }
-
-    // Clean sheet: only eligible at 60+ mins
-    const newCsPts = customXMins >= MINS_THRESHOLD ? baseCsPts * (customXMins / baseXMins) : 0
-
-    // Other points (goals, assists, bonus) scale roughly linearly
-    const timeRatio = baseXMins > 0 ? customXMins / baseXMins : 0
-    const newOtherPts = baseOtherPts * timeRatio
-
-    const adjustedPoints = newAppearancePts + newCsPts + newOtherPts
-    return Math.round(adjustedPoints * 10) / 10
-  }
 
   // Resolve the displayed xMins for a player (used by PlayerCard indicator)
   // Only returns a value when the user has explicitly set an override
@@ -212,7 +116,6 @@ export function FormationPitch({
                       showEO={showEffectiveOwnership}
                       animationDelay={(acc.offset + itemIdx) * 50}
                       customXMins={resolveXMins(player.player_id)}
-                      adjustedPoints={getAdjustedPoints(player)}
                       isSelected={selectedPlayer === player.player_id}
                       isNewTransfer={newTransferIds.includes(player.player_id)}
                       onPlayerClick={handlePlayerClick}
@@ -247,7 +150,6 @@ export function FormationPitch({
               isBench
               animationDelay={(startingCount + idx) * 50}
               customXMins={resolveXMins(player.player_id)}
-              adjustedPoints={getAdjustedPoints(player)}
               isSelected={selectedPlayer === player.player_id}
               isNewTransfer={newTransferIds.includes(player.player_id)}
               onPlayerClick={handlePlayerClick}
@@ -266,7 +168,6 @@ interface PlayerCardProps {
   isBench?: boolean
   animationDelay?: number
   customXMins?: number
-  adjustedPoints?: number
   isSelected?: boolean
   isNewTransfer?: boolean
   onPlayerClick?: (playerId: number) => void
@@ -279,14 +180,17 @@ const PlayerCard = memo(function PlayerCard({
   isBench = false,
   animationDelay = 0,
   customXMins,
-  adjustedPoints,
   isSelected = false,
   isNewTransfer = false,
   onPlayerClick,
 }: PlayerCardProps) {
   const playerId = player.player_id
-  const basePoints = player.stats?.total_points ?? player.points ?? player.predicted_points ?? 0
-  const displayPoints = adjustedPoints ?? player.effective_points ?? basePoints
+  const displayPoints =
+    player.effective_points ??
+    player.stats?.total_points ??
+    player.points ??
+    player.predicted_points ??
+    0
   const teamName = player.team ? (teams[player.team]?.short_name ?? '???') : '???'
   const teamId = player.team ?? 0
   const hasOverride = customXMins !== undefined

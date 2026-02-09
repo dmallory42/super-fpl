@@ -199,6 +199,28 @@ class PredictionEngine
         $total = $appearancePoints + $goalPoints + $assistPoints + $csPoints
             + $bonusPoints + $gcPenalty + $savePoints + $dcPoints + $cardPoints + $penaltyPoints;
 
+        // Per-90 baseline: what this player would score playing a full 90 minutes.
+        // Used by the frontend to scale predictions when xMins is overridden
+        // (especially for injured players where predicted_points = 0).
+        $per90Appearance = self::APPEARANCE_POINTS_60; // 2 pts (assumed 60+)
+        $per90Goals = $expectedGoals * (self::GOAL_POINTS[$position] ?? 4);
+        $per90Assists = $expectedAssists * self::ASSIST_POINTS;
+        $per90CS = $cs * (self::CS_POINTS[$position] ?? 0);
+        $per90Bonus = $bonus;
+        $per90GC = $position <= 2
+            ? $this->calculateGoalsConcededPenalty($player, $fixture, $fixtureOdds, 1.0)
+            : 0;
+        $per90Saves = $position === 1
+            ? $this->calculateSavePoints($player, $fixture, $fixtureOdds, 1.0)
+            : 0;
+        $per90DC = $position >= 2
+            ? $this->dcProb->calculate($player, $position, 90.0)
+            : 0;
+        $per90Cards = $cardDeductions;
+        $per90Total = $per90Appearance + $per90Goals + $per90Assists + $per90CS
+            + $per90Bonus + $per90GC + $per90Saves + $per90DC + $per90Cards
+            + $penaltyPoints;
+
         // No post-hoc calibration — collect snapshots vs actuals to identify
         // systematic bias empirically before adding any correction.
 
@@ -207,6 +229,7 @@ class PredictionEngine
 
         return [
             'predicted_points' => round($total, 2),
+            'predicted_per_90' => round($per90Total, 2),
             'breakdown' => $breakdown,
             'confidence' => $confidence,
         ];

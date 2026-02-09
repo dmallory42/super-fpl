@@ -134,6 +134,7 @@ CREATE TABLE player_predictions (
     player_id INTEGER REFERENCES players(id),
     gameweek INTEGER,
     predicted_points REAL,
+    predicted_per_90 REAL,
     confidence REAL,
     model_version TEXT,
     computed_at TIMESTAMP,

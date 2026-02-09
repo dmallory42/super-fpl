@@ -120,6 +120,7 @@ export interface PlayerMultiWeekPrediction {
   total_points: number
   expected_mins: number // backend override or 90 default
   predictions: Record<number, number> // gameweek -> predicted points
+  per_90_predictions: Record<number, number> // gameweek -> per-90 points (full 90 min baseline)
   total_predicted: number
 }
 

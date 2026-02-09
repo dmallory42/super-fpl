@@ -113,9 +113,8 @@ describe('FormationPitch', () => {
 
     render(<FormationPitch players={players} teams={mockTeams} />)
 
-    // Component displays adjustedPoints (based on points/predicted_points, not effective_points)
-    // With points=8 and no overrides, displays 8.0
-    expect(screen.getByText('8.0')).toBeInTheDocument()
+    // effective_points is preferred when available (e.g. captain 2x in live view)
+    expect(screen.getByText('16.0')).toBeInTheDocument()
   })
 
   it('falls back to ??? for unknown team', () => {
