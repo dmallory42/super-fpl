@@ -127,7 +127,7 @@ class AssistProbability
         $rawMultiplier = $teamXG / $leagueAvg;
 
         // Shrink toward 1.0 — xG-based strength is noisier than odds
-        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.5;
+        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.35;
 
         return min(2.0, $baseXA * $multiplier);
     }
@@ -159,7 +159,7 @@ class AssistProbability
 
         // Shrink toward 1.0 — team-level xG boost doesn't distribute
         // equally across all players (top attackers capture more)
-        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.5;
+        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.35;
 
         return min(2.0, $baseXA * $multiplier);
     }

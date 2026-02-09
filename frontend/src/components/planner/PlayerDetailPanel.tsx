@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import type { PlayerMultiWeekPrediction, XMinsOverrides } from '../../api/client'
 import { PositionBadge } from '../common/PositionBadge'
 import { GradientText } from '../ui/GradientText'
+import { scalePoints } from '../../lib/predictions'
 
 type SidebarTab = 'projections' | 'transfer'
 
@@ -145,16 +146,14 @@ export function PlayerDetailPanel({
   const isGkp = player.element_type === 1
   const isDef = player.element_type === 2
 
-  // Compute scaled xPts per-GW using effective xMins
+  // Compute scaled xPts per-GW using unified if-fit formula
   const scaledXPts = (gw: number): number | null => {
-    const rawPts = playerPrediction?.predictions[gw]
-    if (rawPts == null) return null
-    const per90 = playerPrediction?.per_90_predictions?.[gw]
+    const ifFitPts = playerPrediction?.if_fit_predictions?.[gw] ?? playerPrediction?.predictions[gw]
+    if (ifFitPts == null) return null
+    const ifFitMins = playerPrediction?.expected_mins_if_fit ?? baseExpectedMins
     const override = getGwOverride(gw)
-    const effectiveMins = override ?? perGwXMins?.[gw] ?? baseExpectedMins
-    if (per90) return per90 * (effectiveMins / 90)
-    if (baseExpectedMins <= 0) return rawPts
-    return rawPts * (effectiveMins / baseExpectedMins)
+    const effectiveMins = override ?? perGwXMins?.[gw] ?? playerPrediction?.expected_mins ?? 0
+    return scalePoints(ifFitPts, ifFitMins, effectiveMins)
   }
 
   // Compute total xMins and total scaled xPts across gameweeks

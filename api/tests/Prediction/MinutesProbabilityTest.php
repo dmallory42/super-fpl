@@ -142,4 +142,43 @@ class MinutesProbabilityTest extends TestCase
 
         $this->assertGreaterThan(0.7, $result['prob_any']);
     }
+
+    public function testIgnoreAvailabilitySkipsConfirmedOut(): void
+    {
+        // Player confirmed out (chance_of_playing = 0)
+        $player = [
+            'chance_of_playing' => 0,
+            'starts' => 20,
+            'minutes' => 1800,
+            'appearances' => 20,
+        ];
+
+        // Normal: should return zeros
+        $normal = $this->prob->calculate($player, 24);
+        $this->assertEquals(0.0, $normal['prob_any']);
+        $this->assertEquals(0.0, $normal['expected_mins']);
+
+        // With ignoreAvailability: should return non-zero (as if fit)
+        $ifFit = $this->prob->calculate($player, 24, ignoreAvailability: true);
+        $this->assertGreaterThan(0.7, $ifFit['prob_any']);
+        $this->assertGreaterThan(70, $ifFit['expected_mins']);
+    }
+
+    public function testIgnoreAvailabilityForcesFullAvailability(): void
+    {
+        // Player with 50% chance of playing
+        $player = [
+            'chance_of_playing' => 50,
+            'starts' => 20,
+            'minutes' => 1800,
+            'appearances' => 20,
+        ];
+
+        $normal = $this->prob->calculate($player, 24);
+        $ifFit = $this->prob->calculate($player, 24, ignoreAvailability: true);
+
+        // If-fit should have higher probabilities (availability = 1.0 vs 0.5)
+        $this->assertGreaterThan($normal['prob_any'], $ifFit['prob_any']);
+        $this->assertGreaterThan($normal['expected_mins'], $ifFit['expected_mins']);
+    }
 }

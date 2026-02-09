@@ -18,6 +18,7 @@ import { useLiveSamples } from '../hooks/useLiveSamples'
 import { PlayerExplorer } from '../components/planner/PlayerExplorer'
 import { PlayerDetailPanel } from '../components/planner/PlayerDetailPanel'
 import { buildFormation } from '../lib/formation'
+import { scalePoints } from '../lib/predictions'
 
 const HIT_COST = 4
 
@@ -484,35 +485,27 @@ export function Planner() {
     })
   }
 
-  // Scale a flat prediction by per-GW xMins from the backend
-  // The predictions endpoint uses a single expected_mins for all GWs;
-  // per_gw_xmins from the planner gives the true per-GW minutes.
+  // Scale predictions using the unified if-fit formula.
+  // effectiveMins priority: user override > backend per-GW xMins > player expected_mins
   const perGwXMins = optimizeData?.current_squad?.per_gw_xmins
 
-  const scaleByGwXMins = (
-    playerId: number,
-    gw: number,
-    basePts: number,
-    baseXMins: number
-  ): number => {
+  const scaleByGwXMins = (playerId: number, gw: number): number => {
     const pred = playerPredictionsMap.get(playerId)
-    const per90 = pred?.per_90_predictions?.[gw]
+    const ifFitPts = pred?.if_fit_predictions?.[gw] ?? pred?.predictions[gw] ?? 0
+    const ifFitMins = pred?.expected_mins_if_fit ?? pred?.expected_mins ?? 90
 
     // User override takes priority (always per-GW object now)
     const override = debouncedXMins[playerId]
     if (typeof override === 'object' && override !== null && override[gw] != null) {
-      if (per90) return per90 * (override[gw] / 90)
-      if (baseXMins > 0) return basePts * (override[gw] / baseXMins)
-      return 0
+      return scalePoints(ifFitPts, ifFitMins, override[gw])
     }
     // Backend per-GW xMins fallback
     const backendGwMins = perGwXMins?.[playerId]?.[gw]
-    if (backendGwMins !== undefined && backendGwMins !== baseXMins) {
-      if (per90) return per90 * (backendGwMins / 90)
-      if (baseXMins > 0) return basePts * (backendGwMins / baseXMins)
-      return 0
+    if (backendGwMins !== undefined) {
+      return scalePoints(ifFitPts, ifFitMins, backendGwMins)
     }
-    return basePts
+    // Default: use player's actual expected_mins
+    return scalePoints(ifFitPts, ifFitMins, pred?.expected_mins ?? 0)
   }
 
   // Build formation players for the selected gameweek
@@ -522,18 +515,14 @@ export function Planner() {
     const squadWithData = effectiveSquad
       .map((playerId) => {
         const player = playersData.players.find((p) => p.id === playerId)
-        const pred = playerPredictionsMap.get(playerId)
         if (!player) return null
-
-        const basePts = pred?.predictions[selectedGameweek] ?? 0
-        const baseXMins = pred?.expected_mins ?? 90
 
         return {
           player_id: playerId,
           web_name: player.web_name,
           element_type: player.element_type,
           team: player.team,
-          predicted_points: scaleByGwXMins(playerId, selectedGameweek, basePts, baseXMins),
+          predicted_points: scaleByGwXMins(playerId, selectedGameweek),
         }
       })
       .filter((p): p is NonNullable<typeof p> => p !== null)
@@ -571,11 +560,8 @@ export function Planner() {
       const squadWithData = gwSquad
         .map((playerId) => {
           const player = playersData.players.find((p) => p.id === playerId)
-          const pred = playerPredictionsMap.get(playerId)
           if (!player) return null
-          const basePts = pred?.predictions[gw] ?? 0
-          const baseXMins = pred?.expected_mins ?? 90
-          const pts = scaleByGwXMins(playerId, gw, basePts, baseXMins)
+          const pts = scaleByGwXMins(playerId, gw)
 
           return {
             player_id: playerId,

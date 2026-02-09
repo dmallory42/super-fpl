@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
 import type { PlayerMultiWeekPrediction, XMinsOverrides } from '../../api/client'
 import { BroadcastCard } from '../ui/BroadcastCard'
 import { PositionBadge } from '../common/PositionBadge'
+import { scalePoints } from '../../lib/predictions'
 
 interface PlayerExplorerProps {
   players: PlayerMultiWeekPrediction[]
@@ -333,29 +334,18 @@ export function PlayerExplorer({
                     {player.total_points}
                   </td>
                   {gameweeks.map((gw) => {
-                    const basePts = player.predictions[gw] ?? 0
-                    const per90 = player.per_90_predictions?.[gw]
-                    let pts: number
+                    const ifFitPts = player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
+                    const ifFitMins = player.expected_mins_if_fit ?? baseXMins
+                    let effectiveMins: number
                     if (gwOverride && gwOverride[gw] != null) {
-                      pts = per90
-                        ? per90 * (gwOverride[gw] / 90)
-                        : baseXMins > 0
-                          ? basePts * (gwOverride[gw] / baseXMins)
-                          : 0
+                      effectiveMins = gwOverride[gw]
                     } else if (!hasOverride) {
-                      const backendGwMins = perGwXMins?.[player.player_id]?.[gw]
-                      if (backendGwMins !== undefined && backendGwMins !== baseXMins) {
-                        pts = per90
-                          ? per90 * (backendGwMins / 90)
-                          : baseXMins > 0
-                            ? basePts * (backendGwMins / baseXMins)
-                            : 0
-                      } else {
-                        pts = basePts
-                      }
+                      effectiveMins =
+                        perGwXMins?.[player.player_id]?.[gw] ?? player.expected_mins ?? 0
                     } else {
-                      pts = basePts
+                      effectiveMins = player.expected_mins ?? 0
                     }
+                    const pts = scalePoints(ifFitPts, ifFitMins, effectiveMins)
                     const isScaled = hasOverride || perGwXMins?.[player.player_id] != null
                     return (
                       <td
@@ -370,31 +360,21 @@ export function PlayerExplorer({
                     className={`px-3 py-1.5 text-right font-mono font-bold text-fpl-green ${hasOverride || perGwXMins?.[player.player_id] ? 'italic' : ''}`}
                   >
                     {(() => {
-                      // Sum per-GW scaled predictions
+                      const ifFitMins = player.expected_mins_if_fit ?? baseXMins
                       let total = 0
                       for (const gw of gameweeks) {
-                        const basePts = player.predictions[gw] ?? 0
-                        const per90 = player.per_90_predictions?.[gw]
+                        const ifFitPts =
+                          player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
+                        let effectiveMins: number
                         if (gwOverride && gwOverride[gw] != null) {
-                          total += per90
-                            ? per90 * (gwOverride[gw] / 90)
-                            : baseXMins > 0
-                              ? basePts * (gwOverride[gw] / baseXMins)
-                              : 0
+                          effectiveMins = gwOverride[gw]
                         } else if (!hasOverride) {
-                          const backendGwMins = perGwXMins?.[player.player_id]?.[gw]
-                          if (backendGwMins !== undefined && backendGwMins !== baseXMins) {
-                            total += per90
-                              ? per90 * (backendGwMins / 90)
-                              : baseXMins > 0
-                                ? basePts * (backendGwMins / baseXMins)
-                                : 0
-                          } else {
-                            total += basePts
-                          }
+                          effectiveMins =
+                            perGwXMins?.[player.player_id]?.[gw] ?? player.expected_mins ?? 0
                         } else {
-                          total += basePts
+                          effectiveMins = player.expected_mins ?? 0
                         }
+                        total += scalePoints(ifFitPts, ifFitMins, effectiveMins)
                       }
                       return total.toFixed(1)
                     })()}

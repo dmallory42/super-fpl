@@ -69,7 +69,8 @@ class PredictionService
             } else {
                 // Sum predictions across all fixtures (DGW support)
                 $totalPoints = 0.0;
-                $totalPer90 = 0.0;
+                $totalIfFit = 0.0;
+                $perGameMinsIfFit = 0.0;
                 $totalConfidence = 0.0;
                 $combinedBreakdown = [];
                 $fixtureInfoList = [];
@@ -89,7 +90,9 @@ class PredictionService
                         $playerTeamGames
                     );
                     $totalPoints += $fixturePrediction['predicted_points'];
-                    $totalPer90 += $fixturePrediction['predicted_per_90'];
+                    $totalIfFit += $fixturePrediction['predicted_if_fit'];
+                    // expected_mins_if_fit is per-player (same for all fixtures), not summed
+                    $perGameMinsIfFit = $fixturePrediction['expected_mins_if_fit'];
                     $totalConfidence += $fixturePrediction['confidence'];
 
                     // Merge breakdown (sum values)
@@ -110,7 +113,8 @@ class PredictionService
 
                 $prediction = [
                     'predicted_points' => round($totalPoints, 2),
-                    'predicted_per_90' => round($totalPer90, 2),
+                    'predicted_if_fit' => round($totalIfFit, 2),
+                    'expected_mins_if_fit' => round($perGameMinsIfFit, 1),
                     'confidence' => round($totalConfidence / count($playerFixtures), 2),
                     'breakdown' => $combinedBreakdown,
                 ];
@@ -269,7 +273,8 @@ class PredictionService
             'player_id' => $playerId,
             'gameweek' => $gameweek,
             'predicted_points' => $prediction['predicted_points'],
-            'predicted_per_90' => $prediction['predicted_per_90'] ?? null,
+            'predicted_if_fit' => $prediction['predicted_if_fit'] ?? null,
+            'expected_mins_if_fit' => $prediction['expected_mins_if_fit'] ?? null,
             'confidence' => $prediction['confidence'],
             'model_version' => 'v2.0',
             'computed_at' => date('Y-m-d H:i:s'),

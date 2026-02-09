@@ -22,17 +22,20 @@ class MinutesProbability
     /**
      * @param array<string, mixed> $player Player data from database
      * @param int $teamGames Number of games the player's team has played
+     * @param bool $ignoreAvailability When true, treat the player as fully available
+     *             (skips chance_of_playing=0 early return and forces availability=1.0).
+     *             Used to compute "if fit" predictions for ratio scaling.
      * @return array{prob_60: float, prob_any: float, expected_mins: float}
      */
-    public function calculate(array $player, int $teamGames): array
+    public function calculate(array $player, int $teamGames, bool $ignoreAvailability = false): array
     {
         $chanceOfPlaying = $player['chance_of_playing'] ?? null;
         $starts = (int) ($player['starts'] ?? 0);
         $minutes = (int) ($player['minutes'] ?? 0);
         $appearances = (int) ($player['appearances'] ?? 0);
 
-        // Confirmed out
-        if ($chanceOfPlaying !== null && (int) $chanceOfPlaying === 0) {
+        // Confirmed out (skip when computing if-fit values)
+        if (!$ignoreAvailability && $chanceOfPlaying !== null && (int) $chanceOfPlaying === 0) {
             return [
                 'prob_60' => 0.0,
                 'prob_any' => 0.0,
@@ -50,7 +53,7 @@ class MinutesProbability
         }
 
         $teamGames = max(1, $teamGames);
-        $availability = $this->getAvailability($chanceOfPlaying);
+        $availability = $ignoreAvailability ? 1.0 : $this->getAvailability($chanceOfPlaying);
 
         // Derive per-appearance stats from best available data
         if ($appearances > 0) {

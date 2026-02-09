@@ -109,12 +109,13 @@ $fixtures = $db->fetchAll(
     [$gameweek, (int) $player['club_id'], (int) $player['club_id']]
 );
 
-// --- Cached per_90 ---
+// --- Cached if-fit values ---
 $cached = $db->fetchOne(
-    'SELECT predicted_per_90 FROM player_predictions WHERE player_id = ? AND gameweek = ?',
+    'SELECT predicted_if_fit, expected_mins_if_fit FROM player_predictions WHERE player_id = ? AND gameweek = ?',
     [(int) $player['id'], $gameweek]
 );
-$per90 = $cached ? (float) $cached['predicted_per_90'] : null;
+$ifFit = $cached ? (float) $cached['predicted_if_fit'] : null;
+$minsIfFit = $cached ? (float) $cached['expected_mins_if_fit'] : null;
 
 // --- Output ---
 $w = 52; // total width
@@ -186,8 +187,11 @@ if ($prediction && !empty($prediction['breakdown'])) {
 
     echo "│{$line}│\n";
     printf("│  %-28s %20s  │\n", 'TOTAL (predicted_points)', number_format($prediction['predicted_points'], 2));
-    if ($per90 !== null) {
-        printf("│  %-28s %20s  │\n", 'PER 90 (predicted_per_90)', number_format($per90, 2));
+    if ($ifFit !== null) {
+        printf("│  %-28s %20s  │\n", 'IF FIT (predicted_if_fit)', number_format($ifFit, 2));
+    }
+    if ($minsIfFit !== null) {
+        printf("│  %-28s %20s  │\n", 'IF FIT xMins', number_format($minsIfFit, 1));
     }
     printf("│  %-28s %20s  │\n", 'Confidence', number_format($prediction['confidence'] * 100, 0) . '%');
     printf("│  %-28s %20s  │\n", 'Fixtures', (string) $prediction['fixture_count']);

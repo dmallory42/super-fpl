@@ -40,9 +40,14 @@ class BonusProbability
         // Calculate BPS per 90 minutes
         $bpsPer90 = ($bps / $minutes) * 90;
 
-        // Boost BPS estimate with goal/assist expectations
-        // ~24 BPS per goal, ~15 BPS per assist
-        $bpsBoost = ($expectedGoals * 24) + ($expectedAssists * 15);
+        // Marginal BPS boost: only the difference between this fixture's
+        // expected goals/assists and the season average rate.
+        // bpsPer90 already includes BPS from season goals/assists, so adding
+        // the full expected amount would double-count.
+        $seasonGoalsPer90 = (($player['goals_scored'] ?? 0) / $minutes) * 90;
+        $seasonAssistsPer90 = (($player['assists'] ?? 0) / $minutes) * 90;
+        $bpsBoost = (($expectedGoals - $seasonGoalsPer90) * 24)
+            + (($expectedAssists - $seasonAssistsPer90) * 15);
         $adjustedBps = $bpsPer90 + $bpsBoost;
 
         // Calculate historical bonus per appearance

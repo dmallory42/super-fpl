@@ -464,7 +464,8 @@ function handlePredictionsRange(Database $db): void
             pp.player_id,
             pp.gameweek,
             pp.predicted_points,
-            pp.predicted_per_90,
+            pp.predicted_if_fit,
+            pp.expected_mins_if_fit,
             pp.confidence,
             p.web_name,
             p.club_id as team,
@@ -490,14 +491,18 @@ function handlePredictionsRange(Database $db): void
         $playerId = $pred['player_id'];
         if (!isset($playerMap[$playerId])) {
             // Calculate real expected minutes from player data
+            $clubId = (int) $pred['team'];
             $xMins = 90;
             if ($pred['xmins_override'] !== null) {
                 $xMins = (int) $pred['xmins_override'];
             } else {
-                $clubId = (int) $pred['team'];
                 $minsResult = $minutesProb->calculate($pred, $teamGames[$clubId] ?? 24);
                 $xMins = (int) round($minsResult['expected_mins']);
             }
+
+            // If-fit expected minutes (availability forced to 1.0), computed fresh
+            $minsIfFitResult = $minutesProb->calculate($pred, $teamGames[$clubId] ?? 24, ignoreAvailability: true);
+            $xMinsIfFit = (int) round($minsIfFitResult['expected_mins']);
 
             $playerMap[$playerId] = [
                 'player_id' => (int) $pred['player_id'],
@@ -508,13 +513,14 @@ function handlePredictionsRange(Database $db): void
                 'form' => (float) $pred['form'],
                 'total_points' => (int) $pred['total_points'],
                 'expected_mins' => $xMins,
+                'expected_mins_if_fit' => $xMinsIfFit,
                 'predictions' => [],
-                'per_90_predictions' => [],
+                'if_fit_predictions' => [],
                 'total_predicted' => 0,
             ];
         }
         $playerMap[$playerId]['predictions'][(int) $pred['gameweek']] = round((float) $pred['predicted_points'], 1);
-        $playerMap[$playerId]['per_90_predictions'][(int) $pred['gameweek']] = round((float) ($pred['predicted_per_90'] ?? 0), 2);
+        $playerMap[$playerId]['if_fit_predictions'][(int) $pred['gameweek']] = round((float) ($pred['predicted_if_fit'] ?? 0), 2);
         $playerMap[$playerId]['total_predicted'] += (float) $pred['predicted_points'];
     }
 

@@ -227,6 +227,45 @@ class PredictionEngineTest extends TestCase
         $this->assertGreaterThanOrEqual(0, $result['breakdown']['appearance']);
     }
 
+    public function testReturnsIfFitPrediction(): void
+    {
+        $player = $this->makePlayer(3, 1);
+        $result = $this->engine->predict($player);
+
+        // Should include if-fit values
+        $this->assertArrayHasKey('predicted_if_fit', $result);
+        $this->assertArrayHasKey('expected_mins_if_fit', $result);
+        $this->assertGreaterThan(0, $result['predicted_if_fit']);
+        $this->assertGreaterThan(0, $result['expected_mins_if_fit']);
+    }
+
+    public function testIfFitEqualsActualForHealthyPlayer(): void
+    {
+        // Healthy player (no chance_of_playing set): if-fit should equal actual
+        $player = $this->makePlayer(3, 1);
+        $result = $this->engine->predict($player);
+
+        $this->assertEqualsWithDelta(
+            $result['predicted_points'],
+            $result['predicted_if_fit'],
+            0.01,
+            'For healthy players, predicted_if_fit should equal predicted_points'
+        );
+    }
+
+    public function testIfFitNonZeroForInjuredPlayer(): void
+    {
+        // Injured player (chance_of_playing = 0): if-fit should be non-zero
+        $player = $this->makePlayer(3, 1);
+        $player['chance_of_playing'] = 0;
+
+        $result = $this->engine->predict($player);
+
+        $this->assertEquals(0.0, $result['predicted_points']);
+        $this->assertGreaterThan(0, $result['predicted_if_fit']);
+        $this->assertGreaterThan(0, $result['expected_mins_if_fit']);
+    }
+
     public function testCalibrationDoesNotAffectZeroPredictions(): void
     {
         // Unavailable player with 0.0 prediction should stay at 0.0
