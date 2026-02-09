@@ -123,7 +123,23 @@ The frontend uses a **sports broadcast aesthetic** inspired by Sky Sports MNF an
 - Don't mix font families within a single element
 - Don't use generic green (#22c55e) - use `fpl-green` for brand consistency
 
+## Workflow
+
+- **Atomic commits**: Commit after each completed feature or bug fix, not in bulk. Each commit should have passing tests and a clean lint/typecheck.
+- **Always add a test** for any new or changed behaviour — no exceptions. If you're changing how something works, update or add a test that covers it.
+- **TDD preferred**: Write the failing test first when practical, then implement.
+
 ## Code Conventions
+
+### Code Style
+
+Prettier enforces formatting (runs on pre-commit via Husky + lint-staged):
+- No semicolons
+- Single quotes
+- 100 char line width
+- Trailing commas in ES5 positions
+
+ESLint v9 flat config in `frontend/eslint.config.js` — TypeScript, React hooks, React refresh.
 
 ### PHP Backend
 - PSR-4 autoloading, namespace: `SuperFPL\Api\`
@@ -133,18 +149,21 @@ The frontend uses a **sports broadcast aesthetic** inspired by Sky Sports MNF an
 
 ### TypeScript Frontend
 - React functional components with hooks
-- TanStack Query for data fetching (hooks in `src/hooks/`)
+- TanStack Query for all server state (hooks in `src/hooks/`). No Redux, Zustand, or Context API — local UI state uses `useState`
 - Tailwind CSS for styling
 - Types defined in `src/types.ts` and `src/api/client.ts`
+- Import alias: `@/` → `./src/` (configured in vite + tsconfig)
 
-## Building
+## Dev Architecture
+
+Frontend (Vite :5173) proxies `/api/*` to nginx (:8080) → PHP-FPM. SQLite DB auto-migrates on container start via Docker entrypoint.
+
+## Building & Linting
 
 ```bash
-# Frontend
 cd frontend && npm run build   # TypeScript check + Vite build
-
-# Check PHP syntax
-php -l api/src/Services/SomeService.php
+cd frontend && npm run lint    # ESLint
+php -l api/src/Services/SomeService.php  # PHP syntax check
 ```
 
 ## Testing
@@ -195,7 +214,32 @@ class ExampleServiceTest extends TestCase {
 // Frontend: src/components/Example.test.tsx
 import { render, screen } from '../test/utils'
 // Use custom render with QueryClientProvider
+// Vitest uses jsdom + globals (no need to import describe/it/expect)
 ```
+
+## Data Sync
+
+Cron runs automatically in Docker. To manually sync:
+
+| Command | What it does |
+|---------|-------------|
+| `npm run sync:pre` | Pre-deadline: players, fixtures, odds, predictions |
+| `npm run sync:post` | Post-gameweek: results, history |
+| `npm run sync:slow` | Expensive: season history, appearances |
+| `npm run sync:samples` | Sample managers for comparisons |
+| `npm run sync:snapshot` | Snapshot current predictions |
+
+Regenerate predictions after model changes: `docker compose exec php php cron/predictions.php <GW>`
+
+## Key Business Logic
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| PredictionEngine | `api/src/Services/PredictionEngine.php` | Per-player xPts calculation |
+| MinutesProbability | `api/src/Services/MinutesProbability.php` | Playing time model |
+| PathSolver | `api/src/Services/PathSolver.php` | Multi-GW transfer optimizer (beam search) |
+| applyAutoSubs | `frontend/src/hooks/useLive.ts` | Live auto-sub simulation |
+| buildFormation | `frontend/src/hooks/usePlannerOptimize.ts` | XI selection + captain pick |
 
 ## Key Features
 
@@ -233,3 +277,6 @@ cd frontend && npm run build && npm run dev  # Rebuild frontend
 - **FplClient methods**: Use fluent API - `$fplClient->entry($id)->getRaw()` not `$fplClient->getEntry($id)`
 - **Null checks**: Always check for undefined array keys in PHP when accessing player/squad data
 - **Type mismatches**: Frontend interfaces must match API response structures
+- **Frontend tests require Node 22+**: Use `fnm use 22` if you hit `ERR_REQUIRE_ESM` from `@exodus/bytes`
+- **Don't mix native DOM listeners with React events**: Use `data-*` attributes + `target.closest()` for click-outside patterns
+- **Don't introduce state management libraries**: No Context, Redux, or Zustand — TanStack Query + useState only
