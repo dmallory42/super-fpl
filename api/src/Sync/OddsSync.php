@@ -262,6 +262,44 @@ class OddsSync
     }
 
     /**
+     * Strip diacritics/accents from a string (e.g. "Fernández" → "Fernandez").
+     * SQLite LOWER() only handles ASCII, so accent folding must happen in PHP.
+     * Uses explicit char map because musl iconv (Alpine) transliterates é → 'e.
+     */
+    private function stripAccents(string $str): string
+    {
+        return strtr($str, [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ä' => 'a', 'ã' => 'a', 'å' => 'a',
+            'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ä' => 'A', 'Ã' => 'A', 'Å' => 'A',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'É' => 'E', 'È' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+            'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+            'Í' => 'I', 'Ì' => 'I', 'Î' => 'I', 'Ï' => 'I',
+            'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'ö' => 'o', 'õ' => 'o', 'ø' => 'o',
+            'Ó' => 'O', 'Ò' => 'O', 'Ô' => 'O', 'Ö' => 'O', 'Õ' => 'O', 'Ø' => 'O',
+            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+            'Ú' => 'U', 'Ù' => 'U', 'Û' => 'U', 'Ü' => 'U',
+            'ñ' => 'n', 'Ñ' => 'N',
+            'ç' => 'c', 'Ç' => 'C',
+            'š' => 's', 'Š' => 'S', 'ž' => 'z', 'Ž' => 'Z',
+            'ć' => 'c', 'Ć' => 'C', 'č' => 'c', 'Č' => 'C',
+            'đ' => 'd', 'Đ' => 'D',
+            'ğ' => 'g', 'Ğ' => 'G',
+            'ı' => 'i', 'İ' => 'I',
+            'ş' => 's', 'Ş' => 'S',
+            'ý' => 'y', 'Ý' => 'Y', 'ÿ' => 'y',
+            'ř' => 'r', 'Ř' => 'R',
+            'ł' => 'l', 'Ł' => 'L',
+            'ą' => 'a', 'Ą' => 'A', 'ę' => 'e', 'Ę' => 'E',
+            'ő' => 'o', 'Ő' => 'O', 'ű' => 'u', 'Ű' => 'U',
+            'ß' => 'ss',
+            'æ' => 'ae', 'Æ' => 'AE',
+            'ð' => 'd', 'Ð' => 'D',
+            'þ' => 'th', 'Þ' => 'Th',
+        ]);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     private function matchPlayerByName(string $name): ?array
@@ -289,6 +327,7 @@ class OddsSync
         // Try last part of name
         $parts = explode(' ', $name);
         $lastName = end($parts);
+        $strippedLastName = strtolower($this->stripAccents($lastName));
 
         $player = $this->db->fetchOne(
             'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
@@ -298,13 +337,18 @@ class OddsSync
             return $player;
         }
 
-        // Try second_name match
-        $player = $this->db->fetchOne(
-            'SELECT id FROM players WHERE LOWER(second_name) = LOWER(?)',
-            [$lastName]
+        // Try second_name match (accent-insensitive via PHP)
+        // Use prefix LIKE to narrow candidates, then compare with accents stripped
+        $prefix = mb_substr($lastName, 0, 3);
+        $candidates = $this->db->fetchAll(
+            'SELECT id, second_name FROM players WHERE second_name LIKE ?',
+            [$prefix . '%']
         );
-        if ($player !== null) {
-            return $player;
+        foreach ($candidates as $candidate) {
+            $strippedSecondName = strtolower($this->stripAccents($candidate['second_name']));
+            if ($strippedSecondName === $strippedLastName) {
+                return $candidate;
+            }
         }
 
         // Try fuzzy matching with LIKE
@@ -316,15 +360,21 @@ class OddsSync
             return $player;
         }
 
-        // Try first + last name combination
+        // Try first + last name combination (accent-insensitive)
         if (count($parts) >= 2) {
             $firstName = $parts[0];
-            $player = $this->db->fetchOne(
-                'SELECT id FROM players WHERE LOWER(first_name) = LOWER(?) AND LOWER(second_name) = LOWER(?)',
-                [$firstName, $lastName]
+            $strippedFirstName = strtolower($this->stripAccents($firstName));
+            $candidates = $this->db->fetchAll(
+                'SELECT id, first_name, second_name FROM players WHERE first_name LIKE ?',
+                [mb_substr($firstName, 0, 3) . '%']
             );
-            if ($player !== null) {
-                return $player;
+            foreach ($candidates as $candidate) {
+                if (
+                    strtolower($this->stripAccents($candidate['first_name'])) === $strippedFirstName
+                    && strtolower($this->stripAccents($candidate['second_name'])) === $strippedLastName
+                ) {
+                    return $candidate;
+                }
             }
         }
 
