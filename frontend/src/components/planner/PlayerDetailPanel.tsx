@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import type { PlayerMultiWeekPrediction, XMinsOverrides } from '../../api/client'
 import { PositionBadge } from '../common/PositionBadge'
+import { GradientText } from '../ui/GradientText'
 
-type SidebarTab = 'minutes' | 'transfer'
+type SidebarTab = 'projections' | 'transfer'
 
 interface PlayerDetailPanelProps {
   player: {
@@ -11,12 +12,25 @@ interface PlayerDetailPanelProps {
     element_type: number
     team: number
     now_cost: number
+    total_points: number
+    form: string
+    selected_by_percent: string
+    goals_scored: number
+    assists: number
+    clean_sheets: number
+    minutes: number
+    saves: number
+    starts?: number
+    appearances?: number
+    status: string
+    news: string
   }
   teamName: string
   activeTab: SidebarTab
   onTabChange: (tab: SidebarTab) => void
   onClose: () => void
-  // Minutes tab
+  // Projections tab
+  playerPrediction?: PlayerMultiWeekPrediction
   perGwXMins?: Record<number, number>
   gameweeks: number[]
   selectedGw: number | null
@@ -101,6 +115,7 @@ export function PlayerDetailPanel({
   activeTab,
   onTabChange,
   onClose,
+  playerPrediction,
   perGwXMins,
   gameweeks,
   selectedGw,
@@ -123,49 +138,170 @@ export function PlayerDetailPanel({
   }
 
   const tabs: { id: SidebarTab; label: string }[] = [
-    { id: 'minutes', label: 'xMins' },
+    { id: 'projections', label: 'Projections' },
     { id: 'transfer', label: 'Transfer' },
   ]
 
+  const isGkp = player.element_type === 1
+  const isDef = player.element_type === 2
+
+  // Compute scaled xPts per-GW using effective xMins
+  const scaledXPts = (gw: number): number | null => {
+    const rawPts = playerPrediction?.predictions[gw]
+    if (rawPts == null) return null
+    const per90 = playerPrediction?.per_90_predictions?.[gw]
+    const override = getGwOverride(gw)
+    const effectiveMins = override ?? perGwXMins?.[gw] ?? baseExpectedMins
+    if (per90) return per90 * (effectiveMins / 90)
+    if (baseExpectedMins <= 0) return rawPts
+    return rawPts * (effectiveMins / baseExpectedMins)
+  }
+
+  // Compute total xMins and total scaled xPts across gameweeks
+  const totalXMins = gameweeks.reduce((sum, gw) => {
+    const override = getGwOverride(gw)
+    if (override != null) return sum + override
+    return sum + (perGwXMins?.[gw] ?? baseExpectedMins)
+  }, 0)
+
+  const totalScaledXPts = gameweeks.reduce((sum, gw) => {
+    const pts = scaledXPts(gw)
+    return sum + (pts ?? 0)
+  }, 0)
+
   return (
     <div>
-      {/* Drawer header — player name, position badge, close button */}
-      <div className="px-4 py-3 flex items-center justify-between bg-gradient-to-r from-fpl-green/30 via-fpl-green/10 to-transparent border-b border-fpl-green/30">
-        <h3 className="font-display text-sm uppercase tracking-wider text-foreground">
-          {player.web_name}
-        </h3>
-        <div className="flex items-center gap-2">
-          <PositionBadge elementType={player.element_type} />
-          <button
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-colors"
-          >
-            {'\u2715'}
-          </button>
+      {/* Hero Header */}
+      <div className="relative border-b border-fpl-green/20">
+        {/* Left accent bar */}
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-fpl-green" />
+
+        {/* Background gradient */}
+        <div className="bg-gradient-to-r from-fpl-green/20 via-fpl-green/5 to-transparent">
+          {/* Top row: name, position, close */}
+          <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+            <h3 className="font-display text-lg uppercase tracking-widest text-foreground font-bold">
+              {player.web_name}
+            </h3>
+            <div className="flex items-center gap-2">
+              <PositionBadge elementType={player.element_type} />
+              <button
+                onClick={onClose}
+                className="w-7 h-7 flex items-center justify-center rounded text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+              >
+                {'\u2715'}
+              </button>
+            </div>
+          </div>
+
+          {/* Team + price line */}
+          <div className="px-4 pb-2 flex items-center gap-2">
+            <span className="text-xs text-foreground-muted">{teamName}</span>
+            <span className="text-xs text-foreground-dim">{'\u00B7'}</span>
+            <span className="text-xs text-foreground-muted font-mono">
+              {'\u00A3'}
+              {(player.now_cost / 10).toFixed(1)}m
+            </span>
+            {player.news && (
+              <>
+                <span className="text-xs text-foreground-dim">{'\u00B7'}</span>
+                <span
+                  className={`text-xs ${player.status === 'a' ? 'text-foreground-dim' : 'text-amber-400'}`}
+                >
+                  {player.news}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Mini stat panels */}
+          <div className="px-4 pb-3 grid grid-cols-4 gap-2">
+            {[
+              { value: parseFloat(player.form).toFixed(1), label: 'FORM' },
+              { value: player.total_points, label: 'PTS' },
+              {
+                value: playerPrediction ? totalScaledXPts.toFixed(1) : '-',
+                label: 'xPTS',
+                gradient: true,
+              },
+              { value: `${parseFloat(player.selected_by_percent).toFixed(0)}%`, label: 'OWN' },
+            ].map((stat, i) => (
+              <div
+                key={stat.label}
+                className="bg-surface/60 rounded px-2 py-1.5 animate-fade-in-up opacity-0"
+                style={{ animationDelay: `${100 + i * 50}ms` }}
+              >
+                <div
+                  className={`font-mono text-base font-bold ${stat.gradient ? '' : 'text-foreground'}`}
+                >
+                  {stat.gradient ? <GradientText>{stat.value}</GradientText> : stat.value}
+                </div>
+                <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Season stats strip */}
+      <div className="px-4 py-2 border-b border-border/30 animate-fade-in-up opacity-0 [animation-delay:250ms]">
+        <div className="flex items-center gap-1.5 text-xs font-mono text-foreground-dim flex-wrap">
+          {isGkp ? (
+            <>
+              <span>
+                SV <span className="text-foreground-muted">{player.saves}</span>
+              </span>
+              <span>{'\u00B7'}</span>
+              <span>
+                CS <span className="text-foreground-muted">{player.clean_sheets}</span>
+              </span>
+            </>
+          ) : (
+            <>
+              <span>
+                G <span className="text-foreground-muted">{player.goals_scored}</span>
+              </span>
+              <span>{'\u00B7'}</span>
+              <span>
+                A <span className="text-foreground-muted">{player.assists}</span>
+              </span>
+              {isDef && (
+                <>
+                  <span>{'\u00B7'}</span>
+                  <span>
+                    CS <span className="text-foreground-muted">{player.clean_sheets}</span>
+                  </span>
+                </>
+              )}
+            </>
+          )}
+          <span>{'\u00B7'}</span>
+          <span>
+            Starts{' '}
+            <span className="text-foreground-muted">
+              {player.starts ?? '-'}/{player.appearances ?? '-'}
+            </span>
+          </span>
+          <span>{'\u00B7'}</span>
+          <span>
+            Mins <span className="text-foreground-muted">{player.minutes.toLocaleString()}</span>
+          </span>
         </div>
       </div>
 
       <div className="p-4">
-        {/* Player info line */}
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-xs text-foreground-muted">{teamName}</span>
-          <span className="text-xs text-foreground-dim">{'\u00B7'}</span>
-          <span className="text-xs text-foreground-muted font-mono">
-            {'\u00A3'}
-            {(player.now_cost / 10).toFixed(1)}m
-          </span>
-        </div>
-
         {/* Tab switcher */}
-        <div className="flex gap-1 mb-4">
+        <div className="flex gap-0 mb-4 border-b border-border/50">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex-1 py-1.5 text-xs font-display uppercase tracking-wider rounded transition-colors ${
+              className={`flex-1 py-2 text-xs font-display uppercase tracking-wider transition-colors ${
                 activeTab === tab.id
-                  ? 'bg-fpl-green/20 text-fpl-green border border-fpl-green/40'
-                  : 'bg-surface-elevated text-foreground-muted hover:text-foreground hover:bg-surface-hover border border-transparent'
+                  ? 'text-fpl-green border-b-2 border-fpl-green'
+                  : 'text-foreground-muted hover:text-foreground'
               }`}
             >
               {tab.label}
@@ -173,38 +309,89 @@ export function PlayerDetailPanel({
           ))}
         </div>
 
-        {/* xMins tab */}
-        {activeTab === 'minutes' && (
-          <div className="space-y-3 animate-fade-in-up">
-            <div className="space-y-1">
-              {gameweeks.map((gw) => {
+        {/* Projections tab */}
+        {activeTab === 'projections' && (
+          <div className="animate-fade-in-up">
+            {/* Column headers */}
+            <div className="flex items-center px-2 pb-2 border-b border-border/30">
+              <span className="w-12 font-display text-[10px] uppercase tracking-widest text-foreground-dim">
+                GW
+              </span>
+              <span className="flex-1 font-display text-[10px] uppercase tracking-widest text-foreground-dim text-right pr-3">
+                xMins
+              </span>
+              <span className="w-14 font-display text-[10px] uppercase tracking-widest text-foreground-dim text-right">
+                xPts
+              </span>
+            </div>
+
+            {/* GW rows */}
+            <div className="divide-y divide-border/10">
+              {gameweeks.map((gw, idx) => {
                 const backendMins = perGwXMins?.[gw]
                 const displayMins = backendMins ?? baseExpectedMins
                 const isCurrentGw = gw === selectedGw
+                const xPts = scaledXPts(gw)
+
                 return (
                   <div
                     key={gw}
-                    className={`flex items-center justify-between px-2 py-1.5 rounded transition-colors ${
+                    className={`relative flex items-center px-2 py-1.5 transition-colors animate-fade-in-up opacity-0 ${
                       isCurrentGw ? 'bg-fpl-green/10' : 'hover:bg-surface-hover/50'
                     }`}
+                    style={{ animationDelay: `${idx * 30}ms` }}
                   >
+                    {isCurrentGw && (
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-fpl-green rounded-r" />
+                    )}
                     <span
-                      className={`text-xs font-display uppercase tracking-wider ${
+                      className={`w-12 text-xs font-display uppercase tracking-wider ${
                         isCurrentGw ? 'text-fpl-green' : 'text-foreground-muted'
                       }`}
                     >
                       GW{gw}
                     </span>
-                    <GwXMinsInput
-                      playerId={player.id}
-                      gameweek={gw}
-                      baseValue={displayMins}
-                      committedValue={getGwOverride(gw)}
-                      onChange={onXMinsChange}
-                    />
+                    <div className="flex-1 flex justify-end pr-3">
+                      <GwXMinsInput
+                        playerId={player.id}
+                        gameweek={gw}
+                        baseValue={displayMins}
+                        committedValue={getGwOverride(gw)}
+                        onChange={onXMinsChange}
+                      />
+                    </div>
+                    <span
+                      className={`w-14 text-right text-sm font-mono ${
+                        xPts == null
+                          ? 'text-foreground-dim'
+                          : xPts >= 6
+                            ? 'text-fpl-green font-semibold'
+                            : xPts >= 4
+                              ? 'text-foreground'
+                              : 'text-foreground-muted'
+                      }`}
+                    >
+                      {xPts != null ? xPts.toFixed(1) : '-'}
+                    </span>
                   </div>
                 )
               })}
+            </div>
+
+            {/* Summary row */}
+            <div
+              className="flex items-center px-2 py-2 mt-1 border-t border-border/40 animate-fade-in-up opacity-0"
+              style={{ animationDelay: `${gameweeks.length * 30 + 30}ms` }}
+            >
+              <span className="w-12 text-xs font-display uppercase tracking-wider text-foreground-muted">
+                Total
+              </span>
+              <span className="flex-1 text-right pr-3 text-sm font-mono font-bold text-foreground-muted">
+                {totalXMins}
+              </span>
+              <span className="w-14 text-right text-sm font-mono font-bold">
+                <GradientText>{playerPrediction ? totalScaledXPts.toFixed(1) : '-'}</GradientText>
+              </span>
             </div>
           </div>
         )}
@@ -213,8 +400,11 @@ export function PlayerDetailPanel({
         {activeTab === 'transfer' && (
           <div className="space-y-3 animate-fade-in-up">
             <div className="text-xs text-foreground-muted">
-              Budget: {'\u00A3'}
-              {budget.toFixed(1)}m
+              Budget:{' '}
+              <span className="font-mono">
+                {'\u00A3'}
+                {budget.toFixed(1)}m
+              </span>
             </div>
             <input
               type="text"
@@ -232,10 +422,11 @@ export function PlayerDetailPanel({
                   <button
                     key={rPlayer.player_id}
                     onClick={() => onSelectReplacement(rPlayer)}
-                    className="w-full flex items-center gap-2 p-2 rounded hover:bg-surface-hover text-left transition-colors animate-fade-in-up opacity-0"
+                    className="group w-full relative flex items-center gap-2 p-2 rounded hover:bg-surface-hover text-left transition-colors animate-fade-in-up opacity-0"
                     style={{ animationDelay: `${idx * 20}ms` }}
                   >
-                    <div className="flex-1 min-w-0">
+                    <div className="absolute left-0 top-1 bottom-1 w-[2px] rounded bg-transparent group-hover:bg-fpl-green/40 transition-colors" />
+                    <div className="flex-1 min-w-0 pl-1">
                       <div className="text-foreground font-medium text-sm truncate">
                         {rPlayer.web_name}
                       </div>

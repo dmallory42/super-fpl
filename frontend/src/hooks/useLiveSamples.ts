@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchLiveSamples, type LiveSamplesResponse } from '../api/client'
-import { TIER_LABELS, TIER_ORDER } from '../lib/tiers'
+import { type Tier, TIER_LABELS, TIER_ORDER } from '../lib/tiers'
 
 export function useLiveSamples(gameweek: number | null) {
   return useQuery({
@@ -13,7 +13,7 @@ export function useLiveSamples(gameweek: number | null) {
 }
 
 export interface TierComparison {
-  tier: string
+  tier: Tier
   tierLabel: string
   avgPoints: number
   sampleSize: number
@@ -31,11 +31,12 @@ export function calculateComparisons(
 
   const comparisons: TierComparison[] = []
 
-  for (const [tier, data] of Object.entries(samplesData.samples)) {
+  for (const [key, data] of Object.entries(samplesData.samples)) {
+    const tier = key as Tier
     if (data) {
       comparisons.push({
         tier,
-        tierLabel: TIER_LABELS[tier as keyof typeof TIER_LABELS] || tier,
+        tierLabel: TIER_LABELS[tier] || tier,
         avgPoints: data.avg_points,
         sampleSize: data.sample_size,
         difference: userPoints - data.avg_points,
@@ -44,7 +45,7 @@ export function calculateComparisons(
   }
 
   // Sort by tier importance (top_10k first)
-  comparisons.sort((a, b) => TIER_ORDER.indexOf(a.tier as any) - TIER_ORDER.indexOf(b.tier as any))
+  comparisons.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier))
 
   return comparisons
 }
