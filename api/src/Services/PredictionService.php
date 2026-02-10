@@ -49,12 +49,24 @@ class PredictionService
         $assistOdds = $this->getAssistOdds($gameweek);
         $teamGames = $this->getTeamGames();
 
+        // Get GW deadline (earliest kickoff) for injury recovery modeling
+        $gwDeadline = null;
+        foreach ($fixtures as $f) {
+            if (!empty($f['kickoff_time']) && ($gwDeadline === null || $f['kickoff_time'] < $gwDeadline)) {
+                $gwDeadline = $f['kickoff_time'];
+            }
+        }
+
         // Pre-compute penalty taker chains for all teams
         $this->engine->precomputePenaltyTakers($players, $teamGames);
 
         $predictions = [];
 
         foreach ($players as $player) {
+            // Adjust availability for players expected back before this GW
+            if ($gwDeadline !== null) {
+                $player = $this->adjustAvailabilityForRecovery($player, $gwDeadline);
+            }
             $clubId = (int) $player['club_id'];
             $playerId = (int) $player['id'];
             $playerTeamGames = $teamGames[$clubId] ?? 24;
@@ -624,6 +636,54 @@ class PredictionService
         }
 
         return $curve;
+    }
+
+    /**
+     * Adjust a player's chance_of_playing based on expected recovery date vs GW deadline.
+     *
+     * Only affects players currently at 0% — if their news contains a specific return date
+     * that is on or before the GW deadline, restore chance_of_playing to 75 (conservative).
+     *
+     * @param array $player Player data (must include chance_of_playing and news)
+     * @param string $gwDeadline The earliest kickoff for the target gameweek (Y-m-d H:i:s)
+     * @return array Player data with potentially adjusted chance_of_playing
+     */
+    protected function adjustAvailabilityForRecovery(array $player, string $gwDeadline): array
+    {
+        $chanceOfPlaying = $player['chance_of_playing'] ?? null;
+
+        // Only adjust players confirmed out (0%)
+        if ($chanceOfPlaying === null || (int) $chanceOfPlaying !== 0) {
+            return $player;
+        }
+
+        $news = $player['news'] ?? '';
+        // Parse "Expected back DD Mon" from news
+        if (!preg_match('/expected back (\d{1,2}) (jan|feb|mar|apr|may)/i', $news, $matches)) {
+            return $player;
+        }
+
+        $day = (int) $matches[1];
+        $monthMap = ['jan' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4, 'may' => 5];
+        $month = $monthMap[strtolower($matches[2])] ?? null;
+        if ($month === null) {
+            return $player;
+        }
+
+        $deadlineTs = strtotime($gwDeadline);
+        if ($deadlineTs === false) {
+            return $player;
+        }
+        $deadlineYear = (int) date('Y', $deadlineTs);
+
+        $returnTs = mktime(0, 0, 0, $month, $day, $deadlineYear);
+
+        // If return date is on or before the GW deadline, restore to 75% (conservative)
+        if ($returnTs <= $deadlineTs) {
+            $player['chance_of_playing'] = 75;
+        }
+
+        return $player;
     }
 
     /**
