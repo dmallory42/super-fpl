@@ -499,7 +499,7 @@ export function Planner() {
     const override = debouncedXMins[playerId]
     if (typeof override === 'object' && override !== null && override[gw] != null) {
       const ifFitPts = pred?.if_fit_predictions?.[gw] ?? pred?.predictions[gw] ?? 0
-      const ifFitMins = pred?.expected_mins_if_fit ?? pred?.expected_mins ?? 90
+      const ifFitMins = pred?.expected_mins_if_fit ?? 90
       return scalePoints(ifFitPts, ifFitMins, override[gw])
     }
 
@@ -1227,8 +1227,11 @@ export function Planner() {
                 selectedGw={selectedGameweek}
                 xMinsOverrides={xMinsOverrides}
                 onXMinsChange={handleXMinsChange}
-                baseExpectedMins={
-                  playerPredictionsMap.get(selectedPlayerData.id)?.expected_mins ?? 90
+                expectedMinsPerGw={
+                  playerPredictionsMap.get(selectedPlayerData.id)?.expected_mins ?? {}
+                }
+                expectedMinsIfFit={
+                  playerPredictionsMap.get(selectedPlayerData.id)?.expected_mins_if_fit ?? 90
                 }
                 fixtures={predictionsRange?.fixtures?.[selectedPlayerData.team]}
                 budget={selectedPlayerData.now_cost / 10 + effectiveBank}

@@ -118,8 +118,8 @@ export interface PlayerMultiWeekPrediction {
   now_cost: number
   form: number
   total_points: number
-  expected_mins: number // backend override or 90 default
-  expected_mins_if_fit: number // expected minutes when fully available
+  expected_mins: Record<number, number> // per-GW expected minutes from prediction engine
+  expected_mins_if_fit: number // expected minutes when fully available (single value)
   predictions: Record<number, number> // gameweek -> predicted points
   if_fit_predictions: Record<number, number> // gameweek -> if-fit points (availability=1.0)
   total_predicted: number

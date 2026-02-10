@@ -36,7 +36,8 @@ interface PlayerDetailPanelProps {
   selectedGw: number | null
   xMinsOverrides: XMinsOverrides
   onXMinsChange: (playerId: number, xMins: number, gameweek?: number) => void
-  baseExpectedMins: number
+  expectedMinsPerGw: Record<number, number>
+  expectedMinsIfFit: number
   fixtures?: Record<number, FixtureOpponent[]>
   // Transfer tab
   budget: number
@@ -121,7 +122,8 @@ export function PlayerDetailPanel({
   selectedGw,
   xMinsOverrides,
   onXMinsChange,
-  baseExpectedMins,
+  expectedMinsPerGw,
+  expectedMinsIfFit,
   fixtures,
   budget,
   replacementSearch,
@@ -160,8 +162,7 @@ export function PlayerDetailPanel({
       const ifFitPts =
         playerPrediction?.if_fit_predictions?.[gw] ?? playerPrediction?.predictions[gw]
       if (ifFitPts == null) return null
-      const ifFitMins = playerPrediction?.expected_mins_if_fit ?? baseExpectedMins
-      return scalePoints(ifFitPts, ifFitMins, override)
+      return scalePoints(ifFitPts, expectedMinsIfFit, override)
     }
     return playerPrediction?.predictions[gw] ?? null
   }
@@ -170,7 +171,7 @@ export function PlayerDetailPanel({
   const totalXMins = gameweeks.reduce((sum, gw) => {
     const override = getGwOverride(gw)
     if (override != null) return sum + override
-    return sum + baseExpectedMins
+    return sum + (expectedMinsPerGw[gw] ?? expectedMinsIfFit)
   }, 0)
 
   const totalScaledXPts = gameweeks.reduce((sum, gw) => {
@@ -340,7 +341,7 @@ export function PlayerDetailPanel({
             {/* GW rows */}
             <div className="divide-y divide-border/10">
               {gameweeks.map((gw, idx) => {
-                const displayMins = baseExpectedMins
+                const displayMins = expectedMinsPerGw[gw] ?? expectedMinsIfFit
                 const isCurrentGw = gw === selectedGw
                 const xPts = scaledXPts(gw)
 

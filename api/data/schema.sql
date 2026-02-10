@@ -135,6 +135,7 @@ CREATE TABLE player_predictions (
     gameweek INTEGER,
     predicted_points REAL,
     predicted_if_fit REAL,
+    expected_mins REAL,
     expected_mins_if_fit REAL,
     confidence REAL,
     model_version TEXT,

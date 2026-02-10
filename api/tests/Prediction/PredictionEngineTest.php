@@ -234,8 +234,10 @@ class PredictionEngineTest extends TestCase
 
         // Should include if-fit values
         $this->assertArrayHasKey('predicted_if_fit', $result);
+        $this->assertArrayHasKey('expected_mins', $result);
         $this->assertArrayHasKey('expected_mins_if_fit', $result);
         $this->assertGreaterThan(0, $result['predicted_if_fit']);
+        $this->assertGreaterThan(0, $result['expected_mins']);
         $this->assertGreaterThan(0, $result['expected_mins_if_fit']);
     }
 
@@ -255,13 +257,14 @@ class PredictionEngineTest extends TestCase
 
     public function testIfFitNonZeroForInjuredPlayer(): void
     {
-        // Injured player (chance_of_playing = 0): if-fit should be non-zero
+        // Injured player (chance_of_playing = 0): if-fit should be non-zero, expected_mins should be 0
         $player = $this->makePlayer(3, 1);
         $player['chance_of_playing'] = 0;
 
         $result = $this->engine->predict($player);
 
         $this->assertEquals(0.0, $result['predicted_points']);
+        $this->assertEquals(0.0, $result['expected_mins']);
         $this->assertGreaterThan(0, $result['predicted_if_fit']);
         $this->assertGreaterThan(0, $result['expected_mins_if_fit']);
     }

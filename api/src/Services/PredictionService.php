@@ -103,7 +103,8 @@ class PredictionService
                     );
                     $totalPoints += $fixturePrediction['predicted_points'];
                     $totalIfFit += $fixturePrediction['predicted_if_fit'];
-                    // expected_mins_if_fit is per-player (same for all fixtures), not summed
+                    // expected_mins and expected_mins_if_fit are per-player (same for all fixtures), not summed
+                    $perGameMins = $fixturePrediction['expected_mins'];
                     $perGameMinsIfFit = $fixturePrediction['expected_mins_if_fit'];
                     $totalConfidence += $fixturePrediction['confidence'];
 
@@ -126,6 +127,7 @@ class PredictionService
                 $prediction = [
                     'predicted_points' => round($totalPoints, 2),
                     'predicted_if_fit' => round($totalIfFit, 2),
+                    'expected_mins' => round($perGameMins, 1),
                     'expected_mins_if_fit' => round($perGameMinsIfFit, 1),
                     'confidence' => round($totalConfidence / count($playerFixtures), 2),
                     'breakdown' => $combinedBreakdown,
@@ -286,6 +288,7 @@ class PredictionService
             'gameweek' => $gameweek,
             'predicted_points' => $prediction['predicted_points'],
             'predicted_if_fit' => $prediction['predicted_if_fit'] ?? null,
+            'expected_mins' => $prediction['expected_mins'] ?? null,
             'expected_mins_if_fit' => $prediction['expected_mins_if_fit'] ?? null,
             'confidence' => $prediction['confidence'],
             'model_version' => 'v2.0',

@@ -237,6 +237,7 @@ class PredictionEngine
         return [
             'predicted_points' => round($total, 2),
             'predicted_if_fit' => round($ifFitTotal, 2),
+            'expected_mins' => round($minutes['expected_mins'], 1),
             'expected_mins_if_fit' => round($minutesFit['expected_mins'], 1),
             'breakdown' => $breakdown,
             'confidence' => $confidence,

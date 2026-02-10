@@ -442,21 +442,6 @@ function handlePredictionsRange(Database $db): void
 
     $gameweeks = range($startGw, $endGw);
 
-    // Fetch team games for xMins calculation
-    $teamGamesRows = $db->fetchAll(
-        "SELECT club_id, COUNT(*) as games FROM (
-            SELECT home_club_id as club_id FROM fixtures WHERE finished = 1
-            UNION ALL
-            SELECT away_club_id as club_id FROM fixtures WHERE finished = 1
-        ) GROUP BY club_id"
-    );
-    $teamGames = [];
-    foreach ($teamGamesRows as $row) {
-        $teamGames[(int) $row['club_id']] = (int) $row['games'];
-    }
-
-    $minutesProb = new \SuperFPL\Api\Prediction\MinutesProbability();
-
     // Fetch all predictions for the range in a single query
     $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
     $predictions = $db->fetchAll(
@@ -465,6 +450,7 @@ function handlePredictionsRange(Database $db): void
             pp.gameweek,
             pp.predicted_points,
             pp.predicted_if_fit,
+            pp.expected_mins,
             pp.expected_mins_if_fit,
             pp.confidence,
             p.web_name,
@@ -472,12 +458,7 @@ function handlePredictionsRange(Database $db): void
             p.position,
             p.now_cost,
             p.form,
-            p.total_points,
-            p.xmins_override,
-            p.minutes,
-            p.starts,
-            p.appearances,
-            p.chance_of_playing
+            p.total_points
         FROM player_predictions pp
         JOIN players p ON pp.player_id = p.id
         WHERE pp.gameweek IN ($placeholders)
@@ -490,20 +471,6 @@ function handlePredictionsRange(Database $db): void
     foreach ($predictions as $pred) {
         $playerId = $pred['player_id'];
         if (!isset($playerMap[$playerId])) {
-            // Calculate real expected minutes from player data
-            $clubId = (int) $pred['team'];
-            $xMins = 90;
-            if ($pred['xmins_override'] !== null) {
-                $xMins = (int) $pred['xmins_override'];
-            } else {
-                $minsResult = $minutesProb->calculate($pred, $teamGames[$clubId] ?? 24);
-                $xMins = (int) round($minsResult['expected_mins']);
-            }
-
-            // If-fit expected minutes (availability forced to 1.0), computed fresh
-            $minsIfFitResult = $minutesProb->calculate($pred, $teamGames[$clubId] ?? 24, ignoreAvailability: true);
-            $xMinsIfFit = (int) round($minsIfFitResult['expected_mins']);
-
             $playerMap[$playerId] = [
                 'player_id' => (int) $pred['player_id'],
                 'web_name' => $pred['web_name'],
@@ -512,15 +479,17 @@ function handlePredictionsRange(Database $db): void
                 'now_cost' => (int) $pred['now_cost'],
                 'form' => (float) $pred['form'],
                 'total_points' => (int) $pred['total_points'],
-                'expected_mins' => $xMins,
-                'expected_mins_if_fit' => $xMinsIfFit,
+                'expected_mins' => [],
+                'expected_mins_if_fit' => (int) round((float) ($pred['expected_mins_if_fit'] ?? 90)),
                 'predictions' => [],
                 'if_fit_predictions' => [],
                 'total_predicted' => 0,
             ];
         }
-        $playerMap[$playerId]['predictions'][(int) $pred['gameweek']] = round((float) $pred['predicted_points'], 1);
-        $playerMap[$playerId]['if_fit_predictions'][(int) $pred['gameweek']] = round((float) ($pred['predicted_if_fit'] ?? 0), 2);
+        $gw = (int) $pred['gameweek'];
+        $playerMap[$playerId]['expected_mins'][$gw] = (int) round((float) ($pred['expected_mins'] ?? 90));
+        $playerMap[$playerId]['predictions'][$gw] = round((float) $pred['predicted_points'], 1);
+        $playerMap[$playerId]['if_fit_predictions'][$gw] = round((float) ($pred['predicted_if_fit'] ?? 0), 2);
         $playerMap[$playerId]['total_predicted'] += (float) $pred['predicted_points'];
     }
 

@@ -134,7 +134,7 @@ export function PlayerExplorer({
 
         if (gwOverride && gwOverride[gw] != null) {
           const ifFitPts = player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
-          const ifFitMins = player.expected_mins_if_fit ?? player.expected_mins ?? 90
+          const ifFitMins = player.expected_mins_if_fit ?? 90
           perGw[gw] = scalePoints(ifFitPts, ifFitMins, gwOverride[gw])
         } else {
           perGw[gw] = player.predictions[gw] ?? 0
@@ -330,7 +330,8 @@ export function PlayerExplorer({
           <tbody>
             {visiblePlayers.map((player) => {
               const eo = effectiveOwnership?.[String(player.player_id)]
-              const baseXMins = player.expected_mins ?? 90
+              const baseXMins =
+                player.expected_mins?.[gameweeks[0]] ?? player.expected_mins_if_fit ?? 90
               const rawOverride = xMinsOverrides?.[player.player_id]
               // Overrides are always per-GW objects now — show first GW value in input
               const gwOverride =
