@@ -191,4 +191,38 @@ describe('FixtureThreatIndex', () => {
     // Should show negative impact (in header and fixture row)
     expect(screen.getAllByText('-8.5').length).toBeGreaterThan(0)
   })
+
+  it('limits displayed rows when maxRows is provided', () => {
+    const manyFixtureImpacts = [
+      ...mockFixtureImpacts,
+      {
+        fixtureId: 3,
+        homeTeam: 'TOT',
+        awayTeam: 'WHU',
+        userPoints: 2,
+        tierAvgPoints: 5,
+        impact: -3,
+        isLive: false,
+        isFinished: true,
+        hasUserPlayer: false,
+      },
+    ]
+
+    render(
+      <FixtureThreatIndex
+        fixtureData={createFixtureData([
+          { id: 1, home_club_id: 1, away_club_id: 2, started: true, finished: true },
+          { id: 2, home_club_id: 3, away_club_id: 4, started: true, finished: true },
+          { id: 3, home_club_id: 5, away_club_id: 6, started: true, finished: true },
+        ])}
+        fixtureImpacts={manyFixtureImpacts}
+        selectedTier="top_10k"
+        onTierChange={vi.fn()}
+        maxRows={2}
+      />
+    )
+
+    expect(screen.getByText('Showing top 2 fixtures by impact')).toBeInTheDocument()
+    expect(screen.queryByText('TOT')).not.toBeInTheDocument()
+  })
 })

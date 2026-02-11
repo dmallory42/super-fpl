@@ -116,8 +116,8 @@ describe('FixtureScores', () => {
       />
     )
 
-    // Should show time instead of score
-    expect(screen.getByText('15:00')).toBeInTheDocument()
+    // Should show time instead of score (in local timezone format)
+    expect(screen.getByText(/\d{2}:\d{2}/)).toBeInTheDocument()
   })
 
   it('shows FT for finished fixtures', () => {

@@ -2,12 +2,23 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchLiveSamples, type LiveSamplesResponse } from '../api/client'
 import { type Tier, TIER_LABELS, TIER_ORDER } from '../lib/tiers'
 
-export function useLiveSamples(gameweek: number | null) {
+interface LivePollingContext {
+  isLive?: boolean
+  matchesInProgress?: number
+}
+
+function getSampleRefetchInterval({ isLive, matchesInProgress }: LivePollingContext): number {
+  if (!isLive) return 300000
+  if ((matchesInProgress ?? 0) > 0) return 30000
+  return 60000
+}
+
+export function useLiveSamples(gameweek: number | null, context: LivePollingContext = {}) {
   return useQuery({
     queryKey: ['live-samples', gameweek],
     queryFn: () => fetchLiveSamples(gameweek!),
     enabled: gameweek !== null && gameweek > 0,
-    refetchInterval: 60000, // Refetch every minute during live
+    refetchInterval: getSampleRefetchInterval(context),
     staleTime: 30000,
   })
 }

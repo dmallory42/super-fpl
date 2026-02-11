@@ -87,7 +87,7 @@ export function LiveFormationPitch({
   }, [rows])
 
   return (
-    <div className="pitch-texture rounded-lg p-4 relative overflow-hidden">
+    <div className="pitch-texture rounded-lg p-3 md:p-4 relative overflow-hidden">
       {/* Pitch markings */}
       <div className="absolute inset-4 border-2 border-white/20 rounded pointer-events-none" />
       <div className="absolute left-1/2 top-4 bottom-4 w-px bg-white/10 pointer-events-none" />
@@ -97,9 +97,9 @@ export function LiveFormationPitch({
       <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-12 border-b-2 border-x-2 border-white/10 rounded-b-lg pointer-events-none" />
 
       {/* Formation display */}
-      <div className="relative z-10 flex flex-col gap-6 py-4">
+      <div className="relative z-10 flex flex-col gap-4 md:gap-6 py-3 md:py-4">
         {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-2 md:gap-4">
+          <div key={rowIndex} className="flex justify-center gap-1.5 md:gap-4">
             {row.map((player) => {
               const info = playersInfo.get(player.player_id)
               const teamName = info?.team ? (teamsInfo.get(info.team) ?? '???') : '???'
@@ -129,7 +129,7 @@ export function LiveFormationPitch({
       </div>
 
       {/* Bench */}
-      <div className="mt-6 pt-4 border-t-2 border-white/20">
+      <div className="mt-4 md:mt-6 pt-3 md:pt-4 border-t-2 border-white/20">
         <div className="flex items-center justify-center gap-2 mb-3">
           <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/20" />
           <span className="font-display text-xs uppercase tracking-wider text-white/60 px-3">
@@ -137,7 +137,7 @@ export function LiveFormationPitch({
           </span>
           <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20" />
         </div>
-        <div className="flex justify-center gap-2 md:gap-4 bg-surface/30 rounded-lg py-3 px-4">
+        <div className="flex justify-center gap-1.5 md:gap-4 bg-surface/30 rounded-lg py-2.5 md:py-3 px-2.5 md:px-4">
           {bench.map((player, idx) => {
             const info = playersInfo.get(player.player_id)
             const teamName = info?.team ? (teamsInfo.get(info.team) ?? '???') : '???'

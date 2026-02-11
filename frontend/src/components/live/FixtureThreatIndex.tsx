@@ -19,6 +19,8 @@ interface FixtureThreatIndexProps {
   fixtureImpacts: FixtureImpact[]
   selectedTier: Tier
   onTierChange: (tier: Tier) => void
+  showTierSelector?: boolean
+  maxRows?: number
 }
 
 export function FixtureThreatIndex({
@@ -26,6 +28,8 @@ export function FixtureThreatIndex({
   fixtureImpacts,
   selectedTier,
   onTierChange,
+  showTierSelector = true,
+  maxRows,
 }: FixtureThreatIndexProps) {
   if (!fixtureData || fixtureImpacts.length === 0) {
     return (
@@ -37,6 +41,7 @@ export function FixtureThreatIndex({
 
   // Sort by absolute impact (most impactful first)
   const sortedFixtures = [...fixtureImpacts].sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact))
+  const visibleFixtures = maxRows ? sortedFixtures.slice(0, maxRows) : sortedFixtures
 
   // Calculate totals
   const totalUserPoints = fixtureImpacts.reduce((sum, f) => sum + f.userPoints, 0)
@@ -44,7 +49,7 @@ export function FixtureThreatIndex({
   const totalImpact = totalUserPoints - totalTierAvg
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5 md:space-y-3">
       {/* Header with tier selector */}
       <div className="flex items-center justify-between">
         <div className="text-center">
@@ -60,44 +65,46 @@ export function FixtureThreatIndex({
             {totalImpact > 0 ? '+' : ''}
             {totalImpact.toFixed(1)}
           </div>
-          <div className="text-[9px] font-display uppercase tracking-wider text-foreground-dim">
-            Net Impact
+          <div className="text-[9px] font-display uppercase tracking-wide text-foreground-dim">
+            Fixture Swing
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] text-foreground-dim mr-1">vs</span>
-          {TIER_OPTIONS.map((tier) => (
-            <button
-              key={tier.value}
-              onClick={() => onTierChange(tier.value)}
-              className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-wider rounded transition-colors ${
-                selectedTier === tier.value
-                  ? 'bg-fpl-green/20 text-fpl-green'
-                  : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
-              }`}
-            >
-              {tier.label}
-            </button>
-          ))}
-        </div>
+        {showTierSelector && (
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] md:text-[10px] text-foreground-dim mr-1">vs</span>
+            {TIER_OPTIONS.map((tier) => (
+              <button
+                key={tier.value}
+                onClick={() => onTierChange(tier.value)}
+                className={`px-2 py-0.5 text-[9px] md:text-[10px] font-display uppercase tracking-wide rounded transition-colors ${
+                  selectedTier === tier.value
+                    ? 'bg-fpl-green/20 text-fpl-green'
+                    : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
+                }`}
+              >
+                {tier.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Summary bar */}
-      <div className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated text-xs">
+      <div className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated text-[11px] md:text-xs">
         <div className="flex items-center gap-2">
-          <span className="text-foreground-muted">You:</span>
+          <span className="text-foreground-muted">Your points:</span>
           <span className="font-mono font-bold text-fpl-green">{totalUserPoints.toFixed(1)}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-foreground-muted">Tier:</span>
+          <span className="text-foreground-muted">Field points:</span>
           <span className="font-mono text-foreground-muted">{totalTierAvg.toFixed(1)}</span>
         </div>
       </div>
 
       {/* Fixture list */}
       <div className="space-y-1" key={selectedTier}>
-        {sortedFixtures.map((fixture, idx) => {
+        {visibleFixtures.map((fixture, idx) => {
           const isPositive = fixture.impact > 0
           const isNegative = fixture.impact < 0
 
@@ -157,6 +164,11 @@ export function FixtureThreatIndex({
           )
         })}
       </div>
+      {maxRows && sortedFixtures.length > maxRows && (
+        <p className="text-[10px] text-foreground-dim text-center">
+          Showing top {maxRows} fixtures by impact
+        </p>
+      )}
     </div>
   )
 }

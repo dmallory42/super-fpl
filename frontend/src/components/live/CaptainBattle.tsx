@@ -13,6 +13,9 @@ interface CaptainBattleProps {
       }
     | undefined
   playersMap: Map<number, { web_name: string; team: number; element_type: number }>
+  selectedTier?: Tier
+  onTierChange?: (tier: Tier) => void
+  showTierSelector?: boolean
 }
 
 interface CaptainOption {
@@ -30,10 +33,19 @@ const rankBadgeStyles: Record<number, string> = {
   3: 'bg-gradient-to-br from-orange-400 to-orange-600 text-orange-950',
 }
 
-export function CaptainBattle({ userCaptainId, samples, playersMap }: CaptainBattleProps) {
-  const [selectedTier, setSelectedTier] = useState<Tier>('top_10k')
+export function CaptainBattle({
+  userCaptainId,
+  samples,
+  playersMap,
+  selectedTier,
+  onTierChange,
+  showTierSelector = true,
+}: CaptainBattleProps) {
+  const [internalTier, setInternalTier] = useState<Tier>('top_10k')
+  const activeTier = selectedTier ?? internalTier
+  const handleTierChange = onTierChange ?? setInternalTier
 
-  const tierData = samples?.[selectedTier]
+  const tierData = samples?.[activeTier]
   const captainPercent = tierData?.captain_percent
 
   const captainOptions = useMemo((): CaptainOption[] => {
@@ -98,34 +110,42 @@ export function CaptainBattle({ userCaptainId, samples, playersMap }: CaptainBat
   const isDifferential = userCaptainRank !== null && userCaptainRank > 3
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5 md:space-y-3">
       {/* Tier selector */}
       <div className="flex items-center justify-between">
         {isDifferential && (
-          <span className="text-[10px] font-display uppercase tracking-wider text-fpl-green">
-            Differential pick
+          <span className="text-[9px] md:text-[10px] font-display uppercase tracking-wide text-fpl-green">
+            Captain differential
           </span>
         )}
         <div className={`flex items-center gap-1 ${!isDifferential ? 'ml-auto' : ''}`}>
-          <span className="text-[10px] text-foreground-dim mr-1">vs</span>
-          {TIER_OPTIONS.map((tier) => (
-            <button
-              key={tier.value}
-              onClick={() => setSelectedTier(tier.value)}
-              className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-wider rounded transition-colors ${
-                selectedTier === tier.value
-                  ? 'bg-fpl-purple/20 text-fpl-purple'
-                  : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
-              }`}
-            >
-              {tier.label}
-            </button>
-          ))}
+          {showTierSelector ? (
+            <>
+              <span className="text-[9px] md:text-[10px] text-foreground-dim mr-1">vs</span>
+              {TIER_OPTIONS.map((tier) => (
+                <button
+                  key={tier.value}
+                  onClick={() => handleTierChange(tier.value)}
+                  className={`px-2 py-0.5 text-[9px] md:text-[10px] font-display uppercase tracking-wide rounded transition-colors ${
+                    activeTier === tier.value
+                      ? 'bg-fpl-purple/20 text-fpl-purple'
+                      : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
+                  }`}
+                >
+                  {tier.label}
+                </button>
+              ))}
+            </>
+          ) : (
+            <span className="text-[9px] md:text-[10px] text-foreground-dim uppercase tracking-wide">
+              Tier context shared
+            </span>
+          )}
         </div>
       </div>
 
       {/* Captain list */}
-      <div key={selectedTier} className="space-y-1.5">
+      <div key={activeTier} className="space-y-1.5">
         {captainOptions.length === 0 ? (
           <div className="text-center text-foreground-muted py-4 text-sm">
             No captain data for this tier

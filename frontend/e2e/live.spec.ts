@@ -189,8 +189,8 @@ test.describe('Live Page', () => {
     await page.fill('input[placeholder*="Manager ID"]', '12345')
     await page.click('button:has-text("Track")')
 
-    // Wait for comparison section
-    await page.waitForSelector('text=vs Sample Averages', { timeout: 10000 })
+    // Wait for overall position section
+    await page.waitForSelector('text=Overall Position', { timeout: 10000 })
 
     // Should show tier labels - look for the text anywhere on page (use first() for duplicates)
     await expect(page.locator('text=Top 10K').first()).toBeVisible()
@@ -229,12 +229,13 @@ test.describe('Live Page', () => {
     await page.fill('input[placeholder*="Manager ID"]', '12345')
     await page.click('button:has-text("Track")')
 
-    // Wait for bonus section
-    await page.waitForSelector('text=Bonus Predictions', { timeout: 10000 })
+    // Wait for fixtures section and open the live fixture row to reveal bonus points
+    await page.waitForSelector('text=Fixtures', { timeout: 10000 })
+    await page.locator('button').filter({ hasText: 'MCI' }).first().click()
 
-    // Should show bonus predictions (+3 and +2 badges)
-    await expect(page.locator('text=+3').first()).toBeVisible()
-    await expect(page.locator('text=+2').first()).toBeVisible()
+    // Should show bonus points details for mocked fixtures
+    await expect(page.locator('text=Bonus Points').first()).toBeVisible()
+    await expect(page.locator('text=Salah').first()).toBeVisible()
   })
 
   test('remembers manager ID in localStorage', async ({ page }) => {

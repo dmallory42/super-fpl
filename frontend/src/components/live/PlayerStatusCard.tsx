@@ -36,6 +36,16 @@ export function PlayerStatusCard({
   const [showTooltip, setShowTooltip] = useState(false)
 
   const effectivePoints = points * multiplier
+  const statusLabel =
+    status === 'playing'
+      ? matchMinute
+        ? `Live ${matchMinute}'`
+        : 'Live'
+      : status === 'finished'
+        ? 'Finished'
+        : status === 'upcoming'
+          ? 'Upcoming'
+          : 'Status unknown'
 
   // Status-based container styling
   const getContainerClasses = () => {
@@ -59,17 +69,28 @@ export function PlayerStatusCard({
       style={{ animationDelay: `${animationDelay}ms` }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
+      onFocus={() => setShowTooltip(true)}
+      onBlur={() => setShowTooltip(false)}
+      onClick={() => setShowTooltip((prev) => !prev)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setShowTooltip((prev) => !prev)
+        }
+      }}
+      tabIndex={0}
+      aria-label={`${webName} (${teamName}), ${effectivePoints} points, ${statusLabel}`}
     >
       {/* Shirt with points */}
       <div className="relative group">
         <div className={getContainerClasses()}>
           {/* Team shirt SVG */}
-          <TeamShirt teamId={teamId} size={56} className="drop-shadow-lg" />
+          <TeamShirt teamId={teamId} size={52} className="drop-shadow-lg" />
 
           {/* Points overlay - positioned in center of shirt */}
           <div className="absolute inset-0 flex items-center justify-center pt-2">
             <span
-              className="text-lg font-mono font-bold drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]"
+              className="text-base md:text-lg font-mono font-bold drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]"
               style={{ color: '#FFFFFF' }}
             >
               {effectivePoints}
@@ -110,16 +131,19 @@ export function PlayerStatusCard({
       </div>
 
       {/* Player name */}
-      <div className="bg-surface/90 backdrop-blur-sm text-foreground text-xs px-2 py-0.5 rounded mt-1.5 max-w-[70px] truncate font-medium">
+      <div className="bg-surface/90 backdrop-blur-sm text-foreground text-[11px] md:text-xs px-1.5 md:px-2 py-0.5 rounded mt-1 max-w-[62px] md:max-w-[70px] truncate font-medium">
         {webName}
       </div>
 
       {/* Team */}
-      <div className="text-white/70 text-xs">{teamName}</div>
+      <div className="text-white/70 text-[10px] md:text-xs">{teamName}</div>
+      <div className="text-[9px] md:text-[10px] text-white/60 font-display uppercase tracking-wide">
+        {statusLabel}
+      </div>
 
       {/* Effective ownership (optional) */}
       {effectiveOwnership !== undefined && effectiveOwnership > 0 && (
-        <div className="text-xs mt-0.5 font-mono text-white/90">
+        <div className="hidden md:block text-xs mt-0.5 font-mono text-white/90">
           EO: {effectiveOwnership.toFixed(0)}%
         </div>
       )}

@@ -43,16 +43,18 @@ export function BroadcastCard({
       {title && (
         <div
           className={`
-            px-4 py-3 flex items-center justify-between
+            px-3 md:px-4 py-2.5 md:py-3 flex items-center justify-between
             bg-gradient-to-r ${accentGradients[accentColor]}
             border-b ${accentBorders[accentColor]}
           `}
         >
-          <h3 className="font-display text-sm uppercase tracking-wider text-foreground">{title}</h3>
+          <h3 className="font-display text-xs md:text-sm uppercase tracking-wide text-foreground font-semibold">
+            {title}
+          </h3>
           {headerAction && <div>{headerAction}</div>}
         </div>
       )}
-      <div className="p-4">{children}</div>
+      <div className="p-3 md:p-4">{children}</div>
     </div>
   )
 }

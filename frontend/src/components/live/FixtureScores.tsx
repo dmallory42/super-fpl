@@ -37,6 +37,14 @@ export function FixtureScores({
   bonusPredictions,
 }: FixtureScoresProps) {
   const [expandedFixture, setExpandedFixture] = useState<number | null>(null)
+  const localTimeZoneShort = useMemo(() => {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    }).formatToParts(new Date())
+    return parts.find((part) => part.type === 'timeZoneName')?.value ?? 'local'
+  }, [])
 
   const playerEventsByTeam = useMemo(() => {
     if (!liveElements) return new Map<number, PlayerEvent[]>()
@@ -144,6 +152,9 @@ export function FixtureScores({
 
   return (
     <div className="space-y-3">
+      <div className="text-[10px] text-foreground-dim px-1">
+        Kickoff times shown in {localTimeZoneShort}
+      </div>
       {groups.map((group) => (
         <div key={group.label} className="space-y-1.5">
           <div className="flex items-center gap-2 px-1">
@@ -206,9 +217,10 @@ export function FixtureScores({
                   >
                     {isUpcoming ? (
                       <span className="font-mono text-foreground-dim text-[11px]">
-                        {new Date(fixture.kickoff_time).toLocaleTimeString('en-GB', {
+                        {new Date(fixture.kickoff_time).toLocaleTimeString(undefined, {
                           hour: '2-digit',
                           minute: '2-digit',
+                          hour12: false,
                         })}
                       </span>
                     ) : (

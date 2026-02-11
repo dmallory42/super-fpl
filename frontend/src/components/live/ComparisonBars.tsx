@@ -18,6 +18,7 @@ interface ComparisonBarsProps {
   playerImpacts?: PlayerImpact[]
   selectedTier: Tier
   onTierChange: (tier: Tier) => void
+  showTierSelector?: boolean
   animationDelay?: number
 }
 
@@ -27,6 +28,7 @@ export function ComparisonBars({
   playerImpacts,
   selectedTier,
   onTierChange,
+  showTierSelector = true,
   animationDelay = 0,
 }: ComparisonBarsProps) {
   if (comparisons.length === 0) {
@@ -61,11 +63,11 @@ export function ComparisonBars({
 
   return (
     <div
-      className="space-y-4 animate-fade-in-up opacity-0"
+      className="space-y-3 md:space-y-4 animate-fade-in-up opacity-0"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       {/* Race Track */}
-      <div className="relative pt-12 pb-6">
+      <div className="relative pt-10 md:pt-12 pb-5 md:pb-6">
         {/* The track line */}
         <div className="absolute left-0 right-0 top-1/2 h-1 bg-gradient-to-r from-surface via-foreground-dim/30 to-surface rounded-full" />
 
@@ -131,17 +133,19 @@ export function ComparisonBars({
           {/* Marker */}
           <div className="relative w-4 h-4 bg-fpl-green rounded-full ring-2 ring-background shadow-lg shadow-fpl-green/40" />
           {/* Label above */}
-          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-            <div className="font-display text-xs font-bold uppercase tracking-wider text-fpl-green">
+          <div className="absolute bottom-full mb-1.5 md:mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
+            <div className="font-display text-[11px] md:text-xs font-bold uppercase tracking-wide text-fpl-green">
               YOU
             </div>
-            <div className="font-mono text-xs font-bold text-fpl-green">{userPoints}</div>
+            <div className="font-mono text-[11px] md:text-xs font-bold text-fpl-green">
+              {userPoints}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Comparison summary */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-1.5 md:gap-2">
         {comparisons.map((comp, idx) => {
           const isAhead = comp.difference > 0
           const isBehind = comp.difference < 0
@@ -156,14 +160,14 @@ export function ComparisonBars({
               className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated animate-fade-in-up opacity-0"
               style={{ animationDelay: `${animationDelay + 400 + idx * 50}ms` }}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 md:gap-2">
                 <div className={`w-2 h-2 rounded-full ${config.color}`} />
-                <span className="font-display text-xs uppercase tracking-wider text-foreground-muted">
+                <span className="font-display text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
                   {comp.tierLabel}
                 </span>
               </div>
               <span
-                className={`font-mono text-sm font-bold ${
+                className={`font-mono text-sm md:text-base font-bold ${
                   isAhead ? 'text-fpl-green' : isBehind ? 'text-destructive' : 'text-foreground-dim'
                 }`}
               >
@@ -187,31 +191,33 @@ export function ComparisonBars({
               {/* Header with tier selector */}
               <div className="flex items-center justify-between mb-3">
                 <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
-                  Rank Impact
+                  Biggest Swings
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-foreground-dim mr-1">vs</span>
-                  {TIER_OPTIONS.map((tier) => (
-                    <button
-                      key={tier.value}
-                      onClick={() => onTierChange(tier.value)}
-                      className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-wider rounded transition-colors ${
-                        selectedTier === tier.value
-                          ? 'bg-fpl-green/20 text-fpl-green'
-                          : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
-                      }`}
-                    >
-                      {tier.label}
-                    </button>
-                  ))}
-                </div>
+                {showTierSelector && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-foreground-dim mr-1">vs</span>
+                    {TIER_OPTIONS.map((tier) => (
+                      <button
+                        key={tier.value}
+                        onClick={() => onTierChange(tier.value)}
+                        className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-wider rounded transition-colors ${
+                          selectedTier === tier.value
+                            ? 'bg-fpl-green/20 text-fpl-green'
+                            : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
+                        }`}
+                      >
+                        {tier.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div key={selectedTier} className="grid grid-cols-2 gap-4">
                 {/* Gainers column */}
                 <div className="space-y-1.5">
                   <div className="text-[10px] text-fpl-green font-display uppercase tracking-wider mb-1">
-                    ▲ Helping
+                    ▲ Helping You
                   </div>
                   {gainers.length > 0 ? (
                     gainers.map((player, idx) => (
@@ -239,7 +245,7 @@ export function ComparisonBars({
                 {/* Losers column */}
                 <div className="space-y-1.5">
                   <div className="text-[10px] text-destructive font-display uppercase tracking-wider mb-1">
-                    ▼ Hurting
+                    ▼ Hurting You
                   </div>
                   {losers.length > 0 ? (
                     losers.map((player, idx) => (
@@ -273,7 +279,7 @@ export function ComparisonBars({
         })()}
 
       {/* Sample size note */}
-      <p className="text-[10px] text-foreground-dim text-center pt-2">
+      <p className="text-[9px] md:text-[10px] text-foreground-dim text-center pt-1.5 md:pt-2">
         Based on {comparisons[0]?.sampleSize.toLocaleString() ?? 0} sampled managers per tier
       </p>
     </div>

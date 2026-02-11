@@ -52,30 +52,54 @@ function updateUrlManagerId(managerId: number | null) {
   } else {
     params.delete('manager')
   }
-  const newUrl = `${window.location.pathname}?${params.toString()}`
+  const query = params.toString()
+  const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname
   window.history.replaceState({}, '', newUrl)
+}
+
+function formatUpdatedTime(value: string | undefined): string | null {
+  if (!value) return null
+  const timestamp = Date.parse(value)
+  if (Number.isNaN(timestamp)) return null
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }
 
 export function Live() {
   const initial = getInitialManagerId()
   const [managerId, setManagerId] = useState<number | null>(initial.id)
   const [managerInput, setManagerInput] = useState(initial.input)
+  const [managerInputError, setManagerInputError] = useState<string | null>(null)
   const [comparisonTier, setComparisonTier] = useState<Tier>('top_10k')
 
   // Auto-detect current gameweek
   const { data: gwData, isLoading: isLoadingGw, gameweekData } = useCurrentGameweek()
 
   const gameweek = gwData?.gameweek ?? null
+  const pollingContext = useMemo(
+    () => ({
+      isLive: gwData?.isLive,
+      matchesInProgress: gwData?.matchesInProgress,
+    }),
+    [gwData?.isLive, gwData?.matchesInProgress]
+  )
 
   const { data: playersData } = usePlayers()
   const {
     data: liveManager,
     isLoading: isLoadingManager,
+    isFetching: isFetchingManager,
     error: managerError,
-  } = useLiveManager(gameweek, managerId)
-  const { data: samplesData } = useLiveSamples(gameweek)
-  const { data: liveData } = useLiveData(gameweek)
-  const { data: bonusData } = useLiveBonus(gameweek)
+  } = useLiveManager(gameweek, managerId, pollingContext)
+  const { data: samplesData, isFetching: isFetchingSamples } = useLiveSamples(
+    gameweek,
+    pollingContext
+  )
+  const { data: liveData, isFetching: isFetchingLiveData } = useLiveData(gameweek, pollingContext)
+  const { data: bonusData, isFetching: isFetchingBonus } = useLiveBonus(gameweek, pollingContext)
   const { data: predictionsData } = usePredictions(gameweek)
 
   // Build player info maps
@@ -368,10 +392,21 @@ export function Live() {
 
   // Get tier label for differential analysis
   const tierLabel = TIER_OPTIONS.find((t) => t.value === comparisonTier)?.label ?? comparisonTier
+  const managerLastUpdated = formatUpdatedTime(liveManager?.updated_at)
+  const samplesLastUpdated = formatUpdatedTime(samplesData?.updated_at)
+  const isRefreshingLiveData =
+    isFetchingManager || isFetchingSamples || isFetchingLiveData || isFetchingBonus
 
   const handleLoadManager = (id?: number) => {
-    const managerId = id ?? parseInt(managerInput, 10)
+    const rawInput = id !== undefined ? String(id) : managerInput.trim()
+    if (!/^\d+$/.test(rawInput)) {
+      setManagerInputError('Enter a valid numeric Manager ID.')
+      return
+    }
+
+    const managerId = parseInt(rawInput, 10)
     if (!isNaN(managerId) && managerId > 0) {
+      setManagerInputError(null)
       setManagerId(managerId)
       setManagerInput(String(managerId))
       // Save to localStorage and URL
@@ -395,7 +430,7 @@ export function Live() {
   }, [])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
       <div className="animate-fade-in-up">
         <div className="flex items-center gap-3 mb-2">
@@ -416,6 +451,13 @@ export function Live() {
             'Track live points for your team during the gameweek.'
           )}
         </p>
+        {managerId && (managerLastUpdated || samplesLastUpdated || isRefreshingLiveData) && (
+          <p className="text-xs text-foreground-dim mt-1">
+            {managerLastUpdated ? `Team update ${managerLastUpdated}` : 'Team update pending'}
+            {samplesLastUpdated ? ` • Samples ${samplesLastUpdated}` : ''}
+            {isRefreshingLiveData ? ' • Refreshing…' : ''}
+          </p>
+        )}
         {gwData && gwData.totalMatches > 0 && (
           <div
             className="flex h-1.5 mt-2 rounded-full overflow-hidden bg-surface-elevated max-w-xs"
@@ -443,8 +485,13 @@ export function Live() {
           <div className="flex gap-2 max-w-md">
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={managerInput}
-              onChange={(e) => setManagerInput(e.target.value)}
+              onChange={(e) => {
+                setManagerInput(e.target.value.replace(/\D/g, ''))
+                setManagerInputError(null)
+              }}
               placeholder="Enter your FPL Manager ID"
               className="input-broadcast flex-1"
               aria-label="Manager ID"
@@ -454,6 +501,9 @@ export function Live() {
               Track
             </button>
           </div>
+          {managerInputError && (
+            <p className="mt-2 text-xs text-destructive">{managerInputError}</p>
+          )}
         </div>
       )}
 
@@ -466,7 +516,7 @@ export function Live() {
 
       {/* Loading State */}
       {(isLoadingManager || isLoadingGw) && managerId && (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           <SkeletonStatGrid />
           <SkeletonPitch />
         </div>
@@ -551,40 +601,98 @@ export function Live() {
             />
           </BroadcastCard>
 
-          {/* Bottom Section: Stats Grid */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Comparison Bars */}
-            <BroadcastCard title="vs Sample Averages" animationDelay={300}>
+          {/* Global tier context */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-surface-elevated/70">
+            <span className="text-[10px] md:text-[11px] font-display uppercase tracking-wide text-foreground-muted">
+              Compare Against
+            </span>
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[9px] md:text-[10px] text-foreground-dim mr-1">vs</span>
+              {TIER_OPTIONS.map((tier) => (
+                <button
+                  key={tier.value}
+                  onClick={() => setComparisonTier(tier.value)}
+                  className={`px-2 py-0.5 text-[9px] md:text-[10px] font-display uppercase tracking-wide rounded transition-colors ${
+                    comparisonTier === tier.value
+                      ? 'bg-fpl-green/25 text-fpl-green ring-1 ring-fpl-green/30'
+                      : 'text-foreground-dim hover:text-foreground hover:bg-surface'
+                  }`}
+                >
+                  {tier.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Core cards */}
+          <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+            {/* Overall Position */}
+            <BroadcastCard title="Overall Position" animationDelay={300}>
               <ComparisonBars
                 userPoints={processedSquad.totalPoints}
                 comparisons={comparisons}
                 playerImpacts={playerImpacts}
                 selectedTier={comparisonTier}
                 onTierChange={setComparisonTier}
+                showTierSelector={false}
                 animationDelay={350}
               />
+              {rankMovement && gwData && (
+                <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
+                  <RankProjection
+                    currentRank={rankMovement.current}
+                    previousRank={rankMovement.previous ?? rankMovement.current}
+                    currentPoints={processedSquad.totalPoints}
+                    tierAvgPoints={samplesData?.samples?.[comparisonTier]?.avg_points ?? 0}
+                    fixturesFinished={gwData.matchesPlayed}
+                    fixturesTotal={gwData.totalMatches}
+                    compact
+                  />
+                </div>
+              )}
             </BroadcastCard>
 
-            {/* Captain Battle */}
-            <BroadcastCard title="Captain Battle" accentColor="purple" animationDelay={350}>
+            {/* Key Swings */}
+            <BroadcastCard title="Key Swings" accentColor="purple" animationDelay={350}>
               <CaptainBattle
                 userCaptainId={userCaptain?.playerId}
                 samples={samplesData?.samples}
                 playersMap={playersMap}
+                selectedTier={comparisonTier}
+                onTierChange={setComparisonTier}
+                showTierSelector={false}
               />
+              {differentialData.length > 0 && (
+                <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
+                  <DifferentialAnalysis players={differentialData} tierLabel={tierLabel} />
+                </div>
+              )}
             </BroadcastCard>
+          </div>
 
-            {/* Players Remaining */}
-            <BroadcastCard title="Players Left" animationDelay={400}>
+          {/* Match flow cards */}
+          <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+            {/* What Can Still Change */}
+            <BroadcastCard title="What Can Still Change" animationDelay={400}>
               <PlayersRemaining
                 players={processedSquad.players}
                 playersMap={playersMap}
                 fixtureData={gameweekData}
                 effectiveOwnership={top10kEO}
               />
+              <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
+                <FixtureThreatIndex
+                  fixtureData={gameweekData}
+                  fixtureImpacts={fixtureImpacts}
+                  selectedTier={comparisonTier}
+                  onTierChange={setComparisonTier}
+                  showTierSelector={false}
+                  maxRows={5}
+                />
+              </div>
             </BroadcastCard>
 
-            {/* Fixture Scores */}
+            {/* Fixtures */}
             <BroadcastCard title="Fixtures" accentColor="purple" animationDelay={450}>
               <FixtureScores
                 fixtureData={gameweekData}
@@ -596,50 +704,21 @@ export function Live() {
             </BroadcastCard>
           </div>
 
-          {/* Advanced Analytics Section */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Rank Projection */}
-            {rankMovement && gwData && (
-              <BroadcastCard title="Rank Projection" animationDelay={500}>
-                <RankProjection
-                  currentRank={rankMovement.current}
-                  previousRank={rankMovement.previous ?? rankMovement.current}
-                  currentPoints={processedSquad.totalPoints}
-                  tierAvgPoints={samplesData?.samples?.top_10k?.avg_points ?? 0}
-                  fixturesFinished={gwData.matchesPlayed}
-                  fixturesTotal={gwData.totalMatches}
-                />
-              </BroadcastCard>
-            )}
-
-            {/* Variance Analysis */}
-            {varianceData && (
-              <BroadcastCard title="Luck Analysis" accentColor="purple" animationDelay={550}>
+          {/* Advanced */}
+          {varianceData && (
+            <details className="rounded-lg border border-border/40 bg-surface-elevated/30">
+              <summary className="cursor-pointer px-3 md:px-4 py-2.5 md:py-3 font-display text-xs md:text-sm uppercase tracking-wider text-foreground-muted">
+                Advanced: Expected vs Actual
+              </summary>
+              <div className="px-3 md:px-4 pb-3 md:pb-4 pt-1">
                 <VarianceAnalysis
                   players={varianceData.players}
                   totalPredicted={varianceData.totalPredicted}
                   totalActual={varianceData.totalActual}
                 />
-              </BroadcastCard>
-            )}
-
-            {/* Fixture Impact Analysis */}
-            <BroadcastCard title="Fixture Impact" animationDelay={600}>
-              <FixtureThreatIndex
-                fixtureData={gameweekData}
-                fixtureImpacts={fixtureImpacts}
-                selectedTier={comparisonTier}
-                onTierChange={setComparisonTier}
-              />
-            </BroadcastCard>
-
-            {/* Differential Analysis */}
-            {differentialData.length > 0 && (
-              <BroadcastCard title="Differentials" accentColor="purple" animationDelay={650}>
-                <DifferentialAnalysis players={differentialData} tierLabel={tierLabel} />
-              </BroadcastCard>
-            )}
-          </div>
+              </div>
+            </details>
+          )}
 
           {/* Change Manager Link */}
           <div className="text-center">

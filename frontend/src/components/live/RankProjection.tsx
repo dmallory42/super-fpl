@@ -7,6 +7,7 @@ interface RankProjectionProps {
   tierAvgPoints: number
   fixturesFinished: number
   fixturesTotal: number
+  compact?: boolean
 }
 
 export function RankProjection({
@@ -16,6 +17,7 @@ export function RankProjection({
   tierAvgPoints,
   fixturesFinished,
   fixturesTotal,
+  compact = false,
 }: RankProjectionProps) {
   // Calculate progress
   const progressPercent =
@@ -38,14 +40,14 @@ export function RankProjection({
       : `Losing ~${formatRank(Math.abs(rankMovement))} places`
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? 'space-y-3' : 'space-y-4'}>
       {/* Main rank display */}
       <div className="flex items-center justify-between">
         {/* Current rank with movement */}
         <div className="flex items-center gap-3">
           <div className="text-center">
             <div
-              className={`font-mono text-3xl font-bold ${
+              className={`font-mono ${compact ? 'text-2xl' : 'text-3xl'} font-bold ${
                 isGaining ? 'text-fpl-green' : isLosing ? 'text-destructive' : 'text-foreground'
               }`}
             >
@@ -59,7 +61,7 @@ export function RankProjection({
           {/* Movement indicator */}
           {!isSteady && (
             <div
-              className={`flex items-center gap-1 text-sm ${
+              className={`flex items-center gap-1 ${compact ? 'text-xs' : 'text-sm'} ${
                 isGaining ? 'text-fpl-green' : 'text-destructive'
               }`}
             >
@@ -70,7 +72,7 @@ export function RankProjection({
         </div>
 
         {/* Progress ring */}
-        <div className="relative w-16 h-16">
+        <div className={`relative ${compact ? 'w-14 h-14' : 'w-16 h-16'}`}>
           <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
             {/* Background ring */}
             <circle
@@ -97,7 +99,11 @@ export function RankProjection({
           </svg>
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-mono text-sm font-bold text-fpl-green">{progressPercent}%</span>
+            <span
+              className={`font-mono font-bold text-fpl-green ${compact ? 'text-xs' : 'text-sm'}`}
+            >
+              {progressPercent}%
+            </span>
             <span className="text-[7px] text-foreground-dim font-display uppercase tracking-wider">
               GW Complete
             </span>
@@ -125,7 +131,9 @@ export function RankProjection({
       </div>
 
       {/* Velocity indicator */}
-      <div className="text-center text-sm text-foreground-muted">{velocityLabel}</div>
+      <div className={`text-center text-foreground-muted ${compact ? 'text-xs' : 'text-sm'}`}>
+        {velocityLabel}
+      </div>
     </div>
   )
 }
