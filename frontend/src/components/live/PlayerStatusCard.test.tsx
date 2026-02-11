@@ -20,7 +20,7 @@ describe('PlayerStatusCard', () => {
     )
 
     expect(screen.getByLabelText("Salah (LIV), 20 points, Live 72'")).toBeInTheDocument()
-    expect(screen.getByText("Live 72'")).toBeInTheDocument()
+    expect(screen.getByText('LIV')).toBeInTheDocument()
   })
 
   it('shows minute tooltip on focus for live players', () => {

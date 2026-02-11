@@ -46,6 +46,14 @@ export function PlayerStatusCard({
         : status === 'upcoming'
           ? 'Upcoming'
           : 'Status unknown'
+  const statusDotClass =
+    status === 'playing'
+      ? 'bg-fpl-green animate-pulse'
+      : status === 'finished'
+        ? 'bg-foreground-muted'
+        : status === 'upcoming'
+          ? 'bg-yellow-400/90'
+          : 'bg-foreground-dim'
 
   // Status-based container styling
   const getContainerClasses = () => {
@@ -131,14 +139,14 @@ export function PlayerStatusCard({
       </div>
 
       {/* Player name */}
-      <div className="bg-surface/90 backdrop-blur-sm text-foreground text-[11px] md:text-xs px-1.5 md:px-2 py-0.5 rounded mt-1 max-w-[62px] md:max-w-[70px] truncate font-medium">
+      <div className="bg-surface/90 backdrop-blur-sm text-foreground text-[11px] md:text-xs px-1.5 md:px-2 py-0.5 rounded mt-1 max-w-[68px] md:max-w-[84px] lg:max-w-[96px] truncate font-medium">
         {webName}
       </div>
 
-      {/* Team */}
-      <div className="text-white/70 text-[10px] md:text-xs">{teamName}</div>
-      <div className="text-[9px] md:text-[10px] text-white/60 font-display uppercase tracking-wide">
-        {statusLabel}
+      {/* Team + status indicator */}
+      <div className="flex items-center gap-1 text-white/70 text-xs">
+        <span>{teamName}</span>
+        <span className={`w-1.5 h-1.5 rounded-full ${statusDotClass}`} title={statusLabel} />
       </div>
 
       {/* Effective ownership (optional) */}

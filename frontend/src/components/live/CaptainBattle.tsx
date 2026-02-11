@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { TierSampleData } from '../../api/client'
-import { type Tier, TIER_OPTIONS } from '../../lib/tiers'
+import { type Tier, TIER_OPTIONS, TIER_LABELS } from '../../lib/tiers'
 
 interface CaptainBattleProps {
   userCaptainId: number | undefined
@@ -44,6 +44,7 @@ export function CaptainBattle({
   const [internalTier, setInternalTier] = useState<Tier>('top_10k')
   const activeTier = selectedTier ?? internalTier
   const handleTierChange = onTierChange ?? setInternalTier
+  const activeTierLabel = TIER_LABELS[activeTier] ?? activeTier
 
   const tierData = samples?.[activeTier]
   const captainPercent = tierData?.captain_percent
@@ -114,19 +115,19 @@ export function CaptainBattle({
       {/* Tier selector */}
       <div className="flex items-center justify-between">
         {isDifferential && (
-          <span className="text-[9px] md:text-[10px] font-display uppercase tracking-wide text-fpl-green">
+          <span className="text-xs font-display uppercase tracking-wide text-fpl-green">
             Captain differential
           </span>
         )}
         <div className={`flex items-center gap-1 ${!isDifferential ? 'ml-auto' : ''}`}>
           {showTierSelector ? (
             <>
-              <span className="text-[9px] md:text-[10px] text-foreground-dim mr-1">vs</span>
+              <span className="text-xs text-foreground-dim mr-1">vs</span>
               {TIER_OPTIONS.map((tier) => (
                 <button
                   key={tier.value}
                   onClick={() => handleTierChange(tier.value)}
-                  className={`px-2 py-0.5 text-[9px] md:text-[10px] font-display uppercase tracking-wide rounded transition-colors ${
+                  className={`px-2 py-0.5 text-xs font-display uppercase tracking-wide rounded transition-colors ${
                     activeTier === tier.value
                       ? 'bg-fpl-purple/20 text-fpl-purple'
                       : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
@@ -137,8 +138,8 @@ export function CaptainBattle({
               ))}
             </>
           ) : (
-            <span className="text-[9px] md:text-[10px] text-foreground-dim uppercase tracking-wide">
-              Tier context shared
+            <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
+              vs {activeTierLabel}
             </span>
           )}
         </div>
@@ -146,11 +147,7 @@ export function CaptainBattle({
 
       {/* Captain list */}
       <div key={activeTier} className="space-y-1.5">
-        {captainOptions.length === 0 ? (
-          <div className="text-center text-foreground-muted py-4 text-sm">
-            No captain data for this tier
-          </div>
-        ) : (
+        {captainOptions.length > 0 &&
           captainOptions.map((captain, idx) => {
             const barWidth = maxCaptaincy > 0 ? (captain.captainPct / maxCaptaincy) * 100 : 0
 
@@ -212,8 +209,7 @@ export function CaptainBattle({
                 </div>
               </div>
             )
-          })
-        )}
+          })}
       </div>
     </div>
   )

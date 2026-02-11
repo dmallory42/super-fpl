@@ -61,6 +61,7 @@
 
   html {
     scroll-behavior: smooth;
+    font-size: 118.75%; /* Global readability target (16px -> 19px base) */
   }
 
   body {
@@ -73,6 +74,7 @@
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    line-height: 1.45;
   }
 
   /* Athletic display typography */

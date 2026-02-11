@@ -189,8 +189,8 @@ test.describe('Live Page', () => {
     await page.fill('input[placeholder*="Manager ID"]', '12345')
     await page.click('button:has-text("Track")')
 
-    // Wait for overall position section
-    await page.waitForSelector('text=Overall Position', { timeout: 10000 })
+    // Wait for summary section
+    await page.waitForSelector('text=Gameweek Summary', { timeout: 10000 })
 
     // Should show tier labels - look for the text anywhere on page (use first() for duplicates)
     await expect(page.locator('text=Top 10K').first()).toBeVisible()

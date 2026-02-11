@@ -53,7 +53,7 @@ export function RankProjection({
             >
               {formatRank(currentRank)}
             </div>
-            <div className="text-[10px] font-display uppercase tracking-wider text-foreground-dim">
+            <div className="text-xs font-display uppercase tracking-wide text-foreground-dim">
               Current Rank
             </div>
           </div>
@@ -104,7 +104,7 @@ export function RankProjection({
             >
               {progressPercent}%
             </span>
-            <span className="text-[7px] text-foreground-dim font-display uppercase tracking-wider">
+            <span className="text-[9px] text-foreground-dim font-display uppercase tracking-wide">
               GW Complete
             </span>
           </div>
@@ -113,7 +113,7 @@ export function RankProjection({
 
       {/* Pace comparison */}
       <div className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated">
-        <span className="text-[10px] font-display uppercase tracking-wider text-foreground-muted">
+        <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
           vs Tier Avg
         </span>
         <span

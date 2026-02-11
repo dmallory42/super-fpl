@@ -36,7 +36,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
           <div className="font-mono text-2xl font-bold text-foreground-muted">
             {totalPredicted.toFixed(1)}
           </div>
-          <div className="text-[10px] font-display uppercase tracking-wider text-foreground-dim">
+          <div className="text-xs font-display uppercase tracking-wide text-foreground-dim">
             Expected
           </div>
         </div>
@@ -52,7 +52,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
             {totalVariance.toFixed(1)}
           </div>
           <div
-            className={`text-[10px] font-display uppercase tracking-wider ${
+            className={`text-xs font-display uppercase tracking-wide ${
               isLucky ? 'text-fpl-green' : isUnlucky ? 'text-destructive' : 'text-foreground-dim'
             }`}
           >
@@ -69,7 +69,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
           >
             {totalActual}
           </div>
-          <div className="text-[10px] font-display uppercase tracking-wider text-foreground-dim">
+          <div className="text-xs font-display uppercase tracking-wide text-foreground-dim">
             Actual
           </div>
         </div>
@@ -80,9 +80,9 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
         <div
           className={`absolute inset-y-0 transition-all duration-500 ${
             isLucky
-              ? 'bg-fpl-green right-1/2'
+              ? 'bg-fpl-green left-1/2'
               : isUnlucky
-                ? 'bg-destructive left-1/2'
+                ? 'bg-destructive right-1/2'
                 : 'bg-foreground-dim'
           }`}
           style={{
@@ -98,7 +98,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
       {/* Player breakdown */}
       {sortedPlayers.length > 0 && (
         <div className="pt-3 border-t border-border/50">
-          <div className="text-[10px] text-foreground-dim font-display uppercase tracking-wider mb-2">
+          <div className="text-xs text-foreground-dim font-display uppercase tracking-wide mb-2">
             Player Breakdown
           </div>
           <div className="space-y-1.5">

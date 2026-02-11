@@ -104,7 +104,7 @@ describe('FixtureThreatIndex', () => {
 
     // Net impact: 5 - 4 = +1
     expect(screen.getByText('+1.0')).toBeInTheDocument()
-    expect(screen.getByText(/Net Impact/i)).toBeInTheDocument()
+    expect(screen.getByText(/Fixture Swing/i)).toBeInTheDocument()
   })
 
   it('shows tier selector buttons', () => {

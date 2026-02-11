@@ -32,9 +32,7 @@ export function ComparisonBars({
   animationDelay = 0,
 }: ComparisonBarsProps) {
   if (comparisons.length === 0) {
-    return (
-      <div className="text-center text-foreground-muted py-4">No sample data available yet</div>
-    )
+    return null
   }
 
   // Calculate the range for the gauge based on actual points
@@ -109,10 +107,10 @@ export function ComparisonBars({
               />
               {/* Label below */}
               <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-                <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                <div className="font-display text-xs uppercase tracking-wide text-foreground-muted">
                   {config.abbrev}
                 </div>
-                <div className="font-mono text-[10px] text-foreground-dim">
+                <div className="font-mono text-xs text-foreground-dim">
                   {comp.avgPoints.toFixed(0)}
                 </div>
               </div>
@@ -190,17 +188,17 @@ export function ComparisonBars({
             <div className="pt-3 border-t border-border/50">
               {/* Header with tier selector */}
               <div className="flex items-center justify-between mb-3">
-                <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                <div className="font-display text-xs uppercase tracking-wide text-foreground-muted">
                   Biggest Swings
                 </div>
                 {showTierSelector && (
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-foreground-dim mr-1">vs</span>
+                    <span className="text-xs text-foreground-dim mr-1">vs</span>
                     {TIER_OPTIONS.map((tier) => (
                       <button
                         key={tier.value}
                         onClick={() => onTierChange(tier.value)}
-                        className={`px-2 py-0.5 text-[10px] font-display uppercase tracking-wider rounded transition-colors ${
+                        className={`px-2 py-0.5 text-xs font-display uppercase tracking-wide rounded transition-colors ${
                           selectedTier === tier.value
                             ? 'bg-fpl-green/20 text-fpl-green'
                             : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
@@ -216,7 +214,7 @@ export function ComparisonBars({
               <div key={selectedTier} className="grid grid-cols-2 gap-4">
                 {/* Gainers column */}
                 <div className="space-y-1.5">
-                  <div className="text-[10px] text-fpl-green font-display uppercase tracking-wider mb-1">
+                  <div className="text-xs text-fpl-green font-display uppercase tracking-wide mb-1">
                     ▲ Helping You
                   </div>
                   {gainers.length > 0 ? (
@@ -228,7 +226,7 @@ export function ComparisonBars({
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="text-foreground truncate">{player.name}</span>
-                          <span className="text-[9px] font-mono shrink-0 text-fpl-green">
+                          <span className="text-xs font-mono shrink-0 text-fpl-green">
                             +{player.relativeEO.toFixed(0)}%
                           </span>
                         </div>
@@ -238,13 +236,13 @@ export function ComparisonBars({
                       </div>
                     ))
                   ) : (
-                    <div className="text-[10px] text-foreground-dim">No gainers</div>
+                    <div className="text-xs text-foreground-dim">No gainers</div>
                   )}
                 </div>
 
                 {/* Losers column */}
                 <div className="space-y-1.5">
-                  <div className="text-[10px] text-destructive font-display uppercase tracking-wider mb-1">
+                  <div className="text-xs text-destructive font-display uppercase tracking-wide mb-1">
                     ▼ Hurting You
                   </div>
                   {losers.length > 0 ? (
@@ -260,7 +258,7 @@ export function ComparisonBars({
                           >
                             {player.name}
                           </span>
-                          <span className="text-[9px] font-mono shrink-0 text-destructive">
+                          <span className="text-xs font-mono shrink-0 text-destructive">
                             {player.relativeEO.toFixed(0)}%
                           </span>
                         </div>
@@ -270,7 +268,7 @@ export function ComparisonBars({
                       </div>
                     ))
                   ) : (
-                    <div className="text-[10px] text-foreground-dim">No losers</div>
+                    <div className="text-xs text-foreground-dim">No losers</div>
                   )}
                 </div>
               </div>
@@ -279,7 +277,7 @@ export function ComparisonBars({
         })()}
 
       {/* Sample size note */}
-      <p className="text-[9px] md:text-[10px] text-foreground-dim text-center pt-1.5 md:pt-2">
+      <p className="text-xs text-foreground-dim text-center pt-1.5 md:pt-2">
         Based on {comparisons[0]?.sampleSize.toLocaleString() ?? 0} sampled managers per tier
       </p>
     </div>

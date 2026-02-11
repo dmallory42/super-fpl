@@ -65,19 +65,19 @@ export function FixtureThreatIndex({
             {totalImpact > 0 ? '+' : ''}
             {totalImpact.toFixed(1)}
           </div>
-          <div className="text-[9px] font-display uppercase tracking-wide text-foreground-dim">
+          <div className="text-xs font-display uppercase tracking-wide text-foreground-dim">
             Fixture Swing
           </div>
         </div>
 
         {showTierSelector && (
           <div className="flex items-center gap-1">
-            <span className="text-[9px] md:text-[10px] text-foreground-dim mr-1">vs</span>
+            <span className="text-xs text-foreground-dim mr-1">vs</span>
             {TIER_OPTIONS.map((tier) => (
               <button
                 key={tier.value}
                 onClick={() => onTierChange(tier.value)}
-                className={`px-2 py-0.5 text-[9px] md:text-[10px] font-display uppercase tracking-wide rounded transition-colors ${
+                className={`px-2 py-0.5 text-xs font-display uppercase tracking-wide rounded transition-colors ${
                   selectedTier === tier.value
                     ? 'bg-fpl-green/20 text-fpl-green'
                     : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'

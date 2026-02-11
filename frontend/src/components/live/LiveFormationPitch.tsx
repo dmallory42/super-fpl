@@ -97,9 +97,9 @@ export function LiveFormationPitch({
       <div className="absolute top-4 left-1/2 -translate-x-1/2 w-32 h-12 border-b-2 border-x-2 border-white/10 rounded-b-lg pointer-events-none" />
 
       {/* Formation display */}
-      <div className="relative z-10 flex flex-col gap-4 md:gap-6 py-3 md:py-4">
+      <div className="relative z-10 flex flex-col gap-4 md:gap-5 py-3 md:py-4">
         {rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-center gap-1.5 md:gap-4">
+          <div key={rowIndex} className="w-full flex justify-center gap-3 md:gap-4">
             {row.map((player) => {
               const info = playersInfo.get(player.player_id)
               const teamName = info?.team ? (teamsInfo.get(info.team) ?? '???') : '???'
@@ -137,7 +137,7 @@ export function LiveFormationPitch({
           </span>
           <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20" />
         </div>
-        <div className="flex justify-center gap-1.5 md:gap-4 bg-surface/30 rounded-lg py-2.5 md:py-3 px-2.5 md:px-4">
+        <div className="flex justify-center gap-3 md:gap-4 bg-surface/30 rounded-lg py-2.5 md:py-3 px-2.5 md:px-4">
           {bench.map((player, idx) => {
             const info = playersInfo.get(player.player_id)
             const teamName = info?.team ? (teamsInfo.get(info.team) ?? '???') : '???'

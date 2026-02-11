@@ -13,7 +13,6 @@ import { LiveFormationPitch } from '../components/live/LiveFormationPitch'
 import { ComparisonBars, type PlayerImpact } from '../components/live/ComparisonBars'
 import { FixtureScores } from '../components/live/FixtureScores'
 import { CaptainBattle } from '../components/live/CaptainBattle'
-import { PlayersRemaining } from '../components/live/PlayersRemaining'
 import { RankProjection } from '../components/live/RankProjection'
 import { VarianceAnalysis } from '../components/live/VarianceAnalysis'
 import { FixtureThreatIndex } from '../components/live/FixtureThreatIndex'
@@ -393,7 +392,6 @@ export function Live() {
   // Get tier label for differential analysis
   const tierLabel = TIER_OPTIONS.find((t) => t.value === comparisonTier)?.label ?? comparisonTier
   const managerLastUpdated = formatUpdatedTime(liveManager?.updated_at)
-  const samplesLastUpdated = formatUpdatedTime(samplesData?.updated_at)
   const isRefreshingLiveData =
     isFetchingManager || isFetchingSamples || isFetchingLiveData || isFetchingBonus
 
@@ -435,14 +433,20 @@ export function Live() {
       <div className="animate-fade-in-up">
         <div className="flex items-center gap-3 mb-2">
           <h2 className="font-display text-2xl font-bold tracking-wider text-foreground">
-            Live Tracker
+            Live Gameweek
           </h2>
           {gwData?.isLive && <LiveIndicator size="lg" />}
+          {managerId && (
+            <button
+              onClick={handleClearManager}
+              className="ml-auto btn-secondary text-xs py-1 px-3"
+            >
+              Change Manager ID
+            </button>
+          )}
         </div>
         <p className="text-foreground-muted text-sm">
-          {isLoadingGw ? (
-            'Detecting gameweek...'
-          ) : gwData ? (
+          {gwData ? (
             <>
               GW{gwData.gameweek} • {gwData.matchesPlayed}/{gwData.totalMatches} matches complete
               {gwData.matchesInProgress > 0 && ` • ${gwData.matchesInProgress} in progress`}
@@ -451,10 +455,9 @@ export function Live() {
             'Track live points for your team during the gameweek.'
           )}
         </p>
-        {managerId && (managerLastUpdated || samplesLastUpdated || isRefreshingLiveData) && (
+        {managerId && managerLastUpdated && (
           <p className="text-xs text-foreground-dim mt-1">
-            {managerLastUpdated ? `Team update ${managerLastUpdated}` : 'Team update pending'}
-            {samplesLastUpdated ? ` • Samples ${samplesLastUpdated}` : ''}
+            Updated {managerLastUpdated}
             {isRefreshingLiveData ? ' • Refreshing…' : ''}
           </p>
         )}
@@ -603,16 +606,15 @@ export function Live() {
 
           {/* Global tier context */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-surface-elevated/70">
-            <span className="text-[10px] md:text-[11px] font-display uppercase tracking-wide text-foreground-muted">
+            <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
               Compare Against
             </span>
             <div className="flex items-center gap-1 flex-wrap">
-              <span className="text-[9px] md:text-[10px] text-foreground-dim mr-1">vs</span>
               {TIER_OPTIONS.map((tier) => (
                 <button
                   key={tier.value}
                   onClick={() => setComparisonTier(tier.value)}
-                  className={`px-2 py-0.5 text-[9px] md:text-[10px] font-display uppercase tracking-wide rounded transition-colors ${
+                  className={`px-2 py-0.5 text-xs font-display uppercase tracking-wide rounded transition-colors ${
                     comparisonTier === tier.value
                       ? 'bg-fpl-green/25 text-fpl-green ring-1 ring-fpl-green/30'
                       : 'text-foreground-dim hover:text-foreground hover:bg-surface'
@@ -626,8 +628,8 @@ export function Live() {
 
           {/* Core cards */}
           <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-            {/* Overall Position */}
-            <BroadcastCard title="Overall Position" animationDelay={300}>
+            {/* Gameweek Summary */}
+            <BroadcastCard title="Gameweek Summary" animationDelay={300}>
               <ComparisonBars
                 userPoints={processedSquad.totalPoints}
                 comparisons={comparisons}
@@ -664,7 +666,11 @@ export function Live() {
               />
               {differentialData.length > 0 && (
                 <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
-                  <DifferentialAnalysis players={differentialData} tierLabel={tierLabel} />
+                  <DifferentialAnalysis
+                    players={differentialData}
+                    tierLabel={tierLabel}
+                    showTierLabel={false}
+                  />
                 </div>
               )}
             </BroadcastCard>
@@ -672,24 +678,16 @@ export function Live() {
 
           {/* Match flow cards */}
           <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-            {/* What Can Still Change */}
-            <BroadcastCard title="What Can Still Change" animationDelay={400}>
-              <PlayersRemaining
-                players={processedSquad.players}
-                playersMap={playersMap}
+            {/* Fixture Swing */}
+            <BroadcastCard title="Fixture Swing" animationDelay={400}>
+              <FixtureThreatIndex
                 fixtureData={gameweekData}
-                effectiveOwnership={top10kEO}
+                fixtureImpacts={fixtureImpacts}
+                selectedTier={comparisonTier}
+                onTierChange={setComparisonTier}
+                showTierSelector={false}
+                maxRows={5}
               />
-              <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
-                <FixtureThreatIndex
-                  fixtureData={gameweekData}
-                  fixtureImpacts={fixtureImpacts}
-                  selectedTier={comparisonTier}
-                  onTierChange={setComparisonTier}
-                  showTierSelector={false}
-                  maxRows={5}
-                />
-              </div>
             </BroadcastCard>
 
             {/* Fixtures */}
@@ -708,7 +706,7 @@ export function Live() {
           {varianceData && (
             <details className="rounded-lg border border-border/40 bg-surface-elevated/30">
               <summary className="cursor-pointer px-3 md:px-4 py-2.5 md:py-3 font-display text-xs md:text-sm uppercase tracking-wider text-foreground-muted">
-                Advanced: Expected vs Actual
+                Variance
               </summary>
               <div className="px-3 md:px-4 pb-3 md:pb-4 pt-1">
                 <VarianceAnalysis
@@ -719,16 +717,6 @@ export function Live() {
               </div>
             </details>
           )}
-
-          {/* Change Manager Link */}
-          <div className="text-center">
-            <button
-              onClick={handleClearManager}
-              className="text-sm text-foreground-muted hover:text-foreground transition-colors"
-            >
-              Change Manager ID
-            </button>
-          </div>
         </div>
       )}
 
@@ -736,7 +724,7 @@ export function Live() {
       {!managerId && !isLoadingGw && (
         <EmptyState
           icon={<CalendarIcon size={64} />}
-          title="Track Your Live Points"
+          title="Track Live Points"
           description="Enter your FPL Manager ID to see live gameweek points, compare against top managers, and track bonus predictions."
         />
       )}

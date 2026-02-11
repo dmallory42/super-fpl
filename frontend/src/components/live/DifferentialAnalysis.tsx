@@ -10,6 +10,7 @@ interface DifferentialPlayer {
 interface DifferentialAnalysisProps {
   players: DifferentialPlayer[]
   tierLabel: string
+  showTierLabel?: boolean
 }
 
 // EO thresholds for categorization
@@ -30,7 +31,11 @@ const categoryConfig: Record<Category, { label: string; color: string }> = {
   moderate: { label: 'Moderate', color: 'text-foreground' },
 }
 
-export function DifferentialAnalysis({ players, tierLabel }: DifferentialAnalysisProps) {
+export function DifferentialAnalysis({
+  players,
+  tierLabel,
+  showTierLabel = true,
+}: DifferentialAnalysisProps) {
   if (players.length === 0) {
     return (
       <div className="text-center text-foreground-muted py-4 text-sm">
@@ -46,14 +51,13 @@ export function DifferentialAnalysis({ players, tierLabel }: DifferentialAnalysi
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-display uppercase tracking-wider text-foreground-muted">
-          vs {tierLabel}
-        </span>
-        <div className="flex items-center gap-3 text-[9px] font-display uppercase tracking-wider">
-          <span className="text-foreground-dim">EO</span>
-          <span className="text-foreground-dim">Impact</span>
-          <span className="text-foreground-dim">ROI</span>
-        </div>
+        {showTierLabel ? (
+          <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
+            vs {tierLabel}
+          </span>
+        ) : (
+          <span />
+        )}
       </div>
 
       {/* Player list */}
@@ -81,14 +85,14 @@ export function DifferentialAnalysis({ players, tierLabel }: DifferentialAnalysi
                   <span className="text-foreground font-medium truncate">{player.name}</span>
                 </div>
                 <span
-                  className={`text-[9px] font-display uppercase tracking-wider shrink-0 ${config.color}`}
+                  className={`text-xs font-display uppercase tracking-wide shrink-0 ${config.color}`}
                 >
                   {config.label}
                 </span>
               </div>
 
               {/* Row 2: Metrics */}
-              <div className="flex items-center justify-between text-[10px]">
+              <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-foreground-muted">{player.points} pts</span>
                   <span
@@ -127,7 +131,7 @@ export function DifferentialAnalysis({ players, tierLabel }: DifferentialAnalysi
 
       {/* Legend */}
       <div className="pt-2 border-t border-border/50">
-        <div className="flex items-center justify-center gap-4 text-[9px] font-display uppercase tracking-wider">
+        <div className="flex items-center justify-center gap-4 text-xs font-display uppercase tracking-wide">
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-full bg-fpl-purple" />
             <span className="text-foreground-dim">

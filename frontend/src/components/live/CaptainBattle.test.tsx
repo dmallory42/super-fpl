@@ -90,7 +90,7 @@ describe('CaptainBattle', () => {
     expect(screen.getByText('©')).toBeInTheDocument()
   })
 
-  it('shows "Differential pick" label when user captain is outside top 3', () => {
+  it('shows "Captain differential" label when user captain is outside top 3', () => {
     const samples = createSamples({
       1: 45, // Salah
       2: 35, // Haaland
@@ -100,7 +100,7 @@ describe('CaptainBattle', () => {
 
     render(<CaptainBattle userCaptainId={4} samples={samples} playersMap={mockPlayersMap} />)
 
-    expect(screen.getByText('Differential pick')).toBeInTheDocument()
+    expect(screen.getByText('Captain differential')).toBeInTheDocument()
   })
 
   it('does not show "Differential pick" when user captain is in top 3', () => {
@@ -185,7 +185,7 @@ describe('CaptainBattle', () => {
     expect(screen.getByText('Wilson')).toBeInTheDocument()
   })
 
-  it('shows empty state when tier has no captain data', () => {
+  it('shows no captain rows when tier has no captain data', () => {
     const samples = {
       top_10k: {
         avg_points: 50,
@@ -208,7 +208,8 @@ describe('CaptainBattle', () => {
     // Switch to 100K which has no captain data
     fireEvent.click(screen.getByText('100K'))
 
-    expect(screen.getByText('No captain data for this tier')).toBeInTheDocument()
+    expect(screen.queryByText('Salah')).not.toBeInTheDocument()
+    expect(screen.queryByText('45%')).not.toBeInTheDocument()
   })
 
   it('re-sorts when switching tiers', () => {
