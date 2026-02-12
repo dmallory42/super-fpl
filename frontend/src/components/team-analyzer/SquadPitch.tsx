@@ -1,82 +1,37 @@
 import { useMemo } from 'react'
 import type { Pick, Player } from '../../types'
 import { formatPrice } from '../../types'
-import { TeamShirt } from '../live/TeamShirt'
+import { PitchPlayerCard } from '../pitch/PitchPlayerCard'
+import { PitchLayout } from '../pitch/PitchLayout'
 
 interface SquadPitchProps {
   picks: Pick[]
   players: Map<number, Player>
   teams: Map<number, string>
+  playerPoints?: Record<number, number>
 }
 
-interface PlayerSlotProps {
+interface PlayerSlotData {
   pick: Pick
-  player: Player | undefined
+  player: Player
   teamName: string
-  animationDelay?: number
+  contributedPoints?: number
 }
 
-function PlayerSlot({ pick, player, teamName, animationDelay = 0 }: PlayerSlotProps) {
+function buildPlayerSlot(
+  pick: Pick,
+  player: Player | undefined,
+  teamName: string,
+  contributedPoints?: number
+): PlayerSlotData | null {
   if (!player) {
-    return (
-      <div
-        className="w-20 h-24 flex flex-col items-center justify-center text-foreground-dim animate-fade-in-up opacity-0"
-        style={{ animationDelay: `${animationDelay}ms` }}
-      >
-        <div className="w-12 h-12 rounded-full bg-surface border-2 border-border" />
-        <div className="text-xs mt-1">Unknown</div>
-      </div>
-    )
+    return null
   }
 
-  const isCaptain = pick.is_captain
-  const isViceCaptain = pick.is_vice_captain
-  const teamId = player.team ?? 0
-
-  return (
-    <div
-      className="w-20 flex flex-col items-center animate-fade-in-up opacity-0"
-      style={{ animationDelay: `${animationDelay}ms` }}
-    >
-      <div className="relative group">
-        {/* Team shirt */}
-        <div
-          className={`
-            relative w-14 h-14 flex items-center justify-center
-            transform transition-transform duration-200
-            group-hover:scale-110
-            ${isCaptain ? 'animate-pulse-glow' : ''}
-          `}
-        >
-          <TeamShirt teamId={teamId} size={52} className="drop-shadow-lg" />
-        </div>
-
-        {/* Captain badge */}
-        {isCaptain && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center text-xs font-bold text-black shadow-lg ring-2 ring-yellow-400/50 z-10">
-            C
-          </div>
-        )}
-        {isViceCaptain && !isCaptain && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center text-xs font-bold text-black shadow z-10">
-            V
-          </div>
-        )}
-      </div>
-
-      {/* Player info */}
-      <div className="mt-1.5 text-center">
-        <div className="bg-surface/90 backdrop-blur-sm px-2 py-0.5 rounded text-xs font-semibold text-foreground truncate max-w-[80px]">
-          {player.web_name}
-        </div>
-        <div className="text-xs text-white/70 mt-0.5">{teamName}</div>
-        <div className="text-xs text-white/50 font-mono">£{formatPrice(player.now_cost)}m</div>
-      </div>
-    </div>
-  )
+  return { pick, player, teamName, contributedPoints }
 }
 
-export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
+export function SquadPitch({ picks, players, teams, playerPoints }: SquadPitchProps) {
   const { startingXI, bench } = useMemo(() => {
     const starting = picks.filter((p) => p.position <= 11).sort((a, b) => a.position - b.position)
     const benchPlayers = picks
@@ -86,105 +41,96 @@ export function SquadPitch({ picks, players, teams }: SquadPitchProps) {
   }, [picks])
 
   const rows = useMemo(() => {
-    const gk: Pick[] = []
-    const def: Pick[] = []
-    const mid: Pick[] = []
-    const fwd: Pick[] = []
+    const gk: PlayerSlotData[] = []
+    const def: PlayerSlotData[] = []
+    const mid: PlayerSlotData[] = []
+    const fwd: PlayerSlotData[] = []
 
     for (const pick of startingXI) {
       const player = players.get(pick.element)
-      if (!player) continue
+      const teamName = player ? teams.get(player.team) || '' : ''
+      const slot = buildPlayerSlot(pick, player, teamName, playerPoints?.[pick.element])
+      if (!slot) continue
 
-      switch (player.element_type) {
+      switch (slot.player.element_type) {
         case 1:
-          gk.push(pick)
+          gk.push(slot)
           break
         case 2:
-          def.push(pick)
+          def.push(slot)
           break
         case 3:
-          mid.push(pick)
+          mid.push(slot)
           break
         case 4:
-          fwd.push(pick)
+          fwd.push(slot)
           break
       }
     }
 
     // Order: GK at top, then DEF, MID, FWD at bottom
     return [gk, def, mid, fwd]
-  }, [startingXI, players])
+  }, [startingXI, players, teams, playerPoints])
 
-  const getTeamName = (playerId: number) => {
-    const player = players.get(playerId)
-    if (!player) return ''
-    return teams.get(player.team) || ''
-  }
-
-  // Pre-compute animation delays from row structure (avoids mutable counter in render)
-  const startingCount = rows.reduce((sum, row) => sum + row.length, 0)
-
-  return (
-    <div className="pitch-texture rounded-lg p-4 shadow-xl overflow-hidden">
-      {/* Pitch markings */}
-      <div className="relative border-2 border-white/20 rounded-lg p-4">
-        {/* Center circle */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 border-2 border-white/10 rounded-full" />
-
-        {/* Center line */}
-        <div className="absolute top-4 bottom-4 left-1/2 w-px bg-white/10" />
-
-        {/* Penalty area (top) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 w-48 h-16 border-b-2 border-x-2 border-white/10 rounded-b-lg" />
-
-        {/* Starting XI */}
-        <div className="space-y-6 relative z-10">
-          {
-            rows.reduce<{ elements: JSX.Element[]; offset: number }>(
-              (acc, row, rowIdx) => {
-                acc.elements.push(
-                  <div key={rowIdx} className="flex justify-center gap-2">
-                    {row.map((pick, itemIdx) => (
-                      <PlayerSlot
-                        key={pick.element}
-                        pick={pick}
-                        player={players.get(pick.element)}
-                        teamName={getTeamName(pick.element)}
-                        animationDelay={(acc.offset + itemIdx) * 50}
-                      />
-                    ))}
-                  </div>
-                )
-                acc.offset += row.length
-                return acc
-              },
-              { elements: [], offset: 0 }
-            ).elements
-          }
-        </div>
-      </div>
-
-      {/* Bench - Dugout style */}
-      <div className="mt-4 pt-4 border-t-2 border-white/20">
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/20" />
-          <span className="text-xs font-display uppercase tracking-wider text-white/60 px-3">
-            Bench
-          </span>
-          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/20" />
-        </div>
-        <div className="flex justify-center gap-2 bg-surface/30 rounded-lg py-3 px-4">
-          {bench.map((pick, idx) => (
-            <PlayerSlot
-              key={pick.element}
-              pick={pick}
-              player={players.get(pick.element)}
-              teamName={getTeamName(pick.element)}
-              animationDelay={(startingCount + idx) * 50}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
+  const benchRows = useMemo(
+    () =>
+      bench
+        .map((pick) => {
+          const player = players.get(pick.element)
+          const teamName = player ? teams.get(player.team) || '' : ''
+          return buildPlayerSlot(pick, player, teamName, playerPoints?.[pick.element])
+        })
+        .filter((row): row is PlayerSlotData => row !== null),
+    [bench, players, teams, playerPoints]
   )
+
+  const rowElements = rows.reduce<{ rows: JSX.Element[][]; offset: number }>(
+    (acc, row) => {
+      acc.rows.push(
+        row.map((pick, itemIdx) => (
+          <PitchPlayerCard
+            key={pick.pick.element}
+            teamId={pick.player.team ?? 0}
+            name={pick.player.web_name}
+            secondaryText={pick.teamName}
+            metaText={`£${formatPrice(pick.player.now_cost)}m`}
+            pointsText={
+              pick.contributedPoints !== undefined
+                ? String(Math.round(pick.contributedPoints))
+                : undefined
+            }
+            isCaptain={pick.pick.is_captain}
+            isViceCaptain={pick.pick.is_vice_captain}
+            pulseShirt={pick.pick.is_captain}
+            animationDelay={(acc.offset + itemIdx) * 50}
+          />
+        ))
+      )
+      acc.offset += row.length
+      return acc
+    },
+    { rows: [], offset: 0 }
+  )
+
+  const benchElements = benchRows.map((pick, idx) => (
+    <PitchPlayerCard
+      key={pick.pick.element}
+      teamId={pick.player.team ?? 0}
+      name={pick.player.web_name}
+      secondaryText={pick.teamName}
+      metaText={`£${formatPrice(pick.player.now_cost)}m`}
+      pointsText={
+        pick.contributedPoints !== undefined
+          ? String(Math.round(pick.contributedPoints))
+          : undefined
+      }
+      isCaptain={pick.pick.is_captain}
+      isViceCaptain={pick.pick.is_vice_captain}
+      pulseShirt={pick.pick.is_captain}
+      isBench
+      animationDelay={(rowElements.offset + idx) * 50}
+    />
+  ))
+
+  return <PitchLayout rows={rowElements.rows} bench={benchElements} variant="squad" />
 }
