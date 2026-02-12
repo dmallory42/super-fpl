@@ -330,6 +330,19 @@ class PredictionSnapshotTest extends TestCase
         $this->assertEmpty($results);
     }
 
+    public function testCachedPredictionsAreZeroedForBlankGameweek(): void
+    {
+        $this->insertPlayer(1, 'Salah', 3);
+        $this->insertPrediction(1, 31, 8.5, 0.9);
+        // No fixtures inserted for GW31 -> blank for all teams in this test DB.
+
+        $service = new PredictionService($this->db);
+        $results = $service->getPredictions(31);
+
+        $this->assertCount(1, $results);
+        $this->assertEquals(0.0, (float) $results[0]['predicted_points']);
+    }
+
     public function testAccuracyComputesCorrectly(): void
     {
         $this->insertPlayer(1, 'Salah');

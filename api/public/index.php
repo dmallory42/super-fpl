@@ -111,6 +111,7 @@ try {
         $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
         $uri === '/transfers/simulate' => handleTransferSimulate($db, $fplClient),
         $uri === '/transfers/targets' => handleTransferTargets($db, $fplClient),
+        $uri === '/planner/chips/suggest' => handlePlannerChipSuggest($db, $fplClient),
         $uri === '/planner/optimize' => handlePlannerOptimize($db, $fplClient),
         default => handleNotFound(),
     };
@@ -1016,8 +1017,18 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
     // ft=0 means "auto-detect from FPL API"; omitting ft also auto-detects
     $freeTransfers = isset($_GET['ft']) ? (int) $_GET['ft'] : 0;
 
-    // Parse chip plan from query params
+    // Parse chip plan from query params (legacy + JSON)
     $chipPlan = [];
+    if (isset($_GET['chip_plan'])) {
+        $decodedPlan = json_decode($_GET['chip_plan'], true);
+        if (is_array($decodedPlan)) {
+            foreach (['wildcard', 'bench_boost', 'free_hit', 'triple_captain'] as $chip) {
+                if (isset($decodedPlan[$chip])) {
+                    $chipPlan[$chip] = (int) $decodedPlan[$chip];
+                }
+            }
+        }
+    }
     if (isset($_GET['wildcard_gw'])) {
         $chipPlan['wildcard'] = (int) $_GET['wildcard_gw'];
     }
@@ -1029,6 +1040,22 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
     }
     if (isset($_GET['triple_captain_gw'])) {
         $chipPlan['triple_captain'] = (int) $_GET['triple_captain_gw'];
+    }
+
+    $chipMode = $_GET['chip_mode'] ?? 'locked';
+    $chipAllow = [];
+    if (isset($_GET['chip_allow'])) {
+        $decodedAllow = json_decode($_GET['chip_allow'], true);
+        if (is_array($decodedAllow)) {
+            $chipAllow = array_values(array_map('strval', $decodedAllow));
+        }
+    }
+    $chipForbid = [];
+    if (isset($_GET['chip_forbid'])) {
+        $decodedForbid = json_decode($_GET['chip_forbid'], true);
+        if (is_array($decodedForbid)) {
+            $chipForbid = $decodedForbid;
+        }
     }
 
     // Parse xMins overrides (JSON-encoded player_id -> expected_mins or per-GW map)
@@ -1069,6 +1096,7 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
 
     // Parse skip_solve flag (return squad data without running PathSolver)
     $skipSolve = isset($_GET['skip_solve']) && $_GET['skip_solve'] === '1';
+    $chipCompare = isset($_GET['chip_compare']) && $_GET['chip_compare'] === '1';
 
     if ($managerId === null) {
         http_response_code(400);
@@ -1096,8 +1124,76 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
             $ftValue,
             $depth,
             $skipSolve,
+            $chipMode,
+            $chipAllow,
+            $chipForbid,
+            $chipCompare,
         );
         echo json_encode($plan);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => $e->getMessage(),
+        ]);
+    }
+}
+
+function handlePlannerChipSuggest(Database $db, FplClient $fplClient): void
+{
+    $managerId = isset($_GET['manager']) ? (int) $_GET['manager'] : null;
+    $freeTransfers = isset($_GET['ft']) ? (int) $_GET['ft'] : 0;
+    if ($managerId === null) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing manager parameter']);
+        return;
+    }
+
+    $chipPlan = [];
+    if (isset($_GET['chip_plan'])) {
+        $decodedPlan = json_decode($_GET['chip_plan'], true);
+        if (is_array($decodedPlan)) {
+            foreach (['wildcard', 'bench_boost', 'free_hit', 'triple_captain'] as $chip) {
+                if (isset($decodedPlan[$chip])) {
+                    $chipPlan[$chip] = (int) $decodedPlan[$chip];
+                }
+            }
+        }
+    }
+
+    $chipAllow = [];
+    if (isset($_GET['chip_allow'])) {
+        $decodedAllow = json_decode($_GET['chip_allow'], true);
+        if (is_array($decodedAllow)) {
+            $chipAllow = array_values(array_map('strval', $decodedAllow));
+        }
+    }
+
+    $chipForbid = [];
+    if (isset($_GET['chip_forbid'])) {
+        $decodedForbid = json_decode($_GET['chip_forbid'], true);
+        if (is_array($decodedForbid)) {
+            $chipForbid = $decodedForbid;
+        }
+    }
+
+    $predictionService = new PredictionService($db);
+    $gameweekService = new \SuperFPL\Api\Services\GameweekService($db);
+    $optimizer = new \SuperFPL\Api\Services\TransferOptimizerService(
+        $db,
+        $fplClient,
+        $predictionService,
+        $gameweekService
+    );
+
+    try {
+        $result = $optimizer->suggestChipPlan(
+            $managerId,
+            $freeTransfers,
+            $chipPlan,
+            $chipAllow,
+            $chipForbid
+        );
+        echo json_encode($result);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode([

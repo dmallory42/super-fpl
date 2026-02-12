@@ -4,6 +4,7 @@ import { usePlannerOptimize } from '../hooks/usePlannerOptimize'
 import { usePredictionsRange } from '../hooks/usePredictionsRange'
 import type {
   ChipPlan,
+  ChipMode,
   PlayerMultiWeekPrediction,
   FixedTransfer,
   SolverDepth,
@@ -22,6 +23,18 @@ import { buildFormation } from '../lib/formation'
 import { scalePoints } from '../lib/predictions'
 
 const HIT_COST = 4
+const CHIP_LABELS: Record<keyof ChipPlan, string> = {
+  wildcard: 'Wildcard',
+  free_hit: 'Free Hit',
+  bench_boost: 'Bench Boost',
+  triple_captain: 'Triple Captain',
+}
+const CHIP_SHORT_LABELS: Record<keyof ChipPlan, string> = {
+  wildcard: 'WC',
+  free_hit: 'FH',
+  bench_boost: 'BB',
+  triple_captain: 'TC',
+}
 
 function formatFixtures(fixtures: FixtureOpponent[]): string {
   return fixtures.map((f) => (f.is_home ? f.opponent : f.opponent.toLowerCase())).join(', ')
@@ -59,7 +72,9 @@ export function Planner() {
   const [managerId, setManagerId] = useState<number | null>(initial.id)
   const [managerInput, setManagerInput] = useState(initial.input)
   const [freeTransfers, setFreeTransfers] = useState<number | null>(null)
-  const chipPlan: ChipPlan = {}
+  const [chipPlan, setChipPlan] = useState<ChipPlan>({})
+  const [chipMode, setChipMode] = useState<ChipMode>('locked')
+  const [chipCompare, setChipCompare] = useState(true)
   const [xMinsOverrides, setXMinsOverrides] = useState<XMinsOverrides>({})
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null)
 
@@ -74,6 +89,11 @@ export function Planner() {
   // Solve state — controls whether the solver runs
   const [solveRequested, setSolveRequested] = useState(false)
   const [solveTransfers, setSolveTransfers] = useState<FixedTransfer[]>([])
+  const [solveChipPlan, setSolveChipPlan] = useState<ChipPlan>({})
+  const [solveChipMode, setSolveChipMode] = useState<ChipMode>('locked')
+  const [solveChipCompare, setSolveChipCompare] = useState(true)
+  const [solveFtValue, setSolveFtValue] = useState(1.5)
+  const [solveDepth, setSolveDepth] = useState<SolverDepth>('standard')
   const [showSolveLoader, setShowSolveLoader] = useState(false)
 
   // Player detail sidebar state
@@ -122,29 +142,44 @@ export function Planner() {
     userTransfers,
     ftValue,
     solverDepth,
-    true // skipSolve
+    true, // skipSolve
+    chipMode,
+    false
   )
 
   // Solve query — only when requested
   const { data: solveData, isFetching: isFetchingSolve } = usePlannerOptimize(
     solveRequested ? managerId : null, // null disables the query
     freeTransfers,
-    chipPlan,
+    solveChipPlan,
     debouncedXMins,
     solveTransfers,
-    ftValue,
-    solverDepth,
-    false // run solver
+    solveFtValue,
+    solveDepth,
+    false, // run solver
+    solveChipMode,
+    solveChipCompare
   )
 
   // Stale detection — user changed transfers after solving
-  const isStale = solveRequested && JSON.stringify(userTransfers) !== JSON.stringify(solveTransfers)
+  const isStale =
+    solveRequested &&
+    (JSON.stringify(userTransfers) !== JSON.stringify(solveTransfers) ||
+      JSON.stringify(chipPlan) !== JSON.stringify(solveChipPlan) ||
+      chipMode !== solveChipMode ||
+      chipCompare !== solveChipCompare ||
+      ftValue !== solveFtValue ||
+      solverDepth !== solveDepth)
 
   const isSolveActive = showSolveLoader || isFetchingSolve
 
   // Merge squad + solve data for display
   const optimizeData = squadData
   const paths = solveData?.paths ?? []
+  const chipData = solveData ?? optimizeData
+  const chipSuggestions = chipData?.chip_suggestions_ranked ?? {}
+  const chipResolvedPlan = chipData?.resolved_chip_plan ?? chipData?.chip_plan ?? {}
+  const comparison = solveData?.comparisons
 
   // Get predictions for multiple gameweeks
   const { data: predictionsRange } = usePredictionsRange()
@@ -194,6 +229,30 @@ export function Planner() {
     if (selectedPathIndex === null || !paths.length) return null
     return paths[selectedPathIndex] ?? null
   }, [selectedPathIndex, paths])
+
+  const chipTimelineByGw = useMemo(() => {
+    const timeline: Record<number, string> = {}
+    const gws = predictionsRange?.gameweeks ?? []
+
+    for (const gw of gws) {
+      const pathChip = selectedPath?.transfers_by_gw?.[gw]?.chip_played as
+        | keyof ChipPlan
+        | undefined
+      if (pathChip && CHIP_SHORT_LABELS[pathChip]) {
+        timeline[gw] = CHIP_SHORT_LABELS[pathChip]
+        continue
+      }
+
+      const plannedChip = (Object.entries(chipResolvedPlan).find(
+        ([, chipGw]) => chipGw === gw
+      )?.[0] ?? null) as keyof ChipPlan | null
+      if (plannedChip && CHIP_SHORT_LABELS[plannedChip]) {
+        timeline[gw] = CHIP_SHORT_LABELS[plannedChip]
+      }
+    }
+
+    return timeline
+  }, [predictionsRange?.gameweeks, selectedPath, chipResolvedPlan])
 
   // GW-aware effective squad: apply transfers up to and including selectedGameweek
   const effectiveSquad = useMemo(() => {
@@ -355,8 +414,26 @@ export function Planner() {
       setUserTransfers([])
       setSolveRequested(false)
       setSolveTransfers([])
+      setSolveChipPlan({})
+      setSolveChipMode('locked')
+      setSolveChipCompare(true)
+      setSolveFtValue(1.5)
+      setSolveDepth('standard')
       setFreeTransfers(null)
     }
+  }
+
+  const setChipWeek = (chip: keyof ChipPlan, gameweekValue: string) => {
+    setChipPlan((prev) => {
+      const next: ChipPlan = { ...prev }
+      if (!gameweekValue) {
+        delete next[chip]
+      } else {
+        next[chip] = parseInt(gameweekValue, 10)
+      }
+      return next
+    })
+    setSelectedPathIndex(null)
   }
 
   const handlePlayerSelect = (playerId: number) => {
@@ -410,11 +487,24 @@ export function Planner() {
     setUserTransfers([])
     setSolveRequested(false)
     setSolveTransfers([])
+    setSolveChipPlan({})
+    setSolveChipMode('locked')
+    setSolveChipCompare(true)
+    setSolveFtValue(1.5)
+    setSolveDepth('standard')
+    setChipPlan({})
+    setChipMode('locked')
+    setChipCompare(true)
   }
 
   const handleFindPlans = () => {
     setShowSolveLoader(true)
     setSolveTransfers([...userTransfers])
+    setSolveChipPlan({ ...chipPlan })
+    setSolveChipMode(chipMode)
+    setSolveChipCompare(chipCompare)
+    setSolveFtValue(ftValue)
+    setSolveDepth(solverDepth)
     setSolveRequested(true)
     // Minimum display time so the skeleton always appears
     setTimeout(() => setShowSolveLoader(false), 800)
@@ -870,6 +960,99 @@ export function Planner() {
                 </div>
               </div>
 
+              <div className="grid md:grid-cols-2 gap-3 mb-4">
+                <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                      Chip Strategy
+                    </span>
+                    <select
+                      value={chipMode}
+                      onChange={(e) => {
+                        setChipMode(e.target.value as ChipMode)
+                        setSelectedPathIndex(null)
+                      }}
+                      className="input-broadcast py-1 text-xs min-w-[110px]"
+                    >
+                      <option value="locked">Locked</option>
+                      <option value="auto">Auto</option>
+                      <option value="none">None</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
+                      <label key={chip} className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-foreground-muted">
+                          {CHIP_SHORT_LABELS[chip]}
+                        </span>
+                        <select
+                          value={chipPlan[chip] ?? ''}
+                          onChange={(e) => setChipWeek(chip, e.target.value)}
+                          disabled={chipMode === 'none'}
+                          className="input-broadcast py-1 text-xs min-w-[88px]"
+                        >
+                          <option value="">Auto</option>
+                          {optimizeData.planning_horizon.map((gw) => (
+                            <option key={`${chip}-${gw}`} value={gw}>
+                              GW{gw}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-foreground-muted">
+                    <input
+                      type="checkbox"
+                      checked={chipCompare}
+                      onChange={(e) => setChipCompare(e.target.checked)}
+                      disabled={chipMode === 'none'}
+                    />
+                    Compare chip plan vs no chips
+                  </label>
+                </div>
+
+                <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
+                  <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
+                    Chip Signals
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => {
+                      const gw = chipResolvedPlan[chip]
+                      const top = chipSuggestions[chip]?.[0]
+                      return (
+                        <div
+                          key={`signal-${chip}`}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <span className="text-foreground-muted">{CHIP_LABELS[chip]}</span>
+                          <span className="font-mono text-foreground">
+                            {gw ? `GW${gw}` : top ? `Best GW${top.gameweek}` : 'n/a'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {comparison && (
+                    <div className="mt-3 pt-2 border-t border-border/50 text-xs">
+                      <div className="flex items-center justify-between text-foreground-muted">
+                        <span>Chip delta</span>
+                        <span
+                          className={`font-mono ${
+                            (comparison.chip_delta ?? 0) >= 0
+                              ? 'text-fpl-green'
+                              : 'text-destructive'
+                          }`}
+                        >
+                          {(comparison.chip_delta ?? 0) >= 0 ? '+' : ''}
+                          {(comparison.chip_delta ?? 0).toFixed(1)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Loading skeleton */}
               {isSolveActive && (
                 <div className="pt-3 border-t border-border/50">
@@ -931,6 +1114,11 @@ export function Planner() {
                             return (
                               <div key={gw} className="text-xs text-foreground-muted truncate">
                                 <span className="text-foreground-dim">GW{gw}:</span>{' '}
+                                {gwData.chip_played && (
+                                  <span className="text-fpl-green/80">
+                                    [{CHIP_SHORT_LABELS[gwData.chip_played as keyof ChipPlan]}]{' '}
+                                  </span>
+                                )}
                                 {gwData.action === 'bank' ? (
                                   <span className="text-foreground-dim">Roll</span>
                                 ) : (
@@ -956,6 +1144,29 @@ export function Planner() {
 
             {/* Gameweek Selector */}
             <BroadcastCard title="Select Gameweek" animationDelay={200}>
+              <div className="mb-3 p-2.5 rounded-lg bg-surface-elevated/60 border border-border/50">
+                <div className="text-[10px] font-display uppercase tracking-wider text-foreground-muted mb-1.5">
+                  Chip Timeline
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {predictionsRange?.gameweeks.map((gw) => (
+                    <div
+                      key={`chip-timeline-${gw}`}
+                      className={`px-2 py-1 rounded border text-center min-w-[62px] ${
+                        chipTimelineByGw[gw]
+                          ? 'bg-fpl-green/10 border-fpl-green/30'
+                          : 'bg-surface border-border/40'
+                      }`}
+                    >
+                      <div className="text-[10px] text-foreground-muted">GW{gw}</div>
+                      <div className="text-[11px] font-display tracking-wider text-foreground">
+                        {chipTimelineByGw[gw] ?? '-'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex gap-2 flex-wrap">
                 {predictionsRange?.gameweeks.map((gw, idx) => {
                   const pathGw = selectedPath?.transfers_by_gw[gw]
@@ -998,9 +1209,11 @@ export function Planner() {
                       </div>
                       {pathAction && (
                         <div className="text-[10px] text-fpl-purple mt-0.5">
-                          {pathAction === 'bank'
-                            ? 'Roll'
-                            : `${pathGw.moves.length} move${pathGw.moves.length > 1 ? 's' : ''}`}
+                          {pathGw?.chip_played
+                            ? CHIP_LABELS[pathGw.chip_played as keyof ChipPlan]
+                            : pathAction === 'bank'
+                              ? 'Roll'
+                              : `${pathGw.moves.length} move${pathGw.moves.length > 1 ? 's' : ''}`}
                         </div>
                       )}
                       {!selectedPath && gwUserTransfers.length > 0 && (

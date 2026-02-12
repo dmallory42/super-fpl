@@ -61,7 +61,7 @@
 
   html {
     scroll-behavior: smooth;
-    font-size: 118.75%; /* Global readability target (16px -> 19px base) */
+    font-size: 112.5%; /* Global base: 18px */
   }
 
   body {

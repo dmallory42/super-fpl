@@ -3,6 +3,7 @@ import {
   fetchPlannerOptimize,
   type PlannerOptimizeResponse,
   type ChipPlan,
+  type ChipMode,
   type FixedTransfer,
   type SolverDepth,
   type XMinsOverrides,
@@ -16,7 +17,9 @@ export function usePlannerOptimize(
   fixedTransfers: FixedTransfer[] = [],
   ftValue: number = 1.5,
   depth: SolverDepth = 'standard',
-  skipSolve: boolean = false
+  skipSolve: boolean = false,
+  chipMode: ChipMode = 'locked',
+  chipCompare: boolean = false
 ) {
   return useQuery<PlannerOptimizeResponse>({
     queryKey: [
@@ -29,6 +32,8 @@ export function usePlannerOptimize(
       ftValue,
       depth,
       skipSolve,
+      chipMode,
+      chipCompare,
     ],
     queryFn: () =>
       fetchPlannerOptimize(
@@ -39,7 +44,11 @@ export function usePlannerOptimize(
         fixedTransfers,
         ftValue,
         depth,
-        skipSolve
+        skipSolve,
+        chipMode,
+        [],
+        {},
+        chipCompare
       ),
     enabled: managerId !== null && managerId > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes

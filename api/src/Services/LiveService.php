@@ -13,6 +13,7 @@ use SuperFPL\FplClient\FplClient;
 class LiveService
 {
     private const CACHE_TTL = 60; // 60 seconds cache for live data
+    private const RECENTLY_FINISHED_WINDOW_SECONDS = 21600; // 6 hours
 
     public function __construct(
         private readonly Database $db,
@@ -31,6 +32,9 @@ class LiveService
         // Check cache first
         $cached = $this->getFromCache($gameweek);
         if ($cached !== null) {
+            // Re-apply on cached data so provisional values stay accurate between allocations.
+            $cached = $this->applyProvisionalBonusToLiveData($cached, $gameweek);
+            $this->saveToCache($gameweek, $cached);
             return $cached;
         }
 
@@ -39,6 +43,7 @@ class LiveService
 
         // Enrich with player info
         $enriched = $this->enrichLiveData($liveData);
+        $enriched = $this->applyProvisionalBonusToLiveData($enriched, $gameweek);
 
         // Cache the result
         $this->saveToCache($gameweek, $enriched);
@@ -236,61 +241,234 @@ class LiveService
      */
     public function getBonusPredictions(int $gameweek): array
     {
-        $liveData = $this->getLiveData($gameweek);
-        $elements = $liveData['elements'] ?? [];
-
         // Get current fixtures
         $fixtures = $this->db->fetchAll(
             'SELECT * FROM fixtures WHERE gameweek = ?',
             [$gameweek]
         );
 
-        $predictions = [];
+        return $this->calculateProvisionalBonusPredictions($gameweek, $fixtures);
+    }
 
-        foreach ($fixtures as $fixture) {
-            // Get players from both teams
-            $homeClubId = $fixture['home_club_id'];
-            $awayClubId = $fixture['away_club_id'];
+    /**
+     * Add provisional bonus to live total points for relevant fixtures.
+     *
+     * @param array<string, mixed> $liveData
+     * @return array<string, mixed>
+     */
+    private function applyProvisionalBonusToLiveData(array $liveData, int $gameweek): array
+    {
+        $elements = $liveData['elements'] ?? [];
+        $fixtures = $this->db->fetchAll(
+            'SELECT * FROM fixtures WHERE gameweek = ?',
+            [$gameweek]
+        );
 
-            $fixturePlayers = [];
+        $predictions = $this->calculateProvisionalBonusPredictions($gameweek, $fixtures);
+        $provisionalByPlayer = [];
+        foreach ($predictions as $prediction) {
+            $playerId = (int) ($prediction['player_id'] ?? 0);
+            if ($playerId <= 0) {
+                continue;
+            }
+            $provisionalByPlayer[$playerId] = ($provisionalByPlayer[$playerId] ?? 0)
+                + (int) ($prediction['predicted_bonus'] ?? 0);
+        }
 
-            foreach ($elements as $element) {
-                $playerId = $element['id'] ?? 0;
-                $stats = $element['stats'] ?? [];
+        foreach ($elements as &$element) {
+            $playerId = (int) ($element['id'] ?? 0);
+            $stats = is_array($element['stats'] ?? null) ? $element['stats'] : [];
 
-                // Get player's club
-                $player = $this->db->fetchOne(
-                    'SELECT club_id FROM players WHERE id = ?',
-                    [$playerId]
-                );
+            $provisionalBonus = $provisionalByPlayer[$playerId] ?? 0;
+            $existingProvisional = (int) ($stats['provisional_bonus'] ?? 0);
+            $officialPointsFromExplain = $this->extractOfficialPointsFromExplain($element);
+            $baseTotalPoints = $officialPointsFromExplain
+                ?? ((int) ($stats['total_points'] ?? 0) - $existingProvisional);
+            $stats['provisional_bonus'] = $provisionalBonus;
+            $stats['total_points'] = $baseTotalPoints + $provisionalBonus;
 
-                if ($player && in_array($player['club_id'], [$homeClubId, $awayClubId])) {
-                    $bps = $stats['bps'] ?? 0;
-                    if ($bps > 0) {
-                        $fixturePlayers[] = [
-                            'player_id' => $playerId,
-                            'bps' => $bps,
-                            'fixture_id' => $fixture['id'],
-                        ];
-                    }
-                }
+            $element['provisional_bonus'] = $provisionalBonus;
+            $element['stats'] = $stats;
+        }
+        unset($element);
+
+        $liveData['elements'] = $elements;
+        return $liveData;
+    }
+
+    /**
+     * Derive official points (without provisional bonus) from explain breakdown.
+     *
+     * @param array<string, mixed> $element
+     */
+    private function extractOfficialPointsFromExplain(array $element): ?int
+    {
+        $explainEntries = $element['explain'] ?? null;
+        if (!is_array($explainEntries) || empty($explainEntries)) {
+            return null;
+        }
+
+        $total = 0;
+        $foundStat = false;
+
+        foreach ($explainEntries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $stats = $entry['stats'] ?? null;
+            if (!is_array($stats)) {
+                continue;
             }
 
-            // Sort by BPS descending
-            usort($fixturePlayers, fn($a, $b) => $b['bps'] <=> $a['bps']);
+            foreach ($stats as $stat) {
+                if (!is_array($stat)) {
+                    continue;
+                }
+                $total += (int) ($stat['points'] ?? 0);
+                $foundStat = true;
+            }
+        }
 
-            // Assign bonus predictions (3, 2, 1 for top 3)
-            foreach (array_slice($fixturePlayers, 0, 3) as $i => $player) {
-                $predictions[] = [
-                    'player_id' => $player['player_id'],
-                    'bps' => $player['bps'],
-                    'predicted_bonus' => 3 - $i,
-                    'fixture_id' => $player['fixture_id'],
+        return $foundStat ? $total : null;
+    }
+
+    /**
+     * Calculate provisional bonus predictions per fixture from fixture-level BPS.
+     *
+     * @param array<int, array<string, mixed>> $fixtures
+     * @return array<int, array{player_id: int, bps: int, predicted_bonus: int, fixture_id: int}>
+     */
+    private function calculateProvisionalBonusPredictions(int $gameweek, array $fixtures): array
+    {
+        return $this->calculateProvisionalBonusFromFixtureStats($gameweek, $fixtures);
+    }
+
+    /**
+     * Derive provisional bonus from fixture endpoint stats (fixture-level BPS).
+     *
+     * @param array<int, array<string, mixed>> $fixtures
+     * @return array<int, array{player_id: int, bps: int, predicted_bonus: int, fixture_id: int}>
+     */
+    private function calculateProvisionalBonusFromFixtureStats(int $gameweek, array $fixtures): array
+    {
+        try {
+            $rawFixtures = $this->fplClient->fixtures()->getRaw($gameweek);
+        } catch (\Throwable $e) {
+            error_log("LiveService: Failed to fetch fixture stats for provisional bonus GW{$gameweek}: " . $e->getMessage());
+            return [];
+        }
+
+        $eligibleFixtureIds = [];
+        foreach ($fixtures as $fixture) {
+            if ($this->isFixtureEligibleForProvisionalBonus($fixture)) {
+                $eligibleFixtureIds[(int) ($fixture['id'] ?? 0)] = true;
+            }
+        }
+
+        $predictions = [];
+        foreach ($rawFixtures as $rawFixture) {
+            $fixtureId = (int) ($rawFixture['id'] ?? 0);
+            if ($fixtureId <= 0 || !isset($eligibleFixtureIds[$fixtureId])) {
+                continue;
+            }
+
+            $stats = $rawFixture['stats'] ?? null;
+            if (!is_array($stats)) {
+                continue;
+            }
+
+            $bpsByPlayer = $this->extractFixtureStatByPlayer($stats, 'bps');
+            if (empty($bpsByPlayer)) {
+                continue;
+            }
+
+            // Once official bonus appears for this fixture, provisional should be removed.
+            $bonusByPlayer = $this->extractFixtureStatByPlayer($stats, 'bonus');
+            if (!empty($bonusByPlayer)) {
+                continue;
+            }
+
+            $fixturePlayers = [];
+            foreach ($bpsByPlayer as $playerId => $bps) {
+                if ($bps <= 0) {
+                    continue;
+                }
+                $fixturePlayers[] = [
+                    'player_id' => $playerId,
+                    'bps' => $bps,
+                    'fixture_id' => $fixtureId,
                 ];
+            }
+
+            if (empty($fixturePlayers)) {
+                continue;
+            }
+
+            foreach ($this->assignBonusFromBps($fixturePlayers) as $prediction) {
+                $predictions[] = $prediction;
             }
         }
 
         return $predictions;
+    }
+
+    /**
+     * Extract per-player values for a fixture stat from fixture endpoint payload.
+     *
+     * @param array<int, array<string, mixed>> $fixtureStats
+     * @return array<int, int>
+     */
+    private function extractFixtureStatByPlayer(array $fixtureStats, string $identifier): array
+    {
+        foreach ($fixtureStats as $statRow) {
+            if (!is_array($statRow) || ($statRow['identifier'] ?? '') !== $identifier) {
+                continue;
+            }
+
+            $map = [];
+            foreach (['h', 'a'] as $side) {
+                $entries = $statRow[$side] ?? null;
+                if (!is_array($entries)) {
+                    continue;
+                }
+
+                foreach ($entries as $entry) {
+                    if (!is_array($entry)) {
+                        continue;
+                    }
+                    $playerId = (int) ($entry['element'] ?? 0);
+                    $value = (int) ($entry['value'] ?? 0);
+                    if ($playerId <= 0 || $value <= 0) {
+                        continue;
+                    }
+                    $map[$playerId] = $value;
+                }
+            }
+
+            return $map;
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<string, mixed> $fixture
+     */
+    private function isFixtureEligibleForProvisionalBonus(array $fixture): bool
+    {
+        $kickoffRaw = $fixture['kickoff_time'] ?? null;
+        $kickoffTs = is_string($kickoffRaw) ? strtotime($kickoffRaw) : false;
+        if ($kickoffTs === false || $kickoffTs > time()) {
+            return false;
+        }
+
+        $finished = !empty($fixture['finished']);
+        if (!$finished) {
+            return true; // In-progress fixture
+        }
+
+        // Recently finished fixture where official bonus may not be allocated yet.
+        return (time() - $kickoffTs) <= self::RECENTLY_FINISHED_WINDOW_SECONDS;
     }
 
     /**
@@ -324,6 +502,47 @@ class LiveService
 
         $liveData['elements'] = $enrichedElements;
         return $liveData;
+    }
+
+    /**
+     * Assign bonus using FPL tie rules from fixture-level BPS.
+     *
+     * @param array<int, array{player_id: int, bps: int, fixture_id: int}> $fixturePlayers
+     * @return array<int, array{player_id: int, bps: int, predicted_bonus: int, fixture_id: int}>
+     */
+    private function assignBonusFromBps(array $fixturePlayers): array
+    {
+        usort($fixturePlayers, fn($a, $b) => $b['bps'] <=> $a['bps']);
+
+        $bonusByRank = [1 => 3, 2 => 2, 3 => 1];
+        $predictions = [];
+        $rank = 1;
+        $seen = 0;
+        $previousBps = null;
+
+        foreach ($fixturePlayers as $player) {
+            $bps = (int) ($player['bps'] ?? 0);
+            if ($previousBps !== null && $bps < $previousBps) {
+                $rank = $seen + 1;
+            }
+
+            $seen++;
+            $previousBps = $bps;
+
+            $bonus = $bonusByRank[$rank] ?? 0;
+            if ($bonus <= 0) {
+                continue;
+            }
+
+            $predictions[] = [
+                'player_id' => (int) ($player['player_id'] ?? 0),
+                'bps' => $bps,
+                'predicted_bonus' => $bonus,
+                'fixture_id' => (int) ($player['fixture_id'] ?? 0),
+            ];
+        }
+
+        return $predictions;
     }
 
     /**

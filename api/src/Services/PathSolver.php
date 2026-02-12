@@ -8,6 +8,11 @@ class PathSolver
 {
     private const HIT_COST = 4;
     private const MAX_FT = 5;
+    private const CHIP_NONE = null;
+    private const CHIP_WILDCARD = 'wildcard';
+    private const CHIP_FREE_HIT = 'free_hit';
+    private const CHIP_BENCH_BOOST = 'bench_boost';
+    private const CHIP_TRIPLE_CAPTAIN = 'triple_captain';
 
     // [beamWidth, candidatesPerPos, maxTransfersPerGw]
     private const DEPTH_PRESETS = [
@@ -38,6 +43,7 @@ class PathSolver
      * @param float   $bank           bank balance in millions
      * @param int     $freeTransfers  FTs available for first GW
      * @param array   $fixedTransfers [{gameweek, out, in}]
+     * @param array   $chipPlan       [chip => gameweek]
      * @return array  Top 3 diverse TransferPath arrays
      */
     public function solve(
@@ -48,6 +54,7 @@ class PathSolver
         float $bank,
         int $freeTransfers,
         array $fixedTransfers = [],
+        array $chipPlan = [],
     ): array {
         // Build candidate pools per position
         $candidatePools = $this->buildCandidatePools($squadIds, $predictions, $gameweeks, $playerMap);
@@ -63,8 +70,10 @@ class PathSolver
         $holdScore = 0.0;
         $holdSquad = $squadIds;
         $holdFt = $freeTransfers;
+        $holdBank = $bank;
         foreach ($gameweeks as $gw) {
             $fixed = $fixedByGw[$gw] ?? [];
+            $chip = $this->chipForGameweek($chipPlan, $gw);
 
             foreach ($fixed as $ft) {
                 $outId = $ft['out'];
@@ -76,11 +85,43 @@ class PathSolver
             }
 
             $numFixed = count($fixed);
-            $hitCost = max(0, $numFixed - $holdFt) * self::HIT_COST;
-            $holdScore += $this->evaluateSquad($holdSquad, $predictions, $gw, $playerMap) - $hitCost;
+            if ($chip === self::CHIP_WILDCARD || $chip === self::CHIP_FREE_HIT) {
+                $bestChipSquad = $this->optimizeChipSquads(
+                    $holdSquad,
+                    $holdBank,
+                    $gw,
+                    $gameweeks,
+                    $predictions,
+                    $playerMap,
+                    $chip,
+                    1
+                )[0] ?? null;
+
+                if ($bestChipSquad !== null) {
+                    $holdScore += $this->evaluateSquad(
+                        $bestChipSquad['squad_ids'],
+                        $predictions,
+                        $gw,
+                        $playerMap,
+                        $chip
+                    );
+                    if ($chip === self::CHIP_WILDCARD) {
+                        $holdSquad = $bestChipSquad['squad_ids'];
+                        $holdBank = $bestChipSquad['bank'];
+                    }
+                } else {
+                    $holdScore += $this->evaluateSquad($holdSquad, $predictions, $gw, $playerMap, $chip);
+                }
+            } else {
+                $hitCost = max(0, $numFixed - $holdFt) * self::HIT_COST;
+                $holdScore += $this->evaluateSquad($holdSquad, $predictions, $gw, $playerMap, $chip) - $hitCost;
+            }
 
             // Update FT for next GW
-            if ($numFixed === 0) {
+            if ($chip === self::CHIP_WILDCARD || $chip === self::CHIP_FREE_HIT) {
+                // Keep FT unchanged through WC/FH.
+                $holdFt = $holdFt;
+            } elseif ($numFixed === 0) {
                 $holdFt = min(self::MAX_FT, $holdFt + 1);
             } elseif ($numFixed <= $holdFt) {
                 $holdFt = min(self::MAX_FT, $holdFt - $numFixed + 1);
@@ -105,10 +146,20 @@ class PathSolver
         // Process each gameweek
         foreach ($gameweeks as $gw) {
             $fixed = $fixedByGw[$gw] ?? [];
+            $chip = $this->chipForGameweek($chipPlan, $gw);
             $children = [];
 
             foreach ($beam as $state) {
-                $newChildren = $this->generateChildren($state, $gw, $predictions, $playerMap, $candidatePools, $fixed, $gameweeks);
+                $newChildren = $this->generateChildren(
+                    $state,
+                    $gw,
+                    $predictions,
+                    $playerMap,
+                    $candidatePools,
+                    $fixed,
+                    $gameweeks,
+                    $chip
+                );
                 foreach ($newChildren as $child) {
                     $children[] = $child;
                 }
@@ -151,13 +202,17 @@ class PathSolver
         array $candidatePools,
         array $fixedTransfers,
         array $gameweeks,
+        ?string $chip = self::CHIP_NONE,
     ): array {
         $children = [];
-        $ft = $state['ft'];
+        // WC/FH: dedicated chip transition for this GW (ignore normal transfer generation).
+        if ($chip === self::CHIP_WILDCARD || $chip === self::CHIP_FREE_HIT) {
+            return $this->generateChipSquadChildren($state, $gw, $predictions, $playerMap, $gameweeks, $chip);
+        }
 
         // Apply fixed transfers first (if any for this GW)
         if (!empty($fixedTransfers)) {
-            $fixedState = $this->applyFixedTransfers($state, $gw, $fixedTransfers, $predictions, $playerMap, $gameweeks);
+            $fixedState = $this->applyFixedTransfers($state, $gw, $fixedTransfers, $predictions, $playerMap, $gameweeks, $chip);
             if ($fixedState !== null) {
                 // Generate additional optional transfers on top of fixed ones
                 $children[] = $fixedState;
@@ -169,7 +224,8 @@ class PathSolver
                     $playerMap,
                     $candidatePools,
                     $gameweeks,
-                    true // skip re-evaluating GW score, it's already done
+                    true, // skip re-evaluating GW score, it's already done
+                    $chip
                 );
                 foreach ($additionalChildren as $c) {
                     $children[] = $c;
@@ -179,18 +235,18 @@ class PathSolver
         }
 
         // Option 1: BANK — make 0 transfers, gain +1 FT
-        $bankState = $this->makeBank($state, $gw, $predictions, $playerMap, $gameweeks);
+        $bankState = $this->makeBank($state, $gw, $predictions, $playerMap, $gameweeks, $chip);
         $children[] = $bankState;
 
         // Option 2: SINGLE TRANSFERS
-        $singleChildren = $this->generateSingleTransfers($state, $gw, $predictions, $playerMap, $candidatePools, $gameweeks);
+        $singleChildren = $this->generateSingleTransfers($state, $gw, $predictions, $playerMap, $candidatePools, $gameweeks, false, $chip);
         foreach ($singleChildren as $c) {
             $children[] = $c;
         }
 
         // Option 3: MULTI-TRANSFER COMBOS (2+ transfers in one GW)
         if ($this->maxTransfersPerGw >= 2) {
-            $multiChildren = $this->generateMultiTransfers($state, $gw, $predictions, $playerMap, $candidatePools, $gameweeks);
+            $multiChildren = $this->generateMultiTransfers($state, $gw, $predictions, $playerMap, $candidatePools, $gameweeks, $chip);
             foreach ($multiChildren as $c) {
                 $children[] = $c;
             }
@@ -202,9 +258,16 @@ class PathSolver
     /**
      * Banking: make 0 transfers, gain +1 FT.
      */
-    private function makeBank(array $state, int $gw, array $predictions, array $playerMap, array $gameweeks): array
+    private function makeBank(
+        array $state,
+        int $gw,
+        array $predictions,
+        array $playerMap,
+        array $gameweeks,
+        ?string $chip = self::CHIP_NONE
+    ): array
     {
-        $gwScore = $this->evaluateSquad($state['squad_ids'], $predictions, $gw, $playerMap);
+        $gwScore = $this->evaluateSquad($state['squad_ids'], $predictions, $gw, $playerMap, $chip);
         $newFt = min($state['ft'] + 1, self::MAX_FT);
 
         $newState = $state;
@@ -220,6 +283,7 @@ class PathSolver
             'gw_score' => round($gwScore, 1),
             'squad_ids' => $state['squad_ids'],
             'bank' => $state['bank'],
+            'chip_played' => $chip,
         ];
 
         return $newState;
@@ -236,6 +300,7 @@ class PathSolver
         array $candidatePools,
         array $gameweeks,
         bool $isAdditional = false,
+        ?string $chip = self::CHIP_NONE,
     ): array {
         $children = [];
         $squad = $state['squad_ids'];
@@ -289,7 +354,7 @@ class PathSolver
                 $newSquad[] = $inId;
                 $newBank = $state['bank'] + $outPrice - $inPrice;
 
-                $gwScore = $this->evaluateSquad($newSquad, $predictions, $gw, $playerMap);
+                $gwScore = $this->evaluateSquad($newSquad, $predictions, $gw, $playerMap, $chip);
                 $ftOpportunityCost = min($totalTransfers, $ft) * $this->ftValue;
                 // Hits destroy FT flexibility — penalize proportional to ftValue
                 $hitAversion = $hitCost > 0
@@ -355,6 +420,7 @@ class PathSolver
                     'gw_score' => round($gwScore - $hitCost, 1),
                     'squad_ids' => $newSquad,
                     'bank' => round($newBank, 1),
+                    'chip_played' => $chip,
                 ];
 
                 $children[] = $newState;
@@ -374,6 +440,7 @@ class PathSolver
         array $playerMap,
         array $candidatePools,
         array $gameweeks,
+        ?string $chip = self::CHIP_NONE,
     ): array {
         $children = [];
         $squad = $state['squad_ids'];
@@ -437,7 +504,7 @@ class PathSolver
                             $hitCost = ($numTransfers - $ft) * self::HIT_COST;
                         }
 
-                        $gwScore = $this->evaluateSquad($newSquad, $predictions, $gw, $playerMap);
+                        $gwScore = $this->evaluateSquad($newSquad, $predictions, $gw, $playerMap, $chip);
                         $ftOpportunityCost = min($numTransfers, $ft) * $this->ftValue;
                         $hitAversion = $hitCost > 0
                             ? $this->ftValue * ($hitCost / self::HIT_COST)
@@ -484,6 +551,7 @@ class PathSolver
                             'gw_score' => round($gwScore - $hitCost, 1),
                             'squad_ids' => $newSquad,
                             'bank' => round($newBank, 1),
+                            'chip_played' => $chip,
                         ];
 
                         $children[] = $newState;
@@ -505,6 +573,7 @@ class PathSolver
         array $predictions,
         array $playerMap,
         array $gameweeks,
+        ?string $chip = self::CHIP_NONE,
     ): ?array {
         $squad = $state['squad_ids'];
         $bank = $state['bank'];
@@ -563,7 +632,7 @@ class PathSolver
             $moves[$i]['is_free'] = ($i + 1) <= $ft;
         }
 
-        $gwScore = $this->evaluateSquad($squad, $predictions, $gw, $playerMap);
+        $gwScore = $this->evaluateSquad($squad, $predictions, $gw, $playerMap, $chip);
         $ftOpportunityCost = min($numTransfers, $ft) * $this->ftValue;
         $hitAversion = $hitCost > 0
             ? $this->ftValue * ($hitCost / self::HIT_COST)
@@ -585,6 +654,7 @@ class PathSolver
             'gw_score' => round($gwScore - $hitCost, 1),
             'squad_ids' => $squad,
             'bank' => round($bank, 1),
+            'chip_played' => $chip,
         ];
 
         return $newState;
@@ -594,7 +664,13 @@ class PathSolver
      * Evaluate a squad's predicted points for a single GW.
      * Selects optimal starting 11 + captain bonus.
      */
-    private function evaluateSquad(array $squadIds, array $predictions, int $gw, array $playerMap): float
+    private function evaluateSquad(
+        array $squadIds,
+        array $predictions,
+        int $gw,
+        array $playerMap,
+        ?string $chip = self::CHIP_NONE
+    ): float
     {
         $byPosition = [1 => [], 2 => [], 3 => [], 4 => []];
 
@@ -612,16 +688,278 @@ class PathSolver
 
         $starting11 = self::selectOptimalStarting11($byPosition);
 
-        $captainPred = 0;
-        $total = 0;
+        $captainPred = 0.0;
+        $startingTotal = 0.0;
         foreach ($starting11 as $p) {
-            $total += $p['pred'];
+            $startingTotal += $p['pred'];
             if ($p['pred'] > $captainPred) {
                 $captainPred = $p['pred'];
             }
         }
 
-        return $total + $captainPred; // Captain counts twice
+        $captainMultiplier = $chip === self::CHIP_TRIPLE_CAPTAIN ? 3 : 2;
+        $total = $startingTotal + (($captainMultiplier - 1) * $captainPred);
+
+        if ($chip === self::CHIP_BENCH_BOOST) {
+            $benchTotal = $this->calculateBenchTotal($squadIds, $starting11, $predictions, $gw);
+            $total += $benchTotal;
+        }
+
+        return $total;
+    }
+
+    /**
+     * @param array<int, array{id: int, pred: float}> $starting11
+     */
+    private function calculateBenchTotal(array $squadIds, array $starting11, array $predictions, int $gw): float
+    {
+        $startingIds = array_column($starting11, 'id');
+        $benchTotal = 0.0;
+
+        foreach ($squadIds as $playerId) {
+            if (in_array($playerId, $startingIds, true)) {
+                continue;
+            }
+            $benchTotal += (float) ($predictions[$playerId][$gw] ?? 0.0);
+        }
+
+        return $benchTotal;
+    }
+
+    /**
+     * @param array<string, int> $chipPlan
+     */
+    private function chipForGameweek(array $chipPlan, int $gameweek): ?string
+    {
+        foreach ([self::CHIP_WILDCARD, self::CHIP_FREE_HIT, self::CHIP_BENCH_BOOST, self::CHIP_TRIPLE_CAPTAIN] as $chip) {
+            if ((int) ($chipPlan[$chip] ?? 0) === $gameweek) {
+                return $chip;
+            }
+        }
+
+        return self::CHIP_NONE;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function generateChipSquadChildren(
+        array $state,
+        int $gw,
+        array $predictions,
+        array $playerMap,
+        array $gameweeks,
+        string $chip
+    ): array {
+        $chipSquads = $this->optimizeChipSquads(
+            $state['squad_ids'],
+            (float) $state['bank'],
+            $gw,
+            $gameweeks,
+            $predictions,
+            $playerMap,
+            $chip,
+            $this->beamWidth >= 30 ? 3 : 2
+        );
+
+        if (empty($chipSquads)) {
+            $chipSquads[] = [
+                'squad_ids' => $state['squad_ids'],
+                'bank' => (float) $state['bank'],
+            ];
+        }
+
+        $children = [];
+        foreach ($chipSquads as $chipSquad) {
+            $chipSquadIds = $chipSquad['squad_ids'];
+            $chipBank = (float) $chipSquad['bank'];
+
+            $gwScore = $this->evaluateSquad($chipSquadIds, $predictions, $gw, $playerMap, $chip);
+
+            $newState = $state;
+            $newState['score'] += $gwScore;
+            $newState['display_score'] += $gwScore;
+            $newState['ft'] = $state['ft']; // FT carries unchanged through WC/FH in this model.
+
+            if ($chip === self::CHIP_WILDCARD) {
+                $newState['squad_ids'] = $chipSquadIds;
+                $newState['bank'] = round($chipBank, 1);
+            }
+
+            $newState['transfers_by_gw'][$gw] = [
+                'action' => 'transfer',
+                'ft_available' => $state['ft'],
+                'ft_after' => $state['ft'],
+                'moves' => [],
+                'hit_cost' => 0,
+                'gw_score' => round($gwScore, 1),
+                // For FH, expose the temporary squad in this GW row even though state reverts next GW.
+                'squad_ids' => $chipSquadIds,
+                'bank' => round($chipBank, 1),
+                'chip_played' => $chip,
+            ];
+
+            $children[] = $newState;
+        }
+
+        return $children;
+    }
+
+    /**
+     * Optimize WC/FH squad choices under budget, position, and team constraints.
+     *
+     * @return array<int, array{squad_ids: int[], bank: float}>
+     */
+    private function optimizeChipSquads(
+        array $currentSquadIds,
+        float $currentBank,
+        int $gw,
+        array $gameweeks,
+        array $predictions,
+        array $playerMap,
+        string $chip,
+        int $limit
+    ): array {
+        $budgetUnits = (int) round($currentBank * 10);
+        foreach ($currentSquadIds as $id) {
+            $budgetUnits += (int) ($playerMap[$id]['now_cost'] ?? 0);
+        }
+
+        $remainingGws = array_values(array_filter($gameweeks, fn($x) => $x >= $gw));
+        $objective = [];
+        foreach ($playerMap as $playerId => $player) {
+            if (($player['chance_of_playing'] ?? null) === 0) {
+                continue;
+            }
+
+            $score = 0.0;
+            if ($chip === self::CHIP_WILDCARD) {
+                foreach ($remainingGws as $g) {
+                    $score += (float) ($predictions[$playerId][$g] ?? 0.0);
+                }
+            } else {
+                $score = (float) ($predictions[$playerId][$gw] ?? 0.0);
+            }
+            $objective[$playerId] = $score;
+        }
+
+        $pools = [1 => [], 2 => [], 3 => [], 4 => []];
+        foreach ($playerMap as $playerId => $player) {
+            $pos = (int) ($player['position'] ?? 0);
+            if (!isset($pools[$pos])) {
+                continue;
+            }
+            if (($player['chance_of_playing'] ?? null) === 0) {
+                continue;
+            }
+
+            $pools[$pos][] = [
+                'id' => $playerId,
+                'team' => (int) ($player['club_id'] ?? 0),
+                'cost' => (int) ($player['now_cost'] ?? 0),
+                'score' => (float) ($objective[$playerId] ?? 0.0),
+            ];
+        }
+
+        $poolLimits = [1 => 16, 2 => 30, 3 => 30, 4 => 20];
+        foreach ($pools as $pos => &$pool) {
+            usort($pool, fn($a, $b) => $b['score'] <=> $a['score']);
+            $pool = array_slice($pool, 0, $poolLimits[$pos] ?? 20);
+        }
+        unset($pool);
+
+        $slots = array_merge([1, 1], array_fill(0, 5, 2), array_fill(0, 5, 3), array_fill(0, 3, 4));
+        $minCostByPos = [];
+        foreach ([1, 2, 3, 4] as $pos) {
+            $minCostByPos[$pos] = empty($pools[$pos])
+                ? PHP_INT_MAX
+                : min(array_column($pools[$pos], 'cost'));
+        }
+
+        $remainingMinCost = [];
+        $slotCount = count($slots);
+        $remainingMinCost[$slotCount] = 0;
+        for ($i = $slotCount - 1; $i >= 0; $i--) {
+            $slotPos = $slots[$i];
+            $remainingMinCost[$i] = $remainingMinCost[$i + 1] + ($minCostByPos[$slotPos] ?? PHP_INT_MAX);
+        }
+
+        $states = [[
+            'ids' => [],
+            'id_set' => [],
+            'cost' => 0,
+            'score' => 0.0,
+            'team_counts' => [],
+        ]];
+
+        $beamSize = $this->beamWidth >= 30 ? 500 : 250;
+
+        for ($idx = 0; $idx < $slotCount; $idx++) {
+            $pos = $slots[$idx];
+            $nextStates = [];
+            $bestByHash = [];
+
+            foreach ($states as $state) {
+                foreach ($pools[$pos] as $candidate) {
+                    $pid = $candidate['id'];
+                    $team = $candidate['team'];
+                    $cost = $candidate['cost'];
+
+                    if (isset($state['id_set'][$pid])) {
+                        continue;
+                    }
+
+                    $teamCount = (int) ($state['team_counts'][$team] ?? 0);
+                    if ($teamCount >= 3) {
+                        continue;
+                    }
+
+                    $newCost = $state['cost'] + $cost;
+                    if ($newCost > $budgetUnits) {
+                        continue;
+                    }
+
+                    if ($newCost + $remainingMinCost[$idx + 1] > $budgetUnits) {
+                        continue;
+                    }
+
+                    $newIds = $state['ids'];
+                    $newIds[] = $pid;
+                    sort($newIds);
+                    $hash = implode(',', $newIds);
+                    $newTeamCounts = $state['team_counts'];
+                    $newTeamCounts[$team] = $teamCount + 1;
+
+                    $newState = [
+                        'ids' => $newIds,
+                        'id_set' => $state['id_set'] + [$pid => true],
+                        'cost' => $newCost,
+                        'score' => $state['score'] + $candidate['score'],
+                        'team_counts' => $newTeamCounts,
+                    ];
+
+                    if (!isset($bestByHash[$hash]) || $newState['score'] > $bestByHash[$hash]['score']) {
+                        $bestByHash[$hash] = $newState;
+                    }
+                }
+            }
+
+            $nextStates = array_values($bestByHash);
+            usort($nextStates, fn($a, $b) => $b['score'] <=> $a['score']);
+            $states = array_slice($nextStates, 0, $beamSize);
+        }
+
+        $results = [];
+        foreach (array_slice($states, 0, max(1, $limit)) as $state) {
+            $ids = $state['ids'];
+            sort($ids);
+            $results[] = [
+                'squad_ids' => $ids,
+                'bank' => round(($budgetUnits - (int) $state['cost']) / 10, 1),
+            ];
+        }
+
+        return $results;
     }
 
     /**

@@ -394,6 +394,13 @@ export function Live() {
   const managerLastUpdated = formatUpdatedTime(liveManager?.updated_at)
   const isRefreshingLiveData =
     isFetchingManager || isFetchingSamples || isFetchingLiveData || isFetchingBonus
+  const provisionalBonusIncluded = useMemo(() => {
+    if (!processedSquad) return 0
+
+    return processedSquad.players
+      .filter((p) => p.position <= 11)
+      .reduce((sum, p) => sum + (p.stats?.provisional_bonus ?? 0) * (p.multiplier ?? 1), 0)
+  }, [processedSquad])
 
   const handleLoadManager = (id?: number) => {
     const rawInput = id !== undefined ? String(id) : managerInput.trim()
@@ -534,6 +541,11 @@ export function Live() {
               label="Live Points"
               value={processedSquad.totalPoints}
               highlight
+              subValue={
+                provisionalBonusIncluded > 0
+                  ? `Includes +${provisionalBonusIncluded} provisional bonus`
+                  : undefined
+              }
               animationDelay={0}
             />
             <StatPanel

@@ -146,4 +146,72 @@ class TransferOptimizerPicksTest extends TestCase
 
         $this->assertIsArray($result);
     }
+
+    public function testChipModeNoneClearsResolvedChipPlan(): void
+    {
+        $db = $this->createMock(Database::class);
+        $fplClient = $this->createMock(FplClient::class);
+        $predictionService = $this->createMock(PredictionService::class);
+        $gameweekService = $this->createMock(GameweekService::class);
+
+        $gameweekService->method('getCurrentGameweek')->willReturn(26);
+        $gameweekService->method('hasGameweekStarted')->with(26)->willReturn(true);
+        $gameweekService->method('getNextActionableGameweek')->willReturn(27);
+        $gameweekService->method('getUpcomingGameweeks')->willReturn([27, 28]);
+        $gameweekService->method('getFixtureCounts')->willReturn([27 => [], 28 => []]);
+
+        $entryEndpoint = $this->createMock(EntryEndpoint::class);
+        $entryEndpoint->method('getRaw')->willReturn([
+            'last_deadline_bank' => 20,
+            'last_deadline_value' => 1000,
+        ]);
+        $entryEndpoint->method('picks')->with(26)->willReturn($this->createMockPicks());
+        $fplClient->method('entry')->willReturn($entryEndpoint);
+
+        $db->method('fetchAll')->willReturn([]);
+        $predictionService->method('getPredictions')->willReturn([]);
+
+        $service = new TransferOptimizerService($db, $fplClient, $predictionService, $gameweekService);
+        $result = $service->getOptimalPlan(
+            8028,
+            ['triple_captain' => 27],
+            skipSolve: true,
+            chipMode: 'none'
+        );
+
+        $this->assertSame([], $result['resolved_chip_plan']);
+        $this->assertSame('none', $result['chip_mode']);
+    }
+
+    public function testSuggestChipPlanIncludesRankedSuggestions(): void
+    {
+        $db = $this->createMock(Database::class);
+        $fplClient = $this->createMock(FplClient::class);
+        $predictionService = $this->createMock(PredictionService::class);
+        $gameweekService = $this->createMock(GameweekService::class);
+
+        $gameweekService->method('getCurrentGameweek')->willReturn(26);
+        $gameweekService->method('hasGameweekStarted')->with(26)->willReturn(true);
+        $gameweekService->method('getNextActionableGameweek')->willReturn(27);
+        $gameweekService->method('getUpcomingGameweeks')->willReturn([27, 28]);
+        $gameweekService->method('getFixtureCounts')->willReturn([27 => [], 28 => []]);
+
+        $entryEndpoint = $this->createMock(EntryEndpoint::class);
+        $entryEndpoint->method('getRaw')->willReturn([
+            'last_deadline_bank' => 20,
+            'last_deadline_value' => 1000,
+        ]);
+        $entryEndpoint->method('picks')->with(26)->willReturn($this->createMockPicks());
+        $fplClient->method('entry')->willReturn($entryEndpoint);
+
+        $db->method('fetchAll')->willReturn([]);
+        $predictionService->method('getPredictions')->willReturn([]);
+
+        $service = new TransferOptimizerService($db, $fplClient, $predictionService, $gameweekService);
+        $result = $service->suggestChipPlan(8028);
+
+        $this->assertArrayHasKey('suggestions', $result);
+        $this->assertIsArray($result['suggestions']);
+        $this->assertArrayHasKey('recommended_plan', $result);
+    }
 }

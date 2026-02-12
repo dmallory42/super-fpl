@@ -521,4 +521,123 @@ class PathSolverTest extends TestCase
             }
         }
     }
+
+    public function testTripleCaptainAddsExtraCaptainMultiplier(): void
+    {
+        $gameweeks = [30];
+        [$squadIds, $predictions, $playerMap] = $this->makeSquad($gameweeks, 4.0);
+        $predictions[21][30] = 10.0; // Captain candidate
+
+        $solver = new PathSolver(ftValue: 10.0, depth: 'quick');
+        $noChip = $solver->solve($squadIds, $predictions, $gameweeks, $playerMap, 5.0, 1);
+        $tc = $solver->solve(
+            $squadIds,
+            $predictions,
+            $gameweeks,
+            $playerMap,
+            5.0,
+            1,
+            [],
+            ['triple_captain' => 30]
+        );
+
+        $this->assertNotEmpty($noChip);
+        $this->assertNotEmpty($tc);
+        $this->assertGreaterThan($noChip[0]['total_score'], $tc[0]['total_score'] - 0.1); // sanity
+        $this->assertEqualsWithDelta(10.0, $tc[0]['total_score'] - $noChip[0]['total_score'], 0.2);
+    }
+
+    public function testBenchBoostAddsBenchPoints(): void
+    {
+        $gameweeks = [30];
+        [$squadIds, $predictions, $playerMap] = $this->makeSquad($gameweeks, 4.0);
+
+        $solver = new PathSolver(ftValue: 10.0, depth: 'quick');
+        $noChip = $solver->solve($squadIds, $predictions, $gameweeks, $playerMap, 5.0, 1);
+        $bb = $solver->solve(
+            $squadIds,
+            $predictions,
+            $gameweeks,
+            $playerMap,
+            5.0,
+            1,
+            [],
+            ['bench_boost' => 30]
+        );
+
+        $this->assertNotEmpty($noChip);
+        $this->assertNotEmpty($bb);
+        // 4 bench players at 4.0 each.
+        $this->assertEqualsWithDelta(16.0, $bb[0]['total_score'] - $noChip[0]['total_score'], 0.2);
+    }
+
+    public function testFreeHitSquadRevertsAfterChipWeek(): void
+    {
+        $gameweeks = [30, 31];
+        [$squadIds, $predictions, $playerMap] = $this->makeSquad($gameweeks, 4.0);
+
+        // A one-week monster only in GW30.
+        $this->addCandidates($predictions, $playerMap, [
+            [
+                'id' => 200,
+                'position' => 3,
+                'team' => 18,
+                'cost' => 100,
+                'name' => 'OneWeekStar',
+                'predictions' => [30 => 20.0, 31 => 0.0],
+            ],
+        ]);
+
+        $solver = new PathSolver(ftValue: 10.0, depth: 'quick');
+        $paths = $solver->solve(
+            $squadIds,
+            $predictions,
+            $gameweeks,
+            $playerMap,
+            5.0,
+            1,
+            [],
+            ['free_hit' => 30]
+        );
+
+        $this->assertNotEmpty($paths);
+        $best = $paths[0];
+        $this->assertContains(200, $best['transfers_by_gw'][30]['squad_ids']);
+        $this->assertNotContains(200, $best['transfers_by_gw'][31]['squad_ids']);
+    }
+
+    public function testWildcardSquadPersistsAfterChipWeek(): void
+    {
+        $gameweeks = [30, 31];
+        [$squadIds, $predictions, $playerMap] = $this->makeSquad($gameweeks, 4.0);
+
+        // Premium upgrade that should remain valuable beyond GW30.
+        $this->addCandidates($predictions, $playerMap, [
+            [
+                'id' => 201,
+                'position' => 3,
+                'team' => 18,
+                'cost' => 100,
+                'name' => 'LongTermStar',
+                'predictions' => [30 => 14.0, 31 => 14.0],
+            ],
+        ]);
+
+        $solver = new PathSolver(ftValue: 10.0, depth: 'quick');
+        $paths = $solver->solve(
+            $squadIds,
+            $predictions,
+            $gameweeks,
+            $playerMap,
+            5.0,
+            1,
+            [],
+            ['wildcard' => 30]
+        );
+
+        $this->assertNotEmpty($paths);
+        $best = $paths[0];
+        $this->assertContains(201, $best['transfers_by_gw'][30]['squad_ids']);
+        $this->assertContains(201, $best['transfers_by_gw'][31]['squad_ids']);
+    }
 }

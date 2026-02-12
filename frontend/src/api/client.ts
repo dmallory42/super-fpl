@@ -227,6 +227,7 @@ export interface LivePlayerStats {
   bonus: number
   bps: number
   total_points: number
+  provisional_bonus?: number
   clearances_blocks_interceptions?: number
   defensive_contribution?: number
 }
@@ -570,6 +571,7 @@ export interface PathGameweek {
   action: 'bank' | 'transfer'
   ft_available: number
   ft_after: number
+  chip_played?: 'wildcard' | 'bench_boost' | 'free_hit' | 'triple_captain' | null
   moves: TransferMove[]
   hit_cost: number
   gw_score: number
@@ -586,6 +588,7 @@ export interface TransferPath {
 }
 
 export type SolverDepth = 'quick' | 'standard' | 'deep'
+export type ChipMode = 'none' | 'locked' | 'auto'
 
 // xMins overrides: uniform (number) or per-GW (Record<number, number>)
 export type XMinsOverrides = Record<number, number | Record<number, number>>
@@ -611,8 +614,25 @@ export interface PlannerOptimizeResponse {
   dgw_teams: Record<number, number[]>
   recommendations: TransferRecommendation[]
   chip_suggestions: Record<string, ChipSuggestion>
+  chip_suggestions_ranked?: Record<string, ChipSuggestion[]>
+  chip_mode?: ChipMode
+  requested_chip_plan?: ChipPlan
+  resolved_chip_plan?: ChipPlan
   chip_plan: ChipPlan
+  comparisons?: {
+    no_chip_total_score: number | null
+    chip_plan_total_score: number | null
+    chip_delta: number | null
+  } | null
   paths: TransferPath[]
+}
+
+export interface PlannerChipSuggestResponse {
+  current_gameweek: number
+  planning_horizon: number[]
+  requested_chip_plan: ChipPlan
+  suggestions: Record<string, ChipSuggestion[]>
+  recommended_plan: ChipPlan
 }
 
 // Penalty takers
@@ -668,6 +688,10 @@ export async function fetchPlannerOptimize(
   ftValue: number = 1.5,
   depth: SolverDepth = 'standard',
   skipSolve: boolean = false,
+  chipMode: ChipMode = 'locked',
+  chipAllow: string[] = [],
+  chipForbid: Record<string, number[]> = {},
+  chipCompare: boolean = false,
 ): Promise<PlannerOptimizeResponse> {
   const params = new URLSearchParams()
   params.set('manager', String(managerId))
@@ -680,6 +704,21 @@ export async function fetchPlannerOptimize(
   if (chipPlan.bench_boost) params.set('bench_boost_gw', String(chipPlan.bench_boost))
   if (chipPlan.free_hit) params.set('free_hit_gw', String(chipPlan.free_hit))
   if (chipPlan.triple_captain) params.set('triple_captain_gw', String(chipPlan.triple_captain))
+  if (Object.keys(chipPlan).length > 0) {
+    params.set('chip_plan', JSON.stringify(chipPlan))
+  }
+  if (chipMode !== 'locked') {
+    params.set('chip_mode', chipMode)
+  }
+  if (chipAllow.length > 0) {
+    params.set('chip_allow', JSON.stringify(chipAllow))
+  }
+  if (Object.keys(chipForbid).length > 0) {
+    params.set('chip_forbid', JSON.stringify(chipForbid))
+  }
+  if (chipCompare) {
+    params.set('chip_compare', '1')
+  }
 
   // Pass xMins overrides as JSON if any exist
   if (Object.keys(xMinsOverrides).length > 0) {
@@ -701,4 +740,28 @@ export async function fetchPlannerOptimize(
   }
 
   return fetchApi<PlannerOptimizeResponse>(`/planner/optimize?${params.toString()}`)
+}
+
+export async function fetchPlannerChipSuggest(
+  managerId: number,
+  freeTransfers: number | null = null,
+  chipPlan: ChipPlan = {},
+  chipAllow: string[] = [],
+  chipForbid: Record<string, number[]> = {}
+): Promise<PlannerChipSuggestResponse> {
+  const params = new URLSearchParams()
+  params.set('manager', String(managerId))
+  if (freeTransfers !== null) {
+    params.set('ft', String(freeTransfers))
+  }
+  if (Object.keys(chipPlan).length > 0) {
+    params.set('chip_plan', JSON.stringify(chipPlan))
+  }
+  if (chipAllow.length > 0) {
+    params.set('chip_allow', JSON.stringify(chipAllow))
+  }
+  if (Object.keys(chipForbid).length > 0) {
+    params.set('chip_forbid', JSON.stringify(chipForbid))
+  }
+  return fetchApi<PlannerChipSuggestResponse>(`/planner/chips/suggest?${params.toString()}`)
 }

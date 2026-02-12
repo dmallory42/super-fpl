@@ -12,6 +12,16 @@ class TransferOptimizerService
     private const PLANNING_HORIZON = 6; // Gameweeks to look ahead
     private const HIT_COST = 4; // Points cost per extra transfer
     private const HIT_THRESHOLD = 6; // Minimum net gain required to recommend a hit
+    private const CHIP_WILDCARD = 'wildcard';
+    private const CHIP_BENCH_BOOST = 'bench_boost';
+    private const CHIP_FREE_HIT = 'free_hit';
+    private const CHIP_TRIPLE_CAPTAIN = 'triple_captain';
+    private const CHIP_NAMES = [
+        self::CHIP_WILDCARD,
+        self::CHIP_BENCH_BOOST,
+        self::CHIP_FREE_HIT,
+        self::CHIP_TRIPLE_CAPTAIN,
+    ];
 
     public function __construct(
         private Database $db,
@@ -38,7 +48,169 @@ class TransferOptimizerService
         float $ftValue = 1.5,
         string $depth = 'standard',
         bool $skipSolve = false,
+        string $chipMode = 'locked',
+        array $chipAllow = [],
+        array $chipForbid = [],
+        bool $chipCompare = false,
     ): array {
+        $context = $this->buildPlanningContext($managerId, $freeTransfers);
+        $planFromGw = $context['plan_from_gw'];
+        $upcomingGws = $context['upcoming_gws'];
+        $currentSquad = $context['current_squad'];
+        $bank = $context['bank'];
+        $squadValue = $context['squad_value'];
+        $apiFreeTransfers = $context['api_free_transfers'];
+        $freeTransfers = $context['free_transfers'];
+        $playerMap = $context['player_map'];
+        $predictions = $context['predictions'];
+        $dgwTeams = $context['dgw_teams'];
+
+        $chipMode = $this->normalizeChipMode($chipMode);
+        $requestedChipPlan = $this->normalizeChipPlan($chipPlan, $upcomingGws);
+        $chipInsights = $this->buildChipInsights(
+            $currentSquad,
+            $predictions,
+            $upcomingGws,
+            $playerMap,
+            $dgwTeams,
+            $requestedChipPlan,
+            $chipAllow,
+            $chipForbid
+        );
+        $resolvedChipPlan = $this->resolveChipPlan($chipMode, $requestedChipPlan, $chipInsights['recommended_plan']);
+        $chipSuggestions = $this->toLegacyChipSuggestions($chipInsights['suggestions']);
+
+        // Calculate current squad's predicted points
+        $currentSquadPredictions = $this->calculateSquadPredictions(
+            $currentSquad,
+            $predictions,
+            $upcomingGws,
+            $playerMap
+        );
+
+        // Find recommended transfers
+        $recommendations = $this->findOptimalTransfers(
+            $currentSquad,
+            $predictions,
+            $upcomingGws,
+            $playerMap,
+            $bank,
+            $freeTransfers,
+            $resolvedChipPlan,
+            $dgwTeams
+        );
+
+        // Build formation data for all gameweeks in planning horizon
+        $formations = [];
+        foreach ($upcomingGws as $gw) {
+            $formations[$gw] = $this->buildFormationData($currentSquad, $predictions, $gw, $playerMap);
+        }
+
+        // Run beam search path solver (skip when only squad data is needed)
+        $paths = [];
+        if (!$skipSolve) {
+            $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
+            $paths = $pathSolver->solve(
+                $currentSquad,
+                $predictions,
+                $upcomingGws,
+                $playerMap,
+                $bank,
+                $freeTransfers,
+                $fixedTransfers,
+                $resolvedChipPlan,
+            );
+        }
+
+        $comparisons = null;
+        if ($chipCompare && !$skipSolve) {
+            $chipPlanTotal = $paths[0]['total_score'] ?? null;
+            $noChipPaths = [];
+            if (empty($resolvedChipPlan)) {
+                $noChipPaths = $paths;
+            } else {
+                $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
+                $noChipPaths = $pathSolver->solve(
+                    $currentSquad,
+                    $predictions,
+                    $upcomingGws,
+                    $playerMap,
+                    $bank,
+                    $freeTransfers,
+                    $fixedTransfers,
+                    []
+                );
+            }
+            $noChipTotal = $noChipPaths[0]['total_score'] ?? null;
+            $delta = null;
+            if ($chipPlanTotal !== null && $noChipTotal !== null) {
+                $delta = round($chipPlanTotal - $noChipTotal, 1);
+            }
+            $comparisons = [
+                'no_chip_total_score' => $noChipTotal,
+                'chip_plan_total_score' => $chipPlanTotal,
+                'chip_delta' => $delta,
+            ];
+        }
+
+        return [
+            'current_gameweek' => $planFromGw,
+            'planning_horizon' => $upcomingGws,
+            'current_squad' => [
+                'player_ids' => $currentSquad,
+                'bank' => $bank,
+                'squad_value' => $squadValue,
+                'free_transfers' => $freeTransfers,
+                'api_free_transfers' => $apiFreeTransfers,
+                'predicted_points' => $currentSquadPredictions,
+                'formations' => $formations,
+            ],
+            'dgw_teams' => $dgwTeams,
+            'recommendations' => $recommendations,
+            'chip_suggestions' => $chipSuggestions,
+            'chip_suggestions_ranked' => $chipInsights['suggestions'],
+            'chip_mode' => $chipMode,
+            'requested_chip_plan' => $requestedChipPlan,
+            'resolved_chip_plan' => $resolvedChipPlan,
+            'chip_plan' => $resolvedChipPlan,
+            'comparisons' => $comparisons,
+            'paths' => $paths,
+        ];
+    }
+
+    public function suggestChipPlan(
+        int $managerId,
+        int $freeTransfers = 0,
+        array $chipPlan = [],
+        array $chipAllow = [],
+        array $chipForbid = []
+    ): array {
+        $context = $this->buildPlanningContext($managerId, $freeTransfers);
+        $upcomingGws = $context['upcoming_gws'];
+
+        $requestedChipPlan = $this->normalizeChipPlan($chipPlan, $upcomingGws);
+        $chipInsights = $this->buildChipInsights(
+            $context['current_squad'],
+            $context['predictions'],
+            $upcomingGws,
+            $context['player_map'],
+            $context['dgw_teams'],
+            $requestedChipPlan,
+            $chipAllow,
+            $chipForbid
+        );
+
+        return [
+            'current_gameweek' => $context['plan_from_gw'],
+            'planning_horizon' => $upcomingGws,
+            'requested_chip_plan' => $requestedChipPlan,
+            'suggestions' => $chipInsights['suggestions'],
+            'recommended_plan' => $chipInsights['recommended_plan'],
+        ];
+    }
+
+    private function buildPlanningContext(int $managerId, int $freeTransfers): array
+    {
         $currentGw = $this->gameweekService->getCurrentGameweek();
         $planFromGw = $this->gameweekService->getNextActionableGameweek();
         $upcomingGws = $this->gameweekService->getUpcomingGameweeks(self::PLANNING_HORIZON, $planFromGw);
@@ -96,75 +268,288 @@ class TransferOptimizerService
             }
         }
 
-        // Calculate current squad's predicted points
-        $currentSquadPredictions = $this->calculateSquadPredictions(
-            $currentSquad,
-            $predictions,
-            $upcomingGws,
-            $playerMap
-        );
+        return [
+            'current_gw' => $currentGw,
+            'plan_from_gw' => $planFromGw,
+            'upcoming_gws' => $upcomingGws,
+            'current_squad' => $currentSquad,
+            'bank' => $bank,
+            'squad_value' => $squadValue,
+            'api_free_transfers' => $apiFreeTransfers,
+            'free_transfers' => $freeTransfers,
+            'player_map' => $playerMap,
+            'predictions' => $predictions,
+            'dgw_teams' => $dgwTeams,
+        ];
+    }
 
-        // Find recommended transfers
-        $recommendations = $this->findOptimalTransfers(
-            $currentSquad,
-            $predictions,
-            $upcomingGws,
-            $playerMap,
-            $bank,
-            $freeTransfers,
-            $chipPlan,
-            $dgwTeams
-        );
+    private function normalizeChipMode(string $chipMode): string
+    {
+        $normalized = strtolower(trim($chipMode));
+        if (!in_array($normalized, ['none', 'locked', 'auto'], true)) {
+            return 'locked';
+        }
+        return $normalized;
+    }
 
-        // Suggest chip timing if not fixed
-        $chipSuggestions = $this->suggestChipTiming(
-            $currentSquad,
-            $predictions,
-            $upcomingGws,
-            $playerMap,
-            $dgwTeams,
-            $chipPlan
-        );
+    private function normalizeChipPlan(array $chipPlan, array $gameweeks): array
+    {
+        $allowedGws = array_flip($gameweeks);
+        $normalized = [];
+        foreach (self::CHIP_NAMES as $chip) {
+            if (!isset($chipPlan[$chip])) {
+                continue;
+            }
+            $gw = (int) $chipPlan[$chip];
+            if (isset($allowedGws[$gw])) {
+                $normalized[$chip] = $gw;
+            }
+        }
+        return $normalized;
+    }
 
-        // Build formation data for all gameweeks in planning horizon
-        $formations = [];
-        foreach ($upcomingGws as $gw) {
-            $formations[$gw] = $this->buildFormationData($currentSquad, $predictions, $gw, $playerMap);
+    private function resolveChipPlan(string $chipMode, array $requestedChipPlan, array $recommendedPlan): array
+    {
+        return match ($chipMode) {
+            'none' => [],
+            'auto' => $recommendedPlan,
+            default => $requestedChipPlan,
+        };
+    }
+
+    private function toLegacyChipSuggestions(array $suggestions): array
+    {
+        $legacy = [];
+        foreach ($suggestions as $chip => $candidates) {
+            if (!empty($candidates[0])) {
+                $legacy[$chip] = $candidates[0];
+            }
+        }
+        return $legacy;
+    }
+
+    private function buildChipInsights(
+        array $currentSquad,
+        array $predictions,
+        array $gameweeks,
+        array $playerMap,
+        array $dgwTeams,
+        array $existingPlan,
+        array $chipAllow,
+        array $chipForbid
+    ): array {
+        $allowSet = [];
+        if (!empty($chipAllow)) {
+            foreach ($chipAllow as $chip) {
+                $chip = (string) $chip;
+                if (in_array($chip, self::CHIP_NAMES, true)) {
+                    $allowSet[$chip] = true;
+                }
+            }
         }
 
-        // Run beam search path solver (skip when only squad data is needed)
-        $paths = [];
-        if (!$skipSolve) {
-            $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
-            $paths = $pathSolver->solve(
-                $currentSquad,
-                $predictions,
-                $upcomingGws,
-                $playerMap,
-                $bank,
-                $freeTransfers,
-                $fixedTransfers,
-            );
+        $forbid = [];
+        foreach ($chipForbid as $chip => $weeks) {
+            if (!in_array((string) $chip, self::CHIP_NAMES, true) || !is_array($weeks)) {
+                continue;
+            }
+            foreach ($weeks as $gw) {
+                $forbid[(string) $chip][(int) $gw] = true;
+            }
+        }
+
+        $squadByGw = [];
+        $captainByGw = [];
+        $benchByGw = [];
+        $idealByGw = [];
+        foreach ($gameweeks as $gw) {
+            $squadByGw[$gw] = $this->estimateSquadGameweekPoints($currentSquad, $predictions, $playerMap, $gw);
+            $captainByGw[$gw] = $this->estimateCaptainPoints($currentSquad, $predictions, $playerMap, $gw);
+            $benchByGw[$gw] = $this->estimateBenchPoints($currentSquad, $predictions, $playerMap, $gw);
+            $idealByGw[$gw] = $this->estimateIdealGameweekPoints($predictions, $playerMap, $gw);
+        }
+
+        $candidateByChip = [];
+        foreach (self::CHIP_NAMES as $chip) {
+            if (isset($existingPlan[$chip])) {
+                continue;
+            }
+            if (!empty($allowSet) && !isset($allowSet[$chip])) {
+                continue;
+            }
+
+            $rows = [];
+            foreach ($gameweeks as $gw) {
+                if (isset($forbid[$chip][$gw])) {
+                    continue;
+                }
+
+                $hasDgw = !empty($dgwTeams[$gw] ?? []);
+                $value = match ($chip) {
+                    self::CHIP_TRIPLE_CAPTAIN => $captainByGw[$gw],
+                    self::CHIP_BENCH_BOOST => $benchByGw[$gw],
+                    self::CHIP_FREE_HIT => max(0.0, $idealByGw[$gw] - $squadByGw[$gw]),
+                    self::CHIP_WILDCARD => $this->estimateWildcardGain($gameweeks, $gw, $idealByGw, $squadByGw),
+                    default => 0.0,
+                };
+
+                if ($hasDgw) {
+                    $value *= 1.1;
+                }
+
+                $rows[] = [
+                    'gameweek' => $gw,
+                    'estimated_value' => round($value, 1),
+                    'has_dgw' => $hasDgw,
+                    'reason' => $this->chipReason($chip, $hasDgw),
+                ];
+            }
+
+            usort($rows, fn($a, $b) => $b['estimated_value'] <=> $a['estimated_value']);
+            if (!empty($rows)) {
+                $candidateByChip[$chip] = array_slice($rows, 0, 5);
+            }
+        }
+
+        $recommended = $existingPlan;
+        $usedWeeks = array_flip(array_values($recommended));
+        foreach ([self::CHIP_WILDCARD, self::CHIP_FREE_HIT, self::CHIP_BENCH_BOOST, self::CHIP_TRIPLE_CAPTAIN] as $chip) {
+            if (isset($recommended[$chip]) || !isset($candidateByChip[$chip])) {
+                continue;
+            }
+            foreach ($candidateByChip[$chip] as $candidate) {
+                $gw = (int) $candidate['gameweek'];
+                if (!isset($usedWeeks[$gw])) {
+                    $recommended[$chip] = $gw;
+                    $usedWeeks[$gw] = true;
+                    break;
+                }
+            }
         }
 
         return [
-            'current_gameweek' => $planFromGw,
-            'planning_horizon' => $upcomingGws,
-            'current_squad' => [
-                'player_ids' => $currentSquad,
-                'bank' => $bank,
-                'squad_value' => $squadValue,
-                'free_transfers' => $freeTransfers,
-                'api_free_transfers' => $apiFreeTransfers,
-                'predicted_points' => $currentSquadPredictions,
-                'formations' => $formations,
-            ],
-            'dgw_teams' => $dgwTeams,
-            'recommendations' => $recommendations,
-            'chip_suggestions' => $chipSuggestions,
-            'chip_plan' => $chipPlan,
-            'paths' => $paths,
+            'suggestions' => $candidateByChip,
+            'recommended_plan' => $recommended,
         ];
+    }
+
+    private function estimateWildcardGain(array $gameweeks, int $startGw, array $idealByGw, array $squadByGw): float
+    {
+        $startIdx = array_search($startGw, $gameweeks, true);
+        if ($startIdx === false) {
+            return 0.0;
+        }
+
+        $window = array_slice($gameweeks, (int) $startIdx, 3);
+        $gain = 0.0;
+        $weight = 1.0;
+        foreach ($window as $gw) {
+            $gain += max(0.0, ($idealByGw[$gw] ?? 0.0) - ($squadByGw[$gw] ?? 0.0)) * $weight;
+            $weight *= 0.7; // Prioritize immediate upside while still valuing future weeks.
+        }
+        return $gain;
+    }
+
+    private function chipReason(string $chip, bool $hasDgw): string
+    {
+        return match ($chip) {
+            self::CHIP_WILDCARD => $hasDgw ? 'Reset squad before heavy schedule swing' : 'Rebuild squad to improve short-term run',
+            self::CHIP_FREE_HIT => $hasDgw ? 'Attack double gameweek upside without long-term commitment' : 'Patch a difficult one-week fixture map',
+            self::CHIP_BENCH_BOOST => $hasDgw ? 'Double gameweek boosts bench expected output' : 'Bench projects strongly this week',
+            self::CHIP_TRIPLE_CAPTAIN => $hasDgw ? 'Best captain projection with double gameweek upside' : 'Strong captain projection this week',
+            default => 'Best projected value',
+        };
+    }
+
+    private function estimateSquadGameweekPoints(array $squadIds, array $predictions, array $playerMap, int $gw): float
+    {
+        $byPosition = [1 => [], 2 => [], 3 => [], 4 => []];
+        foreach ($squadIds as $playerId) {
+            $player = $playerMap[$playerId] ?? null;
+            if ($player === null) {
+                continue;
+            }
+            $position = (int) ($player['position'] ?? 0);
+            $byPosition[$position][] = ['id' => $playerId, 'pred' => (float) ($predictions[$playerId][$gw] ?? 0)];
+        }
+
+        $starting11 = $this->selectOptimalStarting11($byPosition);
+        $sum = 0.0;
+        $captain = 0.0;
+        foreach ($starting11 as $p) {
+            $pred = (float) $p['pred'];
+            $sum += $pred;
+            if ($pred > $captain) {
+                $captain = $pred;
+            }
+        }
+        return $sum + $captain;
+    }
+
+    private function estimateCaptainPoints(array $squadIds, array $predictions, array $playerMap, int $gw): float
+    {
+        $byPosition = [1 => [], 2 => [], 3 => [], 4 => []];
+        foreach ($squadIds as $playerId) {
+            $player = $playerMap[$playerId] ?? null;
+            if ($player === null) {
+                continue;
+            }
+            $position = (int) ($player['position'] ?? 0);
+            $byPosition[$position][] = ['id' => $playerId, 'pred' => (float) ($predictions[$playerId][$gw] ?? 0)];
+        }
+        $starting11 = $this->selectOptimalStarting11($byPosition);
+        $captain = 0.0;
+        foreach ($starting11 as $p) {
+            $captain = max($captain, (float) $p['pred']);
+        }
+        return $captain;
+    }
+
+    private function estimateBenchPoints(array $squadIds, array $predictions, array $playerMap, int $gw): float
+    {
+        $byPosition = [1 => [], 2 => [], 3 => [], 4 => []];
+        foreach ($squadIds as $playerId) {
+            $player = $playerMap[$playerId] ?? null;
+            if ($player === null) {
+                continue;
+            }
+            $position = (int) ($player['position'] ?? 0);
+            $byPosition[$position][] = ['id' => $playerId, 'pred' => (float) ($predictions[$playerId][$gw] ?? 0)];
+        }
+
+        $starting11 = $this->selectOptimalStarting11($byPosition);
+        $startingIds = array_flip(array_column($starting11, 'id'));
+        $bench = 0.0;
+        foreach ($squadIds as $playerId) {
+            if (isset($startingIds[$playerId])) {
+                continue;
+            }
+            $bench += (float) ($predictions[$playerId][$gw] ?? 0);
+        }
+        return $bench;
+    }
+
+    private function estimateIdealGameweekPoints(array $predictions, array $playerMap, int $gw): float
+    {
+        $byPosition = [1 => [], 2 => [], 3 => [], 4 => []];
+        foreach ($playerMap as $playerId => $player) {
+            $position = (int) ($player['position'] ?? 0);
+            if ($position < 1 || $position > 4) {
+                continue;
+            }
+            $byPosition[$position][] = ['id' => (int) $playerId, 'pred' => (float) ($predictions[$playerId][$gw] ?? 0)];
+        }
+        $starting11 = $this->selectOptimalStarting11($byPosition);
+        $sum = 0.0;
+        $captain = 0.0;
+        foreach ($starting11 as $p) {
+            $pred = (float) $p['pred'];
+            $sum += $pred;
+            if ($pred > $captain) {
+                $captain = $pred;
+            }
+        }
+        return $sum + $captain;
     }
 
     private function calculateSquadPredictions(

@@ -75,8 +75,26 @@ class PredictionService
             $playerFixtures = $this->findPlayerFixtures($clubId, $fixtures);
 
             if (empty($playerFixtures)) {
-                // No fixture - blank gameweek for this player
-                $prediction = $this->engine->predict($player, null, null, null, null, $playerTeamGames);
+                // No fixture -> blank gameweek: hard-zero points.
+                $prediction = [
+                    'predicted_points' => 0.0,
+                    'predicted_if_fit' => 0.0,
+                    'expected_mins' => 0.0,
+                    'expected_mins_if_fit' => 0.0,
+                    'confidence' => 1.0,
+                    'breakdown' => [
+                        'appearance' => 0.0,
+                        'goals' => 0.0,
+                        'assists' => 0.0,
+                        'clean_sheet' => 0.0,
+                        'bonus' => 0.0,
+                        'goals_conceded' => 0.0,
+                        'saves' => 0.0,
+                        'defensive_contribution' => 0.0,
+                        'cards' => 0.0,
+                        'penalties' => 0.0,
+                    ],
+                ];
                 $fixtureInfo = null;
             } else {
                 // Sum predictions across all fixtures (DGW support)
@@ -191,7 +209,22 @@ class PredictionService
         $this->engine->precomputePenaltyTakers($teamPlayers, $teamGames);
 
         if (empty($playerFixtures)) {
-            $prediction = $this->engine->predict($player, null, null, null, null, $playerTeamGames);
+            $prediction = [
+                'predicted_points' => 0.0,
+                'confidence' => 1.0,
+                'breakdown' => [
+                    'appearance' => 0.0,
+                    'goals' => 0.0,
+                    'assists' => 0.0,
+                    'clean_sheet' => 0.0,
+                    'bonus' => 0.0,
+                    'goals_conceded' => 0.0,
+                    'saves' => 0.0,
+                    'defensive_contribution' => 0.0,
+                    'cards' => 0.0,
+                    'penalties' => 0.0,
+                ],
+            ];
         } else {
             // Sum predictions across all fixtures (DGW support)
             $totalPoints = 0.0;
@@ -266,6 +299,7 @@ class PredictionService
             ORDER BY pp.predicted_points DESC";
 
         $results = $this->db->fetchAll($sql, [$gameweek]);
+        $results = $this->applyBlankFixtureAdjustments($results, $gameweek);
 
         // Add availability to each result
         foreach ($results as &$row) {
@@ -329,6 +363,59 @@ class PredictionService
             $result[$row['fixture_id']] = $row;
         }
         return $result;
+    }
+
+    /**
+     * Ensure players with no fixture in a GW are hard-zeroed.
+     *
+     * @param array<int, array<string, mixed>> $predictions
+     * @return array<int, array<string, mixed>>
+     */
+    private function applyBlankFixtureAdjustments(array $predictions, int $gameweek): array
+    {
+        $teamsWithFixture = $this->getTeamsWithFixture($gameweek);
+
+        foreach ($predictions as &$row) {
+            $teamId = (int) ($row['team'] ?? $row['club_id'] ?? 0);
+            if ($teamId > 0 && !isset($teamsWithFixture[$teamId])) {
+                $row['predicted_points'] = 0.0;
+                if (array_key_exists('predicted_if_fit', $row)) {
+                    $row['predicted_if_fit'] = 0.0;
+                }
+                if (array_key_exists('expected_mins', $row)) {
+                    $row['expected_mins'] = 0.0;
+                }
+                if (array_key_exists('expected_mins_if_fit', $row)) {
+                    $row['expected_mins_if_fit'] = 0.0;
+                }
+            }
+        }
+        unset($row);
+
+        return $predictions;
+    }
+
+    /**
+     * @return array<int, true> team_id => true
+     */
+    private function getTeamsWithFixture(int $gameweek): array
+    {
+        $rows = $this->db->fetchAll(
+            "SELECT DISTINCT home_club_id as team_id FROM fixtures WHERE gameweek = ?
+             UNION
+             SELECT DISTINCT away_club_id as team_id FROM fixtures WHERE gameweek = ?",
+            [$gameweek, $gameweek]
+        );
+
+        $teams = [];
+        foreach ($rows as $row) {
+            $teamId = (int) ($row['team_id'] ?? 0);
+            if ($teamId > 0) {
+                $teams[$teamId] = true;
+            }
+        }
+
+        return $teams;
     }
 
     /**
