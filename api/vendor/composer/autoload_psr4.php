@@ -8,6 +8,7 @@ $baseDir = dirname($vendorDir);
 return array(
     'SuperFPL\\FplClient\\' => array($vendorDir . '/superfpl/fpl-client/src'),
     'SuperFPL\\Api\\' => array($baseDir . '/src'),
+    'Predis\\' => array($vendorDir . '/predis/predis/src'),
     'PhpParser\\' => array($vendorDir . '/nikic/php-parser/lib/PhpParser'),
     'DeepCopy\\' => array($vendorDir . '/myclabs/deep-copy/src/DeepCopy'),
 );

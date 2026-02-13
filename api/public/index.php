@@ -26,6 +26,7 @@ use SuperFPL\Api\Clients\OddsApiClient;
 use SuperFPL\Api\Clients\UnderstatClient;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\Cache\FileCache;
+use Predis\Client as RedisClient;
 
 // CORS headers
 header('Access-Control-Allow-Origin: *');
@@ -57,6 +58,7 @@ $fplClient = new FplClient(
     cacheTtl: $config['cache']['ttl'],
     rateLimitDir: $config['fpl']['rate_limit_dir']
 );
+$responseCacheClient = createResponseCacheClient();
 
 // Simple router
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -70,11 +72,11 @@ if (str_starts_with($uri, '/api')) {
 try {
     match (true) {
         $uri === '' || $uri === '/health' => handleHealth(),
-        $uri === '/players' => handlePlayers($db),
-        $uri === '/players/enhanced' => handlePlayersEnhanced($db),
-        $uri === '/fixtures' => handleFixtures($db),
+        $uri === '/players' => handlePlayers($db, $config),
+        $uri === '/players/enhanced' => handlePlayersEnhanced($db, $config),
+        $uri === '/fixtures' => handleFixtures($db, $config),
         $uri === '/gameweek/current' => handleCurrentGameweek($db),
-        $uri === '/teams' => handleTeams($db),
+        $uri === '/teams' => handleTeams($db, $config),
         $uri === '/sync/status' => handleSyncStatus($config),
         $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
         $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
@@ -94,9 +96,9 @@ try {
         preg_match('#^/managers/(\d+)/season-analysis$#', $uri, $m) === 1 => handleManagerSeasonAnalysis($db, $fplClient, (int) $m[1]),
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
         preg_match('#^/predictions/(\d+)/accuracy$#', $uri, $m) === 1 => handlePredictionAccuracy($db, (int) $m[1]),
-        preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1]),
+        preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1], $config),
         preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
-        $uri === '/predictions/range' => handlePredictionsRange($db),
+        $uri === '/predictions/range' => handlePredictionsRange($db, $config),
         $uri === '/predictions/methodology' => handlePredictionMethodology(),
         preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
@@ -139,48 +141,152 @@ function handleSyncStatus(array $config): void
     echo json_encode(['last_sync' => $lastSync]);
 }
 
-function handlePlayers(Database $db): void
+function createResponseCacheClient(): ?RedisClient
 {
-    $service = new PlayerService($db);
-
-    $filters = [];
-    if (isset($_GET['position'])) {
-        $filters['position'] = (int) $_GET['position'];
+    $host = getenv('REDIS_HOST') ?: 'redis';
+    $port = (int) (getenv('REDIS_PORT') ?: 6379);
+    $redisUrl = getenv('REDIS_URL') ?: '';
+    if ($redisUrl !== '') {
+        $parts = parse_url($redisUrl);
+        if (is_array($parts)) {
+            $host = (string) ($parts['host'] ?? $host);
+            $port = (int) ($parts['port'] ?? $port);
+        }
     }
-    if (isset($_GET['team'])) {
-        $filters['team'] = (int) $_GET['team'];
+
+    $hosts = array_values(array_unique([$host, '127.0.0.1', 'host.docker.internal']));
+    foreach ($hosts as $candidateHost) {
+        try {
+            $client = new RedisClient([
+                'scheme' => 'tcp',
+                'host' => $candidateHost,
+                'port' => $port,
+            ], [
+                'timeout' => 0.5,
+                'read_write_timeout' => 0.5,
+            ]);
+            $client->ping();
+            return $client;
+        } catch (\Throwable) {
+        }
     }
 
-    $players = $service->getAll($filters);
-    $teamService = new TeamService($db);
-    $teams = $teamService->getAll();
-
-    echo json_encode([
-        'players' => $players,
-        'teams' => $teams,
-    ]);
+    return null;
 }
 
-function handlePlayersEnhanced(Database $db): void
+function buildResponseCacheKey(array $config, string $namespace): string
 {
-    $service = new \SuperFPL\Api\Services\PlayerMetricsService($db);
+    $dbPath = $config['database']['path'] ?? '';
+    $dbMtime = ($dbPath && file_exists($dbPath)) ? (string) filemtime($dbPath) : '0';
+    $syncVersionFile = ($config['cache']['path'] ?? (__DIR__ . '/../cache')) . '/sync_version.txt';
+    $syncVersion = file_exists($syncVersionFile) ? trim((string) file_get_contents($syncVersionFile)) : '0';
+    $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 
-    $filters = [];
-    if (isset($_GET['position'])) {
-        $filters['position'] = (int) $_GET['position'];
+    return 'resp:v1:' . sha1($namespace . '|' . $requestUri . '|' . $dbMtime . '|' . $syncVersion);
+}
+
+function withResponseCache(array $config, string $namespace, int $ttlSeconds, callable $producer): void
+{
+    if (
+        ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET'
+        || (($_GET['nocache'] ?? '0') === '1')
+        || (($_GET['refresh'] ?? '0') === '1')
+    ) {
+        header('X-Response-Cache: BYPASS');
+        $producer();
+        return;
     }
-    if (isset($_GET['team'])) {
-        $filters['team'] = (int) $_GET['team'];
+
+    global $responseCacheClient;
+    if (!$responseCacheClient instanceof RedisClient) {
+        header('X-Response-Cache: BYPASS');
+        $producer();
+        return;
     }
 
-    $players = $service->getAllWithMetrics($filters);
-    $teamService = new TeamService($db);
-    $teams = $teamService->getAll();
+    $cacheKey = buildResponseCacheKey($config, $namespace);
 
-    echo json_encode([
-        'players' => $players,
-        'teams' => $teams,
-    ]);
+    try {
+        $cached = $responseCacheClient->get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            header('X-Response-Cache: HIT');
+            echo $cached;
+            return;
+        }
+    } catch (\Throwable) {
+        header('X-Response-Cache: BYPASS');
+        $producer();
+        return;
+    }
+
+    ob_start();
+    $producer();
+    $body = (string) ob_get_clean();
+
+    $status = http_response_code();
+    if ($status === false || $status === 0) {
+        $status = 200;
+    }
+
+    $cacheStatus = 'BYPASS';
+    if ($status === 200 && $body !== '') {
+        try {
+            $responseCacheClient->setex($cacheKey, $ttlSeconds, $body);
+            $cacheStatus = 'MISS';
+        } catch (\Throwable) {
+        }
+    }
+
+    header("X-Response-Cache: {$cacheStatus}");
+    echo $body;
+}
+
+function handlePlayers(Database $db, array $config): void
+{
+    withResponseCache($config, 'players', 300, function () use ($db): void {
+        $service = new PlayerService($db);
+
+        $filters = [];
+        if (isset($_GET['position'])) {
+            $filters['position'] = (int) $_GET['position'];
+        }
+        if (isset($_GET['team'])) {
+            $filters['team'] = (int) $_GET['team'];
+        }
+
+        $players = $service->getAll($filters);
+        $teamService = new TeamService($db);
+        $teams = $teamService->getAll();
+
+        echo json_encode([
+            'players' => $players,
+            'teams' => $teams,
+        ]);
+    });
+}
+
+function handlePlayersEnhanced(Database $db, array $config): void
+{
+    withResponseCache($config, 'players-enhanced', 300, function () use ($db): void {
+        $service = new \SuperFPL\Api\Services\PlayerMetricsService($db);
+
+        $filters = [];
+        if (isset($_GET['position'])) {
+            $filters['position'] = (int) $_GET['position'];
+        }
+        if (isset($_GET['team'])) {
+            $filters['team'] = (int) $_GET['team'];
+        }
+
+        $players = $service->getAllWithMetrics($filters);
+        $teamService = new TeamService($db);
+        $teams = $teamService->getAll();
+
+        echo json_encode([
+            'players' => $players,
+            'teams' => $teams,
+        ]);
+    });
 }
 
 function handlePlayer(Database $db, int $id): void
@@ -197,20 +303,24 @@ function handlePlayer(Database $db, int $id): void
     echo json_encode($player);
 }
 
-function handleFixtures(Database $db): void
+function handleFixtures(Database $db, array $config): void
 {
-    $service = new FixtureService($db);
-    $gameweek = isset($_GET['gameweek']) ? (int) $_GET['gameweek'] : null;
+    withResponseCache($config, 'fixtures', 300, function () use ($db): void {
+        $service = new FixtureService($db);
+        $gameweek = isset($_GET['gameweek']) ? (int) $_GET['gameweek'] : null;
 
-    $fixtures = $service->getAll($gameweek);
-    echo json_encode(['fixtures' => $fixtures]);
+        $fixtures = $service->getAll($gameweek);
+        echo json_encode(['fixtures' => $fixtures]);
+    });
 }
 
-function handleTeams(Database $db): void
+function handleTeams(Database $db, array $config): void
 {
-    $service = new TeamService($db);
-    $teams = $service->getAll();
-    echo json_encode(['teams' => $teams]);
+    withResponseCache($config, 'teams', 600, function () use ($db): void {
+        $service = new TeamService($db);
+        $teams = $service->getAll();
+        echo json_encode(['teams' => $teams]);
+    });
 }
 
 function handleSyncPlayers(Database $db, FplClient $fplClient): void
@@ -380,50 +490,52 @@ function handleSyncManagers(Database $db, FplClient $fplClient): void
     ]);
 }
 
-function handlePredictions(Database $db, int $gameweek): void
+function handlePredictions(Database $db, int $gameweek, array $config): void
 {
-    $gwService = new \SuperFPL\Api\Services\GameweekService($db);
-    $currentGw = $gwService->getCurrentGameweek();
-    $service = new PredictionService($db);
+    withResponseCache($config, 'predictions', 120, function () use ($db, $gameweek): void {
+        $gwService = new \SuperFPL\Api\Services\GameweekService($db);
+        $currentGw = $gwService->getCurrentGameweek();
+        $service = new PredictionService($db);
 
-    if ($gameweek < $currentGw) {
-        // Serve from snapshots for past gameweeks
-        $predictions = $service->getSnapshotPredictions($gameweek);
+        if ($gameweek < $currentGw) {
+            // Serve from snapshots for past gameweeks
+            $predictions = $service->getSnapshotPredictions($gameweek);
 
-        if (empty($predictions)) {
-            http_response_code(404);
+            if (empty($predictions)) {
+                http_response_code(404);
+                echo json_encode([
+                    'error' => 'No prediction snapshot found for this gameweek',
+                    'requested_gameweek' => $gameweek,
+                    'current_gameweek' => $currentGw,
+                ]);
+                return;
+            }
+
             echo json_encode([
-                'error' => 'No prediction snapshot found for this gameweek',
-                'requested_gameweek' => $gameweek,
+                'gameweek' => $gameweek,
                 'current_gameweek' => $currentGw,
+                'source' => 'snapshot',
+                'predictions' => $predictions,
+                'generated_at' => date('c'),
             ]);
             return;
         }
 
-        echo json_encode([
+        $predictions = $service->getPredictions($gameweek);
+
+        $response = [
             'gameweek' => $gameweek,
             'current_gameweek' => $currentGw,
-            'source' => 'snapshot',
             'predictions' => $predictions,
             'generated_at' => date('c'),
-        ]);
-        return;
-    }
+        ];
 
-    $predictions = $service->getPredictions($gameweek);
+        if (isset($_GET['include_methodology'])) {
+            $response['methodology'] = PredictionService::getMethodology();
+        }
 
-    $response = [
-        'gameweek' => $gameweek,
-        'current_gameweek' => $currentGw,
-        'predictions' => $predictions,
-        'generated_at' => date('c'),
-    ];
-
-    if (isset($_GET['include_methodology'])) {
-        $response['methodology'] = PredictionService::getMethodology();
-    }
-
-    echo json_encode($response);
+        echo json_encode($response);
+    });
 }
 
 function handlePredictionAccuracy(Database $db, int $gameweek): void
@@ -446,10 +558,11 @@ function handlePredictionAccuracy(Database $db, int $gameweek): void
     ]);
 }
 
-function handlePredictionsRange(Database $db): void
+function handlePredictionsRange(Database $db, array $config): void
 {
-    $gwService = new \SuperFPL\Api\Services\GameweekService($db);
-    $actionableGw = $gwService->getNextActionableGameweek();
+    withResponseCache($config, 'predictions-range', 120, function () use ($db): void {
+        $gwService = new \SuperFPL\Api\Services\GameweekService($db);
+        $actionableGw = $gwService->getNextActionableGameweek();
 
     // Get gameweek range from query params (default: next 6 gameweeks from actionable)
     $startGw = isset($_GET['start']) ? (int) $_GET['start'] : $actionableGw;
@@ -542,13 +655,14 @@ function handlePredictionsRange(Database $db): void
         $fixturesMap[$awayId][$gw][] = ['opponent' => $row['home_short'], 'is_home' => false];
     }
 
-    echo json_encode([
-        'gameweeks' => $gameweeks,
-        'current_gameweek' => $actionableGw,
-        'players' => $players,
-        'fixtures' => $fixturesMap,
-        'generated_at' => date('c'),
-    ]);
+        echo json_encode([
+            'gameweeks' => $gameweeks,
+            'current_gameweek' => $actionableGw,
+            'players' => $players,
+            'fixtures' => $fixturesMap,
+            'generated_at' => date('c'),
+        ]);
+    });
 }
 
 function handlePredictionMethodology(): void
@@ -737,29 +851,35 @@ function handleCompare(Database $db, FplClient $fplClient): void
 
 function handleLive(Database $db, FplClient $fplClient, array $config, int $gameweek): void
 {
-    $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
-    $data = $service->getLiveData($gameweek);
+    withResponseCache($config, 'live', 30, function () use ($db, $fplClient, $config, $gameweek): void {
+        $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+        $data = $service->getLiveData($gameweek);
 
-    echo json_encode($data);
+        echo json_encode($data);
+    });
 }
 
 function handleLiveManager(Database $db, FplClient $fplClient, array $config, int $gameweek, int $managerId): void
 {
-    $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
-    $data = $service->getManagerLivePoints($managerId, $gameweek);
+    withResponseCache($config, 'live-manager', 15, function () use ($db, $fplClient, $config, $gameweek, $managerId): void {
+        $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+        $data = $service->getManagerLivePoints($managerId, $gameweek);
 
-    echo json_encode($data);
+        echo json_encode($data);
+    });
 }
 
 function handleLiveBonus(Database $db, FplClient $fplClient, array $config, int $gameweek): void
 {
-    $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
-    $predictions = $service->getBonusPredictions($gameweek);
+    withResponseCache($config, 'live-bonus', 30, function () use ($db, $fplClient, $config, $gameweek): void {
+        $service = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+        $predictions = $service->getBonusPredictions($gameweek);
 
-    echo json_encode([
-        'gameweek' => $gameweek,
-        'bonus_predictions' => $predictions,
-    ]);
+        echo json_encode([
+            'gameweek' => $gameweek,
+            'bonus_predictions' => $predictions,
+        ]);
+    });
 }
 
 function handleLiveCurrentGameweek(Database $db, FplClient $fplClient, array $config): void
@@ -797,17 +917,19 @@ function handleLiveManagerEnhanced(Database $db, FplClient $fplClient, array $co
 
 function handleLiveSamples(Database $db, FplClient $fplClient, array $config, int $gameweek): void
 {
-    $liveService = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
-    $sampleService = new SampleService($db, $fplClient, $config['cache']['path'] . '/samples');
+    withResponseCache($config, 'live-samples', 30, function () use ($db, $fplClient, $config, $gameweek): void {
+        $liveService = new LiveService($db, $fplClient, $config['cache']['path'] . '/live');
+        $sampleService = new SampleService($db, $fplClient, $config['cache']['path'] . '/samples');
 
-    // Get live data for points
-    $liveData = $liveService->getLiveData($gameweek);
-    $elements = $liveData['elements'] ?? [];
+        // Get live data for points
+        $liveData = $liveService->getLiveData($gameweek);
+        $elements = $liveData['elements'] ?? [];
 
-    // Get sample data with calculated averages
-    $data = $sampleService->getSampleData($gameweek, $elements);
+        // Get sample data with calculated averages
+        $data = $sampleService->getSampleData($gameweek, $elements);
 
-    echo json_encode($data);
+        echo json_encode($data);
+    });
 }
 
 function handleAdminSample(Database $db, FplClient $fplClient, array $config, int $gameweek): void
@@ -840,6 +962,7 @@ function handleAdminSample(Database $db, FplClient $fplClient, array $config, in
 
 function handleFixturesStatus(Database $db, FplClient $fplClient, array $config): void
 {
+    withResponseCache($config, 'fixtures-status', 30, function () use ($db, $fplClient, $config): void {
     // Keep this endpoint fast for Live tab boot. Full fixture sync can be slow
     // and should run via cron (or explicitly with ?refresh=1), not inline by default.
     $shouldRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
@@ -952,6 +1075,7 @@ function handleFixturesStatus(Database $db, FplClient $fplClient, array $config)
         'is_live' => $activeGw !== null,
         'gameweeks' => array_values($byGameweek),
     ]);
+    });
 }
 
 function handleOwnership(Database $db, FplClient $fplClient, array $config, int $gameweek): void

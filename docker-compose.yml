@@ -19,6 +19,9 @@ services:
     working_dir: /var/www/html/api
     environment:
       - ODDS_API_KEY=2582cba89d202784679a5a7c26914d60
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
 
   cron:
     build:
@@ -30,7 +33,16 @@ services:
     working_dir: /var/www/html/api
     environment:
       - ODDS_API_KEY=2582cba89d202784679a5a7c26914d60
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
     command: ["crond", "-f", "-l", "2"]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports:
+      - "6379:6379"
 
 volumes:
   db-data:

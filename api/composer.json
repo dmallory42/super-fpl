@@ -18,7 +18,8 @@
     ],
     "require": {
         "php": ">=8.2",
-        "superfpl/fpl-client": "*"
+        "superfpl/fpl-client": "*",
+        "predis/predis": "^2.3"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0",

@@ -19,6 +19,7 @@ class ComposerStaticInit02560071142bc1f1b28d28551acbde1d
         ),
         'P' =>
         array (
+            'Predis\\' => 7,
             'PhpParser\\' => 10,
         ),
         'D' =>
@@ -35,6 +36,10 @@ class ComposerStaticInit02560071142bc1f1b28d28551acbde1d
         'SuperFPL\\Api\\' =>
         array (
             0 => __DIR__ . '/../..' . '/src',
+        ),
+        'Predis\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/predis/predis/src',
         ),
         'PhpParser\\' =>
         array (
