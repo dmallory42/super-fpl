@@ -10,7 +10,7 @@
 | P2-2 | `audit/p2-2-live-rank-swing-decomposition` | `.worktrees/p2-2-live-rank-swing-decomposition` | done | done | done | done | PR-ready (`42dfe80`) |
 | P2-3 | `audit/p2-3-cross-widget-dgw-consistency` | `.worktrees/p2-3-cross-widget-dgw-consistency` | done | done | done | done | PR-ready (`7b02bcd`) |
 | P2-4 | `audit/p2-4-live-regression-test-suite-expansion` | `.worktrees/p2-4-live-regression-test-suite-expansion` | done | done | done | done | PR-ready (`5c5c306`) |
-| P3-1 | `audit/p3-1-league-page-ia-refresh` | `.worktrees/p3-1-league-page-ia-refresh` | pending | pending | pending | pending | bootstrapped |
+| P3-1 | `audit/p3-1-league-page-ia-refresh` | `.worktrees/p3-1-league-page-ia-refresh` | done | done | done | done | PR-ready (`228a2a3`) |
 | P3-2 | `audit/p3-2-league-decision-delta-module` | `.worktrees/p3-2-league-decision-delta-module` | pending | pending | pending | pending | bootstrapped |
 | P3-3 | `audit/p3-3-season-expected-vs-actual` | `.worktrees/p3-3-season-expected-vs-actual` | pending | pending | pending | pending | bootstrapped |
 | P3-4 | `audit/p3-4-transfer-quality-scorecard` | `.worktrees/p3-4-transfer-quality-scorecard` | pending | pending | pending | pending | bootstrapped |
@@ -21,5 +21,5 @@
 
 ## Current Focus
 
-- Active issue: `P3-1`
+- Active issue: `P3-2`
 - Execution order: from `docs/page-audit-fixes-plan.md` suggested order.
