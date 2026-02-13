@@ -18,6 +18,10 @@ node_modules/
 # Database
 /api/data/*.db
 /api/data/*.sqlite
+/api/data/*.db-shm
+/api/data/*.db-wal
+*.db-shm
+*.db-wal
 
 # Cache
 /api/cache/
