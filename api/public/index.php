@@ -14,7 +14,6 @@ use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\LeagueService;
 use SuperFPL\Api\Services\LeagueSeasonAnalysisService;
 use SuperFPL\Api\Services\ComparisonService;
-use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\Api\Services\LiveService;
 use SuperFPL\Api\Services\SampleService;
 use SuperFPL\Api\Services\TransferService;

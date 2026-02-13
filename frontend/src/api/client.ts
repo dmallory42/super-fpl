@@ -7,12 +7,36 @@ export interface ApiResponse<T> {
 
 async function fetchApi<T>(endpoint: string): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`)
+  const raw = await response.text()
+  let parsed: unknown = null
 
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`)
+  if (raw.trim().length > 0) {
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      if (response.ok) {
+        throw new Error(
+          `API returned invalid JSON for ${endpoint} (status ${response.status})`
+        )
+      }
+    }
   }
 
-  return response.json()
+  if (!response.ok) {
+    const apiError =
+      parsed && typeof parsed === 'object' && 'error' in parsed
+        ? String((parsed as { error?: unknown }).error ?? '')
+        : raw.slice(0, 200).trim()
+    throw new Error(
+      `API error: ${response.status} ${response.statusText}${apiError ? ` - ${apiError}` : ''}`
+    )
+  }
+
+  if (parsed === null) {
+    throw new Error(`API returned empty response for ${endpoint}`)
+  }
+
+  return parsed as T
 }
 
 export interface SyncStatusResponse {
