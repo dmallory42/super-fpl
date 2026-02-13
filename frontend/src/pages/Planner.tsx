@@ -156,6 +156,8 @@ export function Planner() {
 
   // Path solver state
   const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null)
+  const [comparePlanAIndex, setComparePlanAIndex] = useState<number | null>(null)
+  const [comparePlanBIndex, setComparePlanBIndex] = useState<number | null>(null)
   const [ftValue, setFtValue] = useState(1.5)
   const [solverDepth, setSolverDepth] = useState<SolverDepth>('standard')
   const [objectiveMode, setObjectiveMode] = useState<PlannerObjectiveMode>('expected')
@@ -342,6 +344,21 @@ export function Planner() {
   const chipSuggestions = chipData?.chip_suggestions_ranked ?? {}
   const chipResolvedPlan = chipData?.resolved_chip_plan ?? chipData?.chip_plan ?? {}
   const comparison = solveData?.comparisons
+
+  useEffect(() => {
+    if (paths.length >= 2) {
+      setComparePlanAIndex(0)
+      setComparePlanBIndex(1)
+      return
+    }
+    if (paths.length === 1) {
+      setComparePlanAIndex(0)
+      setComparePlanBIndex(null)
+      return
+    }
+    setComparePlanAIndex(null)
+    setComparePlanBIndex(null)
+  }, [solveData, paths.length])
 
   // Get predictions for multiple gameweeks
   const { data: predictionsRange } = usePredictionsRange()
@@ -573,6 +590,61 @@ export function Planner() {
     hitsCost,
     chipTimelineByGw,
   ])
+
+  const planComparison = useMemo(() => {
+    if (
+      comparePlanAIndex === null ||
+      comparePlanBIndex === null ||
+      !paths[comparePlanAIndex] ||
+      !paths[comparePlanBIndex]
+    ) {
+      return null
+    }
+
+    const planA = paths[comparePlanAIndex]
+    const planB = paths[comparePlanBIndex]
+    const horizon = optimizeData?.planning_horizon ?? []
+
+    const describeTransfers = (gwData: PathGameweek | undefined): string => {
+      if (!gwData || gwData.moves.length === 0) return 'Roll'
+      return gwData.moves.map((move) => `${move.out_name} -> ${move.in_name}`).join(', ')
+    }
+
+    const describeChip = (gwData: PathGameweek | undefined): string => {
+      const chip = gwData?.chip_played as keyof ChipPlan | null | undefined
+      if (!chip) return '-'
+      return CHIP_SHORT_LABELS[chip] ?? chip
+    }
+
+    let cumulativeDelta = 0
+    const rows = horizon.map((gw) => {
+      const gwA = planA.transfers_by_gw[gw]
+      const gwB = planB.transfers_by_gw[gw]
+      const pointsA = gwA?.gw_score ?? 0
+      const pointsB = gwB?.gw_score ?? 0
+      const gwDelta = pointsA - pointsB
+      cumulativeDelta += gwDelta
+
+      return {
+        gw,
+        pointsA,
+        pointsB,
+        gwDelta,
+        cumulativeDelta,
+        transfersA: describeTransfers(gwA),
+        transfersB: describeTransfers(gwB),
+        chipA: describeChip(gwA),
+        chipB: describeChip(gwB),
+      }
+    })
+
+    return {
+      planA,
+      planB,
+      rows,
+      cumulativeDelta,
+    }
+  }, [comparePlanAIndex, comparePlanBIndex, paths, optimizeData?.planning_horizon])
 
   // Get the selected player's data
   const selectedPlayerData = useMemo(() => {
@@ -1490,6 +1562,96 @@ export function Planner() {
               {!isSolveActive && paths.length > 0 && (
                 <div className="pt-2 text-xs text-foreground-muted">
                   Objective: {OBJECTIVE_LABELS[solveObjectiveMode]}
+                </div>
+              )}
+              {!isSolveActive && paths.length > 1 && (
+                <div
+                  className="mt-3 pt-3 border-t border-border/50 space-y-3"
+                  data-testid="plan-comparison-panel"
+                >
+                  <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                    A/B Plan Comparison
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    <label className="text-xs text-foreground-muted">
+                      Plan A
+                      <select
+                        data-testid="compare-plan-a"
+                        value={comparePlanAIndex ?? ''}
+                        onChange={(e) =>
+                          setComparePlanAIndex(
+                            e.target.value === '' ? null : Number.parseInt(e.target.value, 10)
+                          )
+                        }
+                        className="input-broadcast mt-1"
+                      >
+                        {paths.map((path, idx) => (
+                          <option key={`compare-a-${path.id}-${idx}`} value={idx}>
+                            Plan {path.id} ({path.total_score.toFixed(1)})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="text-xs text-foreground-muted">
+                      Plan B
+                      <select
+                        data-testid="compare-plan-b"
+                        value={comparePlanBIndex ?? ''}
+                        onChange={(e) =>
+                          setComparePlanBIndex(
+                            e.target.value === '' ? null : Number.parseInt(e.target.value, 10)
+                          )
+                        }
+                        className="input-broadcast mt-1"
+                      >
+                        {paths.map((path, idx) => (
+                          <option key={`compare-b-${path.id}-${idx}`} value={idx}>
+                            Plan {path.id} ({path.total_score.toFixed(1)})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {planComparison && (
+                    <div className="space-y-2">
+                      {planComparison.rows.map((row) => (
+                        <div
+                          key={`comparison-gw-${row.gw}`}
+                          data-testid={`comparison-row-gw-${row.gw}`}
+                          className="rounded-lg border border-border/50 bg-surface-elevated/60 p-2.5"
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-display uppercase tracking-wider text-foreground-muted">
+                              GW{row.gw}
+                            </span>
+                            <span className={row.gwDelta >= 0 ? 'text-fpl-green' : 'text-destructive'}>
+                              Delta {row.gwDelta >= 0 ? '+' : ''}
+                              {row.gwDelta.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-foreground">
+                            Points: A {row.pointsA.toFixed(1)} vs B {row.pointsB.toFixed(1)} | Cumulative:{' '}
+                            {row.cumulativeDelta >= 0 ? '+' : ''}
+                            {row.cumulativeDelta.toFixed(1)}
+                          </div>
+                          <div className="mt-1 text-xs text-foreground-muted">
+                            Transfers: A {row.transfersA} | B {row.transfersB}
+                          </div>
+                          <div className="text-xs text-foreground-muted">
+                            Chips: A {row.chipA} | B {row.chipB}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="text-xs text-foreground" data-testid="comparison-cumulative-delta">
+                        Final cumulative delta:{' '}
+                        <span className={planComparison.cumulativeDelta >= 0 ? 'text-fpl-green' : 'text-destructive'}>
+                          {planComparison.cumulativeDelta >= 0 ? '+' : ''}
+                          {planComparison.cumulativeDelta.toFixed(1)}
+                        </span>{' '}
+                        (Plan {planComparison.planA.id} vs Plan {planComparison.planB.id})
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </BroadcastCard>
