@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
-import { useManager, useManagerPicks, useManagerHistory } from '../hooks/useManager'
+import { useManager, useManagerPicks, useManagerHistory, useManagerSeasonAnalysis } from '../hooks/useManager'
+import { useLeagueSeasonAnalysis } from '../hooks/useLeagueAnalysis'
 import { ManagerSearch } from '../components/team-analyzer/ManagerSearch'
 import { SquadPitch } from '../components/team-analyzer/SquadPitch'
 import { SquadStats } from '../components/team-analyzer/SquadStats'
 import { SeasonReview } from '../components/team-analyzer/SeasonReview'
+import { ExpectedActualLuckPanel } from '../components/team-analyzer/ExpectedActualLuckPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, TrophyIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonPitch, SkeletonCard } from '../components/ui/SkeletonLoader'
@@ -24,6 +26,20 @@ export function TeamAnalyzer() {
     isLoading: historyLoading,
     error: historyError,
   } = useManagerHistory(managerId)
+  const {
+    data: seasonAnalysis,
+    isLoading: seasonAnalysisLoading,
+    error: seasonAnalysisError,
+  } = useManagerSeasonAnalysis(managerId)
+
+  const primaryLeagueId = useMemo(() => {
+    return manager?.leagues?.classic?.find((league) => league.id > 0)?.id ?? null
+  }, [manager?.leagues?.classic])
+  const { data: leagueSeasonData } = useLeagueSeasonAnalysis(
+    primaryLeagueId,
+    {},
+    { enabled: primaryLeagueId !== null && primaryLeagueId > 0 }
+  )
 
   const playersMap = useMemo(() => {
     if (!playersData?.players) return new Map()
@@ -39,8 +55,16 @@ export function TeamAnalyzer() {
     setManagerId(id)
   }
 
-  const isLoading = playersLoading || managerLoading || picksLoading || historyLoading
-  const error = managerError || picksError || historyError
+  const leagueMedianByGw = useMemo(() => {
+    if (!leagueSeasonData?.benchmarks) return undefined
+    return new Map(
+      leagueSeasonData.benchmarks.map((row) => [row.gameweek, row.median_actual_points] as const)
+    )
+  }, [leagueSeasonData?.benchmarks])
+
+  const isLoading =
+    playersLoading || managerLoading || picksLoading || historyLoading || seasonAnalysisLoading
+  const error = managerError || picksError || historyError || seasonAnalysisError
 
   return (
     <div className="space-y-6">
@@ -134,6 +158,16 @@ export function TeamAnalyzer() {
 
       {/* Season Review */}
       {manager && history && !isLoading && <SeasonReview history={history} />}
+
+      {/* Expected vs Actual + Luck Trend */}
+      {manager && seasonAnalysis && !isLoading && (
+        <BroadcastCard title="Expected vs Actual" accentColor="highlight" animationDelay={120}>
+          <ExpectedActualLuckPanel
+            seasonAnalysis={seasonAnalysis}
+            leagueMedianByGw={leagueMedianByGw}
+          />
+        </BroadcastCard>
+      )}
 
       {/* Empty State */}
       {!manager && !isLoading && !error && (

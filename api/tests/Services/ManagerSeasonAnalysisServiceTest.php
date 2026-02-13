@@ -100,6 +100,16 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
     {
         $pdo = $this->db->getPdo();
 
+        $pdo->exec("
+            INSERT INTO manager_history (manager_id, gameweek, points, total_points, overall_rank, bank, team_value, transfers_cost, points_on_bench) VALUES
+            (100, 1, 12, 12, 100000, 0, 1000, 0, 0),
+            (100, 2, 10, 22, 90000, 0, 1001, 4, 2),
+            (200, 1, 70, 70, 9000, 0, 1000, 0, 0),
+            (200, 2, 60, 130, 9500, 0, 1000, 0, 0),
+            (300, 1, 50, 50, 12000, 0, 1000, 0, 0),
+            (300, 2, 40, 90, 15000, 0, 1000, 0, 0)
+        ");
+
         // GW1 picks for manager 100 (player 1 captain)
         $pdo->exec("
             INSERT INTO manager_picks (manager_id, gameweek, player_id, position, multiplier, is_captain, is_vice_captain) VALUES
@@ -185,6 +195,12 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
         $transferGw = $result['transfer_analytics'][0];
         $this->assertSame(2, $transferGw['gameweek']);
         $this->assertSame(1, $transferGw['transfer_count']);
+
+        $this->assertArrayHasKey('benchmarks', $result);
+        $this->assertSame(44.0, $result['benchmarks']['overall'][0]['points']);
+        $this->assertSame(36.67, $result['benchmarks']['overall'][1]['points']);
+        $this->assertSame(70.0, $result['benchmarks']['top_10k'][0]['points']);
+        $this->assertSame(60.0, $result['benchmarks']['top_10k'][1]['points']);
     }
 
     public function testSeasonAnalysisHandlesNoChipsAndNoHits(): void

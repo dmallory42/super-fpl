@@ -118,6 +118,10 @@ export interface ManagerSeasonAnalysisResponse {
   generated_at: string
   gameweeks: ManagerSeasonAnalysisGameweek[]
   transfer_analytics: ManagerSeasonTransferAnalytics[]
+  benchmarks?: {
+    overall: Array<{ gameweek: number; points: number | null }>
+    top_10k: Array<{ gameweek: number; points: number | null }>
+  }
   summary: {
     actual_points: number
     expected_points: number
