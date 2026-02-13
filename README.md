@@ -20,6 +20,7 @@ Fantasy Premier League analytics app with:
 
 ```bash
 npm install
+cd api && composer install && cd ..
 npm run up:build
 ```
 
@@ -96,8 +97,3 @@ docker compose up -d cron
 - API response cache: Redis-backed (with fallback bypass), keying includes DB mtime and sync version
 - Cache status header for supported GET endpoints: `X-Response-Cache: HIT|MISS|BYPASS`
 - Bypass per request: append `?nocache=1`
-
-## Repo Notes
-
-- `vendor` is intentionally not tracked in Git.
-- Install PHP dependencies in the API container or locally with Composer as needed.
