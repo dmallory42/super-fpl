@@ -1,6 +1,12 @@
 # Super FPL sync schedule
 # All times UTC
 
+# fixtures: daily refresh at 01:00
+0 1 * * * cd /var/www/html/api && php cron/fixtures-refresh.php >> /var/log/cron/sync.log 2>&1
+
+# fixtures: hourly check, run once 1h after each GW deadline
+5 * * * * cd /var/www/html/api && php cron/fixtures-post-deadline-refresh.php >> /var/log/cron/sync.log 2>&1
+
 # pre-deadline: daily 09:00
 0 9 * * * cd /var/www/html/api && php cron/sync-all.php --phase=pre-deadline >> /var/log/cron/sync.log 2>&1
 
