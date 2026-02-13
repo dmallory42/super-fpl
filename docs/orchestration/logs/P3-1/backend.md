@@ -1,4 +1,6 @@
 # P3-1 Backend Agent Log
 
-- Status: in_progress
+- Status: done
 - Notes:
+  - No backend changes required for P3-1.
+  - Existing `GET /leagues/:id/analysis` and `GET /leagues/:id/season-analysis` contracts were reused.
