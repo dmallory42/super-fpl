@@ -17,6 +17,7 @@ import { RankProjection } from '../components/live/RankProjection'
 import { VarianceAnalysis } from '../components/live/VarianceAnalysis'
 import { FixtureThreatIndex } from '../components/live/FixtureThreatIndex'
 import { DifferentialAnalysis } from '../components/live/DifferentialAnalysis'
+import { RankSwingDecomposition } from '../components/live/RankSwingDecomposition'
 import { GoodWeekBanner } from '../components/live/GoodWeekBanner'
 import { formatRank } from '../lib/format'
 import { type Tier, TIER_OPTIONS } from '../lib/tiers'
@@ -355,6 +356,54 @@ export function Live() {
     })
   }, [gameweekData, processedSquad, tierEO, liveData, playersMap, teamsMap])
 
+  const rankSwingComponents = useMemo(() => {
+    if (!processedSquad || !liveData?.elements || !tierEO) return null
+
+    const startingXI = processedSquad.players.filter((p) => p.position <= 11)
+    const startingIds = new Set(startingXI.map((p) => p.player_id))
+    const pointsByPlayer = new Map<number, number>(
+      liveData.elements.map((el) => [el.id, el.stats?.total_points ?? 0])
+    )
+
+    const captainRow = startingXI.find((p) => p.is_captain)
+    const userCaptainPoints = captainRow?.effective_points ?? 0
+    const tierCaptainPercent = samplesData?.samples?.[comparisonTier]?.captain_percent ?? {}
+    const tierCaptainPoints = Object.entries(tierCaptainPercent).reduce((sum, [playerId, percent]) => {
+      const points = pointsByPlayer.get(Number(playerId)) ?? 0
+      return sum + points * (percent / 100)
+    }, 0)
+    const captain = userCaptainPoints - tierCaptainPoints
+
+    const differentials = startingXI.reduce((sum, player) => {
+      const eo = tierEO[player.player_id] ?? 0
+      const multiplier = player.multiplier || 1
+      return sum + player.effective_points * (1 - eo / (100 * multiplier))
+    }, 0)
+
+    const fixture = fixtureImpacts
+      .filter((f) => f.hasUserPlayer)
+      .reduce((sum, f) => sum + f.impact, 0)
+
+    const fadesExposure = liveData.elements.reduce((sum, el) => {
+      if (startingIds.has(el.id)) return sum
+      const eo = tierEO[el.id] ?? 0
+      if (eo < 50) return sum
+      const points = el.stats?.total_points ?? 0
+      return sum + (points * eo) / 100
+    }, 0)
+    const fades = -fadesExposure
+
+    const net = captain + differentials + fixture + fades
+
+    return {
+      captain: Math.round(captain * 10) / 10,
+      differentials: Math.round(differentials * 10) / 10,
+      fixture: Math.round(fixture * 10) / 10,
+      fades: Math.round(fades * 10) / 10,
+      net: Math.round(net * 10) / 10,
+    }
+  }, [processedSquad, liveData, tierEO, comparisonTier, samplesData, fixtureImpacts])
+
   // Calculate differential analysis data
   const differentialData = useMemo(() => {
     if (!processedSquad || !tierEO) return []
@@ -683,6 +732,16 @@ export function Live() {
                     players={differentialData}
                     tierLabel={tierLabel}
                     showTierLabel={false}
+                  />
+                </div>
+              )}
+              {rankSwingComponents && (
+                <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
+                  <RankSwingDecomposition
+                    components={rankSwingComponents}
+                    selectedTier={comparisonTier}
+                    onTierChange={setComparisonTier}
+                    showTierSelector
                   />
                 </div>
               )}
