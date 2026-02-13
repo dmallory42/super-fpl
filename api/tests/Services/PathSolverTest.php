@@ -238,6 +238,61 @@ class PathSolverTest extends TestCase
         }
     }
 
+    public function testObjectiveModesCanChangeBestPathRanking(): void
+    {
+        $gameweeks = [30];
+        [$squadIds, $predictions, $playerMap] = $this->makeSquad($gameweeks, 4.0);
+
+        $predictions[25][30] = [
+            'predicted_points' => 2.0,
+            'confidence' => 1.0,
+            'expected_mins' => 90.0,
+        ];
+
+        $this->addCandidates($predictions, $playerMap, [
+            [
+                'id' => 201,
+                'position' => 3,
+                'team' => 18,
+                'cost' => 50,
+                'name' => 'SafeMid',
+                'predictions' => [
+                    30 => [
+                        'predicted_points' => 8.0,
+                        'confidence' => 0.95,
+                        'expected_mins' => 90.0,
+                    ],
+                ],
+            ],
+            [
+                'id' => 202,
+                'position' => 3,
+                'team' => 19,
+                'cost' => 50,
+                'name' => 'BoomBustMid',
+                'predictions' => [
+                    30 => [
+                        'predicted_points' => 7.0,
+                        'confidence' => 0.35,
+                        'expected_mins' => 90.0,
+                    ],
+                ],
+            ],
+        ]);
+
+        $expectedSolver = new PathSolver(ftValue: 0.0, depth: 'quick', objectiveMode: 'expected');
+        $expectedPaths = $expectedSolver->solve($squadIds, $predictions, $gameweeks, $playerMap, 5.0, 1);
+        $this->assertNotEmpty($expectedPaths);
+        $expectedMove = $expectedPaths[0]['transfers_by_gw'][30]['moves'][0]['in_id'] ?? null;
+        $this->assertSame(201, $expectedMove);
+
+        $ceilingSolver = new PathSolver(ftValue: 0.0, depth: 'quick', objectiveMode: 'ceiling');
+        $ceilingPaths = $ceilingSolver->solve($squadIds, $predictions, $gameweeks, $playerMap, 5.0, 1);
+        $this->assertNotEmpty($ceilingPaths);
+        $ceilingMove = $ceilingPaths[0]['transfers_by_gw'][30]['moves'][0]['in_id'] ?? null;
+        $this->assertSame(202, $ceilingMove);
+    }
+
     // -------------------------------------------------------------------------
     // Test 4: High FT value discourages hits
     // -------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import type {
   ChipMode,
   PlayerMultiWeekPrediction,
   FixedTransfer,
+  PlannerObjectiveMode,
   SolverDepth,
   XMinsOverrides,
   FixtureOpponent,
@@ -34,6 +35,11 @@ const CHIP_SHORT_LABELS: Record<keyof ChipPlan, string> = {
   free_hit: 'FH',
   bench_boost: 'BB',
   triple_captain: 'TC',
+}
+const OBJECTIVE_LABELS: Record<PlannerObjectiveMode, string> = {
+  expected: 'Expected',
+  floor: 'Floor',
+  ceiling: 'Ceiling',
 }
 
 function formatFixtures(fixtures: FixtureOpponent[]): string {
@@ -82,6 +88,7 @@ export function Planner() {
   const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null)
   const [ftValue, setFtValue] = useState(1.5)
   const [solverDepth, setSolverDepth] = useState<SolverDepth>('standard')
+  const [objectiveMode, setObjectiveMode] = useState<PlannerObjectiveMode>('expected')
 
   // User transfers (replaces old fixedTransfers concept)
   const [userTransfers, setUserTransfers] = useState<FixedTransfer[]>([])
@@ -94,6 +101,7 @@ export function Planner() {
   const [solveChipCompare, setSolveChipCompare] = useState(true)
   const [solveFtValue, setSolveFtValue] = useState(1.5)
   const [solveDepth, setSolveDepth] = useState<SolverDepth>('standard')
+  const [solveObjectiveMode, setSolveObjectiveMode] = useState<PlannerObjectiveMode>('expected')
   const [showSolveLoader, setShowSolveLoader] = useState(false)
 
   // Player detail sidebar state
@@ -144,6 +152,7 @@ export function Planner() {
     solverDepth,
     true, // skipSolve
     chipMode,
+    objectiveMode,
     false
   )
 
@@ -158,6 +167,7 @@ export function Planner() {
     solveDepth,
     false, // run solver
     solveChipMode,
+    solveObjectiveMode,
     solveChipCompare
   )
 
@@ -169,7 +179,8 @@ export function Planner() {
       chipMode !== solveChipMode ||
       chipCompare !== solveChipCompare ||
       ftValue !== solveFtValue ||
-      solverDepth !== solveDepth)
+      solverDepth !== solveDepth ||
+      objectiveMode !== solveObjectiveMode)
 
   const isSolveActive = showSolveLoader || isFetchingSolve
 
@@ -419,6 +430,7 @@ export function Planner() {
       setSolveChipCompare(true)
       setSolveFtValue(1.5)
       setSolveDepth('standard')
+      setSolveObjectiveMode('expected')
       setFreeTransfers(null)
     }
   }
@@ -492,9 +504,11 @@ export function Planner() {
     setSolveChipCompare(true)
     setSolveFtValue(1.5)
     setSolveDepth('standard')
+    setSolveObjectiveMode('expected')
     setChipPlan({})
     setChipMode('locked')
     setChipCompare(true)
+    setObjectiveMode('expected')
   }
 
   const handleFindPlans = () => {
@@ -505,6 +519,7 @@ export function Planner() {
     setSolveChipCompare(chipCompare)
     setSolveFtValue(ftValue)
     setSolveDepth(solverDepth)
+    setSolveObjectiveMode(objectiveMode)
     setSolveRequested(true)
     // Minimum display time so the skeleton always appears
     setTimeout(() => setShowSolveLoader(false), 800)
@@ -927,6 +942,21 @@ export function Planner() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    {(Object.keys(OBJECTIVE_LABELS) as PlannerObjectiveMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setObjectiveMode(mode)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
+                          objectiveMode === mode
+                            ? 'bg-highlight/20 text-highlight border border-highlight/30'
+                            : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
+                        }`}
+                      >
+                        {OBJECTIVE_LABELS[mode]}
+                      </button>
+                    ))}
+                  </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-foreground-muted whitespace-nowrap">FT</span>
                     <input
@@ -1138,6 +1168,11 @@ export function Planner() {
                       </button>
                     )
                   })}
+                </div>
+              )}
+              {!isSolveActive && paths.length > 0 && (
+                <div className="pt-2 text-xs text-foreground-muted">
+                  Objective: {OBJECTIVE_LABELS[solveObjectiveMode]}
                 </div>
               )}
             </BroadcastCard>

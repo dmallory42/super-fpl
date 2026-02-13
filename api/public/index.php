@@ -1133,6 +1133,11 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
         $depth = 'standard';
     }
 
+    $objectiveMode = $_GET['objective'] ?? 'expected';
+    if (!in_array($objectiveMode, ['expected', 'floor', 'ceiling'], true)) {
+        $objectiveMode = 'expected';
+    }
+
     // Parse skip_solve flag (return squad data without running PathSolver)
     $skipSolve = isset($_GET['skip_solve']) && $_GET['skip_solve'] === '1';
     $chipCompare = isset($_GET['chip_compare']) && $_GET['chip_compare'] === '1';
@@ -1167,6 +1172,7 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
             $chipAllow,
             $chipForbid,
             $chipCompare,
+            $objectiveMode,
         );
         echo json_encode($plan);
     } catch (\Throwable $e) {
