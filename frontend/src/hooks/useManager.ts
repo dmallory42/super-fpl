@@ -3,7 +3,9 @@ import {
   fetchManager,
   fetchManagerPicks,
   fetchManagerHistory,
+  fetchManagerSeasonAnalysis,
   type ManagerHistoryResponse,
+  type ManagerSeasonAnalysisResponse,
 } from '../api/client'
 import type { Manager, ManagerPicks } from '../types'
 
@@ -29,6 +31,15 @@ export function useManagerHistory(id: number | null) {
   return useQuery<ManagerHistoryResponse>({
     queryKey: ['manager-history', id],
     queryFn: () => fetchManagerHistory(id!),
+    enabled: id !== null && id > 0,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+export function useManagerSeasonAnalysis(id: number | null) {
+  return useQuery<ManagerSeasonAnalysisResponse>({
+    queryKey: ['manager-season-analysis', id],
+    queryFn: () => fetchManagerSeasonAnalysis(id!),
     enabled: id !== null && id > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes
   })

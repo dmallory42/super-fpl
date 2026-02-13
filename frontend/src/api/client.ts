@@ -59,6 +59,58 @@ export async function fetchManagerHistory(id: number): Promise<ManagerHistoryRes
   return fetchApi<ManagerHistoryResponse>(`/managers/${id}/history`)
 }
 
+export interface ManagerSeasonAnalysisGameweek {
+  gameweek: number
+  actual_points: number
+  expected_points: number
+  luck_delta: number
+  overall_rank: number | null
+  event_transfers: number
+  event_transfers_cost: number
+  captain_impact: {
+    captain_id: number | null
+    multiplier: number
+    actual_gain: number
+    expected_gain: number
+    luck_delta: number
+  }
+  chip_impact: {
+    chips: string[]
+    active: string | null
+  }
+}
+
+export interface ManagerSeasonTransferAnalytics {
+  gameweek: number
+  transfer_count: number
+  transfer_cost: number
+  foresight_gain: number
+  hindsight_gain: number
+  net_gain: number
+}
+
+export interface ManagerSeasonAnalysisResponse {
+  manager_id: number
+  generated_at: string
+  gameweeks: ManagerSeasonAnalysisGameweek[]
+  transfer_analytics: ManagerSeasonTransferAnalytics[]
+  summary: {
+    actual_points: number
+    expected_points: number
+    luck_delta: number
+    captain_actual_gain: number
+    captain_expected_gain: number
+    captain_luck_delta: number
+    transfer_foresight_gain: number
+    transfer_hindsight_gain: number
+    transfer_net_gain: number
+  }
+}
+
+export async function fetchManagerSeasonAnalysis(id: number): Promise<ManagerSeasonAnalysisResponse> {
+  return fetchApi<ManagerSeasonAnalysisResponse>(`/managers/${id}/season-analysis`)
+}
+
 export interface TeamsResponse {
   teams: { id: number; name: string; short_name: string }[]
 }

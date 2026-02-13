@@ -9,6 +9,7 @@ use SuperFPL\Api\Services\PlayerService;
 use SuperFPL\Api\Services\FixtureService;
 use SuperFPL\Api\Services\TeamService;
 use SuperFPL\Api\Services\ManagerService;
+use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\LeagueService;
 use SuperFPL\Api\Services\ComparisonService;
@@ -89,6 +90,7 @@ try {
         preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, (int) $m[1]),
         preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, (int) $m[1], (int) $m[2]),
         preg_match('#^/managers/(\d+)/history$#', $uri, $m) === 1 => handleManagerHistory($db, $fplClient, (int) $m[1]),
+        preg_match('#^/managers/(\d+)/season-analysis$#', $uri, $m) === 1 => handleManagerSeasonAnalysis($db, $fplClient, (int) $m[1]),
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
         preg_match('#^/predictions/(\d+)/accuracy$#', $uri, $m) === 1 => handlePredictionAccuracy($db, (int) $m[1]),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1]),
@@ -348,6 +350,20 @@ function handleManagerHistory(Database $db, FplClient $fplClient, int $managerId
     }
 
     echo json_encode($history);
+}
+
+function handleManagerSeasonAnalysis(Database $db, FplClient $fplClient, int $managerId): void
+{
+    $service = new ManagerSeasonAnalysisService($db, $fplClient);
+    $analysis = $service->analyze($managerId);
+
+    if ($analysis === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Season analysis not found']);
+        return;
+    }
+
+    echo json_encode($analysis);
 }
 
 function handleSyncManagers(Database $db, FplClient $fplClient): void
