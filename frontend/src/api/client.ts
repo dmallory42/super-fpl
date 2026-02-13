@@ -551,6 +551,76 @@ export async function fetchLeagueAnalysis(leagueId: number, gameweek?: number): 
   return fetchApi<LeagueAnalysisResponse>(`/leagues/${leagueId}/analysis${gwParam}`)
 }
 
+export interface LeagueSeasonAnalysisGameweek {
+  gameweek: number
+  actual_points: number
+  expected_points: number
+  luck_delta: number
+  event_transfers: number
+  event_transfers_cost: number
+  captain_actual_gain: number
+  missing: boolean
+}
+
+export interface LeagueSeasonDecisionQuality {
+  captain_gains: number
+  hit_cost: number
+  transfer_net_gain: number
+  hit_roi: number | null
+  chip_events: number
+}
+
+export interface LeagueSeasonManager {
+  manager_id: number
+  manager_name: string
+  team_name: string
+  rank: number
+  total: number
+  gameweeks: LeagueSeasonAnalysisGameweek[]
+  decision_quality: LeagueSeasonDecisionQuality
+}
+
+export interface LeagueSeasonBenchmark {
+  gameweek: number
+  mean_actual_points: number
+  median_actual_points: number
+  mean_expected_points: number
+  median_expected_points: number
+}
+
+export interface LeagueSeasonAnalysisResponse {
+  league: {
+    id: number
+    name: string
+  }
+  gw_from: number
+  gw_to: number
+  gameweek_axis: number[]
+  manager_count: number
+  managers: LeagueSeasonManager[]
+  benchmarks: LeagueSeasonBenchmark[]
+}
+
+export interface LeagueSeasonAnalysisParams {
+  gwFrom?: number
+  gwTo?: number
+  topN?: number
+}
+
+export async function fetchLeagueSeasonAnalysis(
+  leagueId: number,
+  params: LeagueSeasonAnalysisParams = {}
+): Promise<LeagueSeasonAnalysisResponse> {
+  const searchParams = new URLSearchParams()
+  if (params.gwFrom !== undefined) searchParams.set('gw_from', String(params.gwFrom))
+  if (params.gwTo !== undefined) searchParams.set('gw_to', String(params.gwTo))
+  if (params.topN !== undefined) searchParams.set('top_n', String(params.topN))
+  const query = searchParams.toString()
+  return fetchApi<LeagueSeasonAnalysisResponse>(
+    `/leagues/${leagueId}/season-analysis${query ? `?${query}` : ''}`
+  )
+}
+
 // Planner Optimization
 export interface ChipPlan {
   wildcard?: number
