@@ -238,6 +238,37 @@ test.describe('Live Page', () => {
     await expect(page.locator('text=Salah').first()).toBeVisible()
   })
 
+  test('shows confidence strip source and stale status from sample metadata', async ({ page }) => {
+    await page.unroute('**/api/live/24/samples')
+    await page.route('**/api/live/24/samples', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          gameweek: 24,
+          samples: {
+            top_10k: {
+              avg_points: 72,
+              sample_size: 120,
+              effective_ownership: { 1: 185.5, 2: 92.3 },
+              estimated: true,
+            },
+          },
+          updated_at: '2020-01-15T18:00:00Z',
+        }),
+      })
+    })
+
+    await page.goto('/')
+    await page.click('text=Live')
+    await page.fill('input[placeholder*="Manager ID"]', '12345')
+    await page.click('button:has-text("Track")')
+
+    await page.waitForSelector('text=Data Confidence', { timeout: 10000 })
+    await expect(page.locator('text=estimated')).toBeVisible()
+    await expect(page.locator('text=Stale')).toBeVisible()
+  })
+
   test('remembers manager ID in localStorage', async ({ page }) => {
     await page.goto('/')
     await page.click('text=Live')

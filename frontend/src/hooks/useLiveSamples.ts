@@ -31,6 +31,15 @@ export interface TierComparison {
   difference: number // positive = you're ahead
 }
 
+export interface LiveSampleProvenance {
+  source: 'real' | 'estimated'
+  sampleSize: number
+  updatedAt: string
+  ageSeconds: number | null
+  isStale: boolean
+  staleThresholdSeconds: number
+}
+
 /**
  * Calculate comparison data between user points and tier averages
  */
@@ -131,4 +140,27 @@ export function estimateLiveRank(
   const ratio = Math.max(0, userPoints / overall)
   const rank = Math.round(5000000 + (1 - ratio) * 5000000)
   return { rank: Math.min(rank, 10000000), tier: 'below_average', confidence: 'low' }
+}
+
+export function getSampleProvenance(
+  tier: Tier,
+  samplesData: LiveSamplesResponse | undefined,
+  isLive: boolean,
+  nowMs: number = Date.now()
+): LiveSampleProvenance | null {
+  const tierData = samplesData?.samples?.[tier]
+  if (!tierData || !samplesData?.updated_at) return null
+
+  const updatedMs = Date.parse(samplesData.updated_at)
+  const ageSeconds = Number.isNaN(updatedMs) ? null : Math.max(0, Math.floor((nowMs - updatedMs) / 1000))
+  const staleThresholdSeconds = isLive ? 120 : 600
+
+  return {
+    source: tierData.estimated ? 'estimated' : 'real',
+    sampleSize: tierData.sample_size,
+    updatedAt: samplesData.updated_at,
+    ageSeconds,
+    isStale: ageSeconds !== null && ageSeconds > staleThresholdSeconds,
+    staleThresholdSeconds,
+  }
 }

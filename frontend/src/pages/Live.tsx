@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useLiveData, useLiveManager, useLiveBonus } from '../hooks/useLive'
 import { usePlayers } from '../hooks/usePlayers'
 import { useCurrentGameweek } from '../hooks/useCurrentGameweek'
-import { useLiveSamples, calculateComparisons } from '../hooks/useLiveSamples'
+import { useLiveSamples, calculateComparisons, getSampleProvenance } from '../hooks/useLiveSamples'
 import { usePredictions } from '../hooks/usePredictions'
 import { StatPanel, StatPanelGrid } from '../components/ui/StatPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
@@ -393,6 +393,29 @@ export function Live() {
   // Get tier label for differential analysis
   const tierLabel = TIER_OPTIONS.find((t) => t.value === comparisonTier)?.label ?? comparisonTier
   const managerLastUpdated = formatUpdatedTime(liveManager?.updated_at)
+  const sampleProvenance = useMemo(() => {
+    const direct = getSampleProvenance(comparisonTier, samplesData, Boolean(gwData?.isLive))
+    if (direct) return direct
+
+    // Fallback to top_10k shape to avoid dropping strip when a tier key is temporarily absent.
+    const fallback = samplesData?.samples?.top_10k
+    if (!fallback || !samplesData?.updated_at) return null
+
+    const nowMs = Date.now()
+    const updatedMs = Date.parse(samplesData.updated_at)
+    const ageSeconds = Number.isNaN(updatedMs) ? null : Math.max(0, Math.floor((nowMs - updatedMs) / 1000))
+    const staleThresholdSeconds = gwData?.isLive ? 120 : 600
+
+    return {
+      source: fallback.estimated ? ('estimated' as const) : ('real' as const),
+      sampleSize: fallback.sample_size,
+      updatedAt: samplesData.updated_at,
+      ageSeconds,
+      isStale: ageSeconds !== null && ageSeconds > staleThresholdSeconds,
+      staleThresholdSeconds,
+    }
+  }, [comparisonTier, samplesData, gwData?.isLive])
+  const sampleUpdatedAt = formatUpdatedTime(sampleProvenance?.updatedAt)
   const isRefreshingLiveData =
     isFetchingManager || isFetchingSamples || isFetchingLiveData || isFetchingBonus
   const provisionalBonusIncluded = useMemo(() => {
@@ -536,6 +559,39 @@ export function Live() {
       {/* Live Points Display */}
       {liveManager && !liveManager.error && gameweek && processedSquad && (
         <div className="space-y-6">
+          {sampleProvenance && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs flex flex-wrap items-center gap-2 ${
+                sampleProvenance.isStale
+                  ? 'border-yellow-400/40 bg-yellow-500/10 text-yellow-300'
+                  : 'border-border/50 bg-surface-elevated/50 text-foreground-muted'
+              }`}
+            >
+              <span className="font-display uppercase tracking-wide text-foreground-dim">
+                Data Confidence
+              </span>
+              <span
+                className={`px-2 py-0.5 rounded font-display uppercase tracking-wide ${
+                  sampleProvenance.source === 'real'
+                    ? 'bg-fpl-green/20 text-fpl-green border border-fpl-green/30'
+                    : 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/30'
+                }`}
+              >
+                {sampleProvenance.source}
+              </span>
+              <span>
+                {tierLabel}: n={sampleProvenance.sampleSize.toLocaleString()}
+              </span>
+              {sampleUpdatedAt && <span>Updated {sampleUpdatedAt}</span>}
+              {sampleProvenance.isStale && (
+                <span className="font-medium">
+                  Stale ({sampleProvenance.ageSeconds}s old; target{' '}
+                  {sampleProvenance.staleThresholdSeconds}s)
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Stats Header */}
           <StatPanelGrid>
             <StatPanel
