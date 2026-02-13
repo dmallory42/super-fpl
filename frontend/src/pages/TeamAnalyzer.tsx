@@ -7,6 +7,7 @@ import { SquadPitch } from '../components/team-analyzer/SquadPitch'
 import { SquadStats } from '../components/team-analyzer/SquadStats'
 import { SeasonReview } from '../components/team-analyzer/SeasonReview'
 import { ExpectedActualLuckPanel } from '../components/team-analyzer/ExpectedActualLuckPanel'
+import { TransferQualityScorecard } from '../components/team-analyzer/TransferQualityScorecard'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, TrophyIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonPitch, SkeletonCard } from '../components/ui/SkeletonLoader'
@@ -166,6 +167,13 @@ export function TeamAnalyzer() {
             seasonAnalysis={seasonAnalysis}
             leagueMedianByGw={leagueMedianByGw}
           />
+        </BroadcastCard>
+      )}
+
+      {/* Transfer Quality Scorecard */}
+      {manager && seasonAnalysis && !isLoading && (
+        <BroadcastCard title="Transfer Quality" accentColor="purple" animationDelay={130}>
+          <TransferQualityScorecard seasonAnalysis={seasonAnalysis} />
         </BroadcastCard>
       )}
 

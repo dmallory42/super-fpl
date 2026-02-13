@@ -270,4 +270,20 @@ test.describe('Season Review', () => {
     await page.selectOption('#season-benchmark-select', 'league_median')
     await expect(page.locator('[data-testid="expected-actual-table"]')).toContainText('56.0')
   })
+
+  test('transfer quality scorecard shows only transfer weeks with aggregate totals', async ({ page }) => {
+    await page.goto('/')
+
+    await page.fill('input[placeholder*="Manager ID"]', '12345')
+    await page.click('button:has-text("Analyze")')
+
+    await page.waitForSelector('text=Transfer Quality', { timeout: 10000 })
+    const table = page.locator('[data-testid="transfer-quality-table"]')
+    await expect(table).toBeVisible()
+
+    const rows = table.locator('tbody tr')
+    await expect(rows).toHaveCount(2)
+    await expect(rows.nth(0)).toContainText('2')
+    await expect(rows.nth(1)).toContainText('3')
+  })
 })
