@@ -59,6 +59,58 @@ export async function fetchManagerHistory(id: number): Promise<ManagerHistoryRes
   return fetchApi<ManagerHistoryResponse>(`/managers/${id}/history`)
 }
 
+export interface ManagerSeasonAnalysisGameweek {
+  gameweek: number
+  actual_points: number
+  expected_points: number
+  luck_delta: number
+  overall_rank: number | null
+  event_transfers: number
+  event_transfers_cost: number
+  captain_impact: {
+    captain_id: number | null
+    multiplier: number
+    actual_gain: number
+    expected_gain: number
+    luck_delta: number
+  }
+  chip_impact: {
+    chips: string[]
+    active: string | null
+  }
+}
+
+export interface ManagerSeasonTransferAnalytics {
+  gameweek: number
+  transfer_count: number
+  transfer_cost: number
+  foresight_gain: number
+  hindsight_gain: number
+  net_gain: number
+}
+
+export interface ManagerSeasonAnalysisResponse {
+  manager_id: number
+  generated_at: string
+  gameweeks: ManagerSeasonAnalysisGameweek[]
+  transfer_analytics: ManagerSeasonTransferAnalytics[]
+  summary: {
+    actual_points: number
+    expected_points: number
+    luck_delta: number
+    captain_actual_gain: number
+    captain_expected_gain: number
+    captain_luck_delta: number
+    transfer_foresight_gain: number
+    transfer_hindsight_gain: number
+    transfer_net_gain: number
+  }
+}
+
+export async function fetchManagerSeasonAnalysis(id: number): Promise<ManagerSeasonAnalysisResponse> {
+  return fetchApi<ManagerSeasonAnalysisResponse>(`/managers/${id}/season-analysis`)
+}
+
 export interface TeamsResponse {
   teams: { id: number; name: string; short_name: string }[]
 }
@@ -497,6 +549,76 @@ export interface LeagueAnalysisResponse {
 export async function fetchLeagueAnalysis(leagueId: number, gameweek?: number): Promise<LeagueAnalysisResponse> {
   const gwParam = gameweek ? `?gw=${gameweek}` : ''
   return fetchApi<LeagueAnalysisResponse>(`/leagues/${leagueId}/analysis${gwParam}`)
+}
+
+export interface LeagueSeasonAnalysisGameweek {
+  gameweek: number
+  actual_points: number
+  expected_points: number
+  luck_delta: number
+  event_transfers: number
+  event_transfers_cost: number
+  captain_actual_gain: number
+  missing: boolean
+}
+
+export interface LeagueSeasonDecisionQuality {
+  captain_gains: number
+  hit_cost: number
+  transfer_net_gain: number
+  hit_roi: number | null
+  chip_events: number
+}
+
+export interface LeagueSeasonManager {
+  manager_id: number
+  manager_name: string
+  team_name: string
+  rank: number
+  total: number
+  gameweeks: LeagueSeasonAnalysisGameweek[]
+  decision_quality: LeagueSeasonDecisionQuality
+}
+
+export interface LeagueSeasonBenchmark {
+  gameweek: number
+  mean_actual_points: number
+  median_actual_points: number
+  mean_expected_points: number
+  median_expected_points: number
+}
+
+export interface LeagueSeasonAnalysisResponse {
+  league: {
+    id: number
+    name: string
+  }
+  gw_from: number
+  gw_to: number
+  gameweek_axis: number[]
+  manager_count: number
+  managers: LeagueSeasonManager[]
+  benchmarks: LeagueSeasonBenchmark[]
+}
+
+export interface LeagueSeasonAnalysisParams {
+  gwFrom?: number
+  gwTo?: number
+  topN?: number
+}
+
+export async function fetchLeagueSeasonAnalysis(
+  leagueId: number,
+  params: LeagueSeasonAnalysisParams = {}
+): Promise<LeagueSeasonAnalysisResponse> {
+  const searchParams = new URLSearchParams()
+  if (params.gwFrom !== undefined) searchParams.set('gw_from', String(params.gwFrom))
+  if (params.gwTo !== undefined) searchParams.set('gw_to', String(params.gwTo))
+  if (params.topN !== undefined) searchParams.set('top_n', String(params.topN))
+  const query = searchParams.toString()
+  return fetchApi<LeagueSeasonAnalysisResponse>(
+    `/leagues/${leagueId}/season-analysis${query ? `?${query}` : ''}`
+  )
 }
 
 // Planner Optimization
