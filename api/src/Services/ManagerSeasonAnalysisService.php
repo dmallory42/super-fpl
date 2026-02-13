@@ -105,6 +105,7 @@ class ManagerSeasonAnalysisService
             'transfer_hindsight_gain' => round(array_sum(array_column($transferAnalytics, 'hindsight_gain')), 2),
             'transfer_net_gain' => round(array_sum(array_column($transferAnalytics, 'net_gain')), 2),
         ];
+        $benchmarkSeries = $this->buildBenchmarkSeries($gameweeks);
 
         return [
             'manager_id' => $managerId,
@@ -112,6 +113,7 @@ class ManagerSeasonAnalysisService
             'gameweeks' => $gameweeks,
             'transfer_analytics' => $transferAnalytics,
             'summary' => $summary,
+            'benchmarks' => $benchmarkSeries,
         ];
     }
 
@@ -319,5 +321,65 @@ class ManagerSeasonAnalysisService
             $chipsByGw[$gw][] = (string) ($chip['name'] ?? 'unknown');
         }
         return $chipsByGw;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $gameweeks
+     * @return array<string, array<int, array<string, float|int|null>>>
+     */
+    private function buildBenchmarkSeries(array $gameweeks): array
+    {
+        $gws = array_values(array_unique(array_map(
+            static fn(array $row): int => (int) ($row['gameweek'] ?? 0),
+            $gameweeks
+        )));
+        $gws = array_values(array_filter($gws, static fn(int $gw): bool => $gw > 0));
+
+        if (empty($gws)) {
+            return [
+                'overall' => [],
+                'top_10k' => [],
+            ];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($gws), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT
+                gameweek,
+                AVG(points) AS overall_avg,
+                AVG(CASE WHEN overall_rank <= 10000 THEN points END) AS top_10k_avg
+             FROM manager_history
+             WHERE gameweek IN ($placeholders)
+             GROUP BY gameweek",
+            $gws
+        );
+
+        $byGw = [];
+        foreach ($rows as $row) {
+            $byGw[(int) ($row['gameweek'] ?? 0)] = [
+                'overall_avg' => isset($row['overall_avg']) ? (float) $row['overall_avg'] : null,
+                'top_10k_avg' => isset($row['top_10k_avg']) ? (float) $row['top_10k_avg'] : null,
+            ];
+        }
+
+        $overall = [];
+        $top10k = [];
+        sort($gws);
+        foreach ($gws as $gw) {
+            $series = $byGw[$gw] ?? ['overall_avg' => null, 'top_10k_avg' => null];
+            $overall[] = [
+                'gameweek' => $gw,
+                'points' => $series['overall_avg'] === null ? null : round($series['overall_avg'], 2),
+            ];
+            $top10k[] = [
+                'gameweek' => $gw,
+                'points' => $series['top_10k_avg'] === null ? null : round($series['top_10k_avg'], 2),
+            ];
+        }
+
+        return [
+            'overall' => $overall,
+            'top_10k' => $top10k,
+        ];
     }
 }
