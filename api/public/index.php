@@ -840,20 +840,16 @@ function handleAdminSample(Database $db, FplClient $fplClient, array $config, in
 
 function handleFixturesStatus(Database $db, FplClient $fplClient, array $config): void
 {
-    // Auto-sync fixtures if data is stale (older than 5 minutes)
-    // This ensures live scores stay fresh without needing a cron job
-    $cachePath = $config['cache']['path'] ?? __DIR__ . '/../cache';
-    $syncTimestampFile = $cachePath . '/fixtures_last_sync.txt';
-    $syncInterval = 300; // 5 minutes
-
-    $lastSync = file_exists($syncTimestampFile) ? (int)file_get_contents($syncTimestampFile) : 0;
-    $now = time();
-
-    if ($now - $lastSync > $syncInterval) {
-        // Sync fixtures from FPL API
-        $fixtureSync = new \SuperFPL\Api\Sync\FixtureSync($db, $fplClient);
-        $fixtureSync->sync();
-        file_put_contents($syncTimestampFile, (string)$now);
+    // Keep this endpoint fast for Live tab boot. Full fixture sync can be slow
+    // and should run via cron (or explicitly with ?refresh=1), not inline by default.
+    $shouldRefresh = isset($_GET['refresh']) && $_GET['refresh'] === '1';
+    if ($shouldRefresh) {
+        try {
+            $fixtureSync = new \SuperFPL\Api\Sync\FixtureSync($db, $fplClient);
+            $fixtureSync->sync();
+        } catch (\Throwable) {
+            // Serve current DB state even if refresh fails.
+        }
     }
 
     // Get fixture status for current/active gameweek detection
