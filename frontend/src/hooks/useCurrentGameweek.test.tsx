@@ -124,4 +124,42 @@ describe('usePlayerFixtureStatus', () => {
     expect(usePlayerFixtureStatus(99, fixtureData)).toBe('unknown')
     expect(usePlayerFixtureStatus(undefined, fixtureData)).toBe('unknown')
   })
+
+  it('handles numeric started/finished flags consistently', () => {
+    const fixtureData = {
+      gameweek: 24,
+      fixtures: [
+        {
+          id: 1,
+          kickoff_time: '2026-02-10T20:00:00Z',
+          started: 1,
+          finished: 1,
+          minutes: 90,
+          home_club_id: 1,
+          away_club_id: 2,
+          home_score: 1,
+          away_score: 1,
+        },
+        {
+          id: 2,
+          kickoff_time: '2026-02-11T20:00:00Z',
+          started: 1,
+          finished: 0,
+          minutes: 40,
+          home_club_id: 3,
+          away_club_id: 4,
+          home_score: 2,
+          away_score: 0,
+        },
+      ],
+      total: 2,
+      started: 2,
+      finished: 1,
+      first_kickoff: '2026-02-10T20:00:00Z',
+      last_kickoff: '2026-02-11T20:00:00Z',
+    }
+
+    expect(usePlayerFixtureStatus(1, fixtureData)).toBe('finished')
+    expect(usePlayerFixtureStatus(3, fixtureData)).toBe('playing')
+  })
 })

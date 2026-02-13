@@ -146,6 +146,49 @@ test.describe('Live Page', () => {
     await expect(page.locator('text=/\\d+\\/\\d+ matches complete/')).toBeVisible()
   })
 
+  test('accepts numeric fixture status flags from API', async ({ page }) => {
+    await page.unroute('**/api/fixtures/status')
+    await page.route('**/api/fixtures/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          current_gameweek: 24,
+          is_live: true,
+          gameweeks: [
+            {
+              gameweek: 24,
+              fixtures: [
+                {
+                  id: 1,
+                  kickoff_time: '2024-01-15T17:30:00Z',
+                  started: 1,
+                  finished: 0,
+                  minutes: 65,
+                  home_club_id: 3,
+                  away_club_id: 4,
+                  home_score: 1,
+                  away_score: 0,
+                },
+              ],
+              total: 1,
+              started: 1,
+              finished: 0,
+              first_kickoff: '2024-01-15T17:30:00Z',
+              last_kickoff: '2024-01-15T17:30:00Z',
+            },
+          ],
+        }),
+      })
+    })
+
+    await page.goto('/')
+    await page.click('text=Live')
+
+    await expect(page.locator('text=/GW24/')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('text=/0\\/1 matches complete/')).toBeVisible()
+  })
+
   test('displays formation pitch with players in correct positions', async ({ page }) => {
     await page.goto('/')
     await page.click('text=Live')

@@ -203,6 +203,32 @@ describe('FixtureScores', () => {
     expect(screen.getByText("67'")).toBeInTheDocument()
   })
 
+  it('treats numeric status flags as live/finished correctly', () => {
+    const fixtureData: GameweekFixtureStatus = {
+      gameweek: 1,
+      fixtures: [createFixture({ started: 1, finished: 0, minutes: 72 })],
+      total: 1,
+      started: 1,
+      finished: 0,
+      first_kickoff: '2024-01-01T15:00:00Z',
+      last_kickoff: '2024-01-01T15:00:00Z',
+    }
+
+    render(
+      <FixtureScores
+        fixtureData={fixtureData}
+        teamsMap={mockTeamsMap}
+        liveElements={[]}
+        playersMap={mockPlayersMap}
+        bonusPredictions={[]}
+      />
+    )
+
+    expect(screen.getByText('Live')).toBeInTheDocument()
+    expect(screen.getByText("72'")).toBeInTheDocument()
+    expect(screen.queryByText('FT')).not.toBeInTheDocument()
+  })
+
   it('expands fixture details on click when there are events', () => {
     const fixtureData: GameweekFixtureStatus = {
       gameweek: 1,
@@ -639,5 +665,62 @@ describe('FixtureScores', () => {
     expect(screen.getAllByText('▼')).toHaveLength(1)
     expect(screen.getByText('Upcoming')).toBeInTheDocument()
     expect(screen.queryByText("0'")).not.toBeInTheDocument()
+  })
+
+  it('keeps DGW event assignment deterministic with numeric status typing', () => {
+    const fixtureData: GameweekFixtureStatus = {
+      gameweek: 1,
+      fixtures: [
+        createFixture({
+          id: 200,
+          home_club_id: 1,
+          away_club_id: 2,
+          started: 1,
+          finished: 0,
+          minutes: 30,
+        }),
+        createFixture({
+          id: 201,
+          home_club_id: 3,
+          away_club_id: 1,
+          started: 1,
+          finished: 0,
+          minutes: 0,
+          home_score: null,
+          away_score: null,
+        }),
+      ],
+      total: 2,
+      started: 2,
+      finished: 0,
+      first_kickoff: '2024-01-01T15:00:00Z',
+      last_kickoff: '2024-01-01T20:00:00Z',
+    }
+
+    const liveElements = [
+      createLiveElement({
+        id: 1,
+        stats: { ...createLiveElement().stats, goals_scored: 1, total_points: 8 },
+        explain: [
+          {
+            fixture: 200,
+            stats: [{ identifier: 'goals_scored', points: 5, value: 1, points_modification: 0 }],
+          },
+        ],
+      }),
+    ]
+
+    render(
+      <FixtureScores
+        fixtureData={fixtureData}
+        teamsMap={mockTeamsMap}
+        liveElements={liveElements}
+        playersMap={mockPlayersMap}
+        bonusPredictions={[]}
+      />
+    )
+
+    expect(screen.getAllByText('▼')).toHaveLength(1)
+    expect(screen.getByText('Upcoming')).toBeInTheDocument()
   })
 })
