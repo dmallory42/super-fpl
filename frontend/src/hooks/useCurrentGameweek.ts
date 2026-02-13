@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { fetchFixturesStatus } from '../api/client'
+import { getTeamFixtureStatus } from '../lib/fixtureMapping'
 
 export interface CurrentGameweekData {
   gameweek: number
@@ -52,14 +53,5 @@ export function usePlayerFixtureStatus(
   teamId: number | undefined,
   gameweekData: ReturnType<typeof useCurrentGameweek>['gameweekData']
 ): 'upcoming' | 'playing' | 'finished' | 'unknown' {
-  if (!teamId || !gameweekData) return 'unknown'
-
-  const fixture = gameweekData.fixtures.find(
-    (f) => f.home_club_id === teamId || f.away_club_id === teamId
-  )
-
-  if (!fixture) return 'unknown'
-  if (fixture.finished) return 'finished'
-  if (fixture.started) return 'playing'
-  return 'upcoming'
+  return getTeamFixtureStatus(gameweekData, teamId)
 }

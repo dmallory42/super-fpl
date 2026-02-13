@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { LiveManagerPlayer, GameweekFixtureStatus } from '../../api/client'
+import { getTeamFixtureStatus } from '../../lib/fixtureMapping'
 
 interface PlayersRemainingProps {
   players: LiveManagerPlayer[]
@@ -27,16 +28,6 @@ export function PlayersRemaining({
       return { playersLeft: [], playersFinished: [], avgPlayersLeft: null }
     }
 
-    const getFixtureStatus = (teamId: number) => {
-      const fixture = fixtureData.fixtures.find(
-        (f) => f.home_club_id === teamId || f.away_club_id === teamId
-      )
-      if (!fixture) return 'unknown'
-      if (fixture.finished) return 'finished'
-      if (fixture.started) return 'playing'
-      return 'upcoming'
-    }
-
     const starting = players.filter((p) => p.position <= 11)
     const left: typeof players = []
     const finished: typeof players = []
@@ -44,7 +35,7 @@ export function PlayersRemaining({
     for (const player of starting) {
       const info = playersMap.get(player.player_id)
       if (!info) continue
-      const status = getFixtureStatus(info.team)
+      const status = getTeamFixtureStatus(fixtureData, info.team)
       if (status === 'finished') {
         finished.push(player)
       } else {
@@ -59,7 +50,7 @@ export function PlayersRemaining({
         const playerId = parseInt(playerIdStr, 10)
         const info = playersMap.get(playerId)
         if (!info) continue
-        const status = getFixtureStatus(info.team)
+        const status = getTeamFixtureStatus(fixtureData, info.team)
         if (status !== 'finished') {
           totalEO += Math.min(eo, 100)
         }
@@ -165,14 +156,7 @@ export function PlayersRemaining({
           <div className="flex flex-wrap gap-1.5">
             {playersLeft.map((player, idx) => {
               const info = playersMap.get(player.player_id)
-              const isPlaying = fixtureData?.fixtures.some((f) => {
-                if (!info) return false
-                return (
-                  (f.home_club_id === info.team || f.away_club_id === info.team) &&
-                  f.started &&
-                  !f.finished
-                )
-              })
+              const isPlaying = info ? getTeamFixtureStatus(fixtureData, info.team) === 'playing' : false
               const position = info?.element_type ? positionNames[info.element_type] : ''
 
               return (
