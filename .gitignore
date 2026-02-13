@@ -1,7 +1,9 @@
 # Dependencies
+/vendor/
+/api/vendor/
+/packages/*/vendor/
 vendor/
 node_modules/
-/packages/*/vendor/
 
 # Build outputs
 /frontend/dist/
@@ -38,6 +40,8 @@ Thumbs.db
 # Testing
 /coverage/
 .phpunit.result.cache
+/frontend/playwright-report/
+/frontend/test-results/
 
 # Build artifacts
 tsconfig.tsbuildinfo
