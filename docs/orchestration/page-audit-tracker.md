@@ -15,11 +15,11 @@
 | P3-3 | `audit/p3-3-season-expected-vs-actual` | `.worktrees/p3-3-season-expected-vs-actual` | done | done | done | done | PR-ready (`0dc8ce2`) |
 | P3-4 | `audit/p3-4-transfer-quality-scorecard` | `.worktrees/p3-4-transfer-quality-scorecard` | done | done | done | done | PR-ready (`12c4cf3`) |
 | P4-1 | `audit/p4-1-solver-objective-modes` | `.worktrees/p4-1-solver-objective-modes` | done | done | done | done | PR-ready (`b1dfb61`) |
-| P4-2 | `audit/p4-2-planner-constraints-layer` | `.worktrees/p4-2-planner-constraints-layer` | pending | pending | pending | pending | bootstrapped |
+| P4-2 | `audit/p4-2-planner-constraints-layer` | `.worktrees/p4-2-planner-constraints-layer` | done | done | done | done | PR-ready (`dceae7b`) |
 | P4-3 | `audit/p4-3-per-gw-rationale-panel` | `.worktrees/p4-3-per-gw-rationale-panel` | pending | pending | pending | pending | bootstrapped |
 | P4-4 | `audit/p4-4-ab-plan-comparison` | `.worktrees/p4-4-ab-plan-comparison` | pending | pending | pending | pending | bootstrapped |
 
 ## Current Focus
 
-- Active issue: `P4-2`
+- Active issue: `P4-3`
 - Execution order: from `docs/page-audit-fixes-plan.md` suggested order.
