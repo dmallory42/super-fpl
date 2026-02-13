@@ -19,8 +19,7 @@ Fantasy Premier League analytics app with:
 ## Quick Start
 
 ```bash
-npm install
-cd api && composer install && cd ..
+npm run setup
 npm run up:build
 ```
 
