@@ -417,6 +417,158 @@ test.describe('Planner Page', () => {
     await expect(gw28Rationale).toContainText('Hit cost: -0.0')
   })
 
+  test('compares two plans with gw deltas, transfer/chip differences, and cumulative delta', async ({
+    page,
+  }) => {
+    await page.route('**/api/planner/optimize**', async (route) => {
+      const url = new URL(route.request().url())
+      const skipSolve = url.searchParams.get('skip_solve') === '1'
+
+      const base = {
+        current_gameweek: 27,
+        planning_horizon: [27, 28],
+        current_squad: {
+          player_ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+          bank: 1.5,
+          squad_value: 102.4,
+          free_transfers: 1,
+          api_free_transfers: 1,
+          predicted_points: { 27: 58, 28: 56, total: 114 },
+        },
+        recommendations: [],
+        chip_suggestions_ranked: {},
+        chip_mode: 'locked',
+        objective_mode: 'expected',
+        requested_chip_plan: [],
+        resolved_chip_plan: [],
+        chip_plan: [],
+        comparisons: null,
+      }
+
+      if (skipSolve) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ...base, paths: [] }),
+        })
+        return
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...base,
+          paths: [
+            {
+              id: 1,
+              total_score: 119,
+              score_vs_hold: 4,
+              total_hits: 0,
+              transfers_by_gw: {
+                27: {
+                  action: 'transfer',
+                  ft_available: 1,
+                  ft_after: 1,
+                  chip_played: null,
+                  moves: [
+                    {
+                      out_id: 8,
+                      out_name: 'Saka',
+                      out_team: 1,
+                      out_price: 10,
+                      in_id: 16,
+                      in_name: 'SafeMid',
+                      in_team: 2,
+                      in_price: 10,
+                      gain: 2.5,
+                      is_free: true,
+                    },
+                  ],
+                  hit_cost: 0,
+                  gw_score: 62,
+                  squad_ids: [1, 2, 3],
+                  bank: 1.5,
+                },
+                28: {
+                  action: 'bank',
+                  ft_available: 1,
+                  ft_after: 2,
+                  chip_played: null,
+                  moves: [],
+                  hit_cost: 0,
+                  gw_score: 57,
+                  squad_ids: [1, 2, 3],
+                  bank: 1.5,
+                },
+              },
+            },
+            {
+              id: 2,
+              total_score: 117,
+              score_vs_hold: 2,
+              total_hits: 0,
+              transfers_by_gw: {
+                27: {
+                  action: 'transfer',
+                  ft_available: 1,
+                  ft_after: 1,
+                  chip_played: null,
+                  moves: [
+                    {
+                      out_id: 9,
+                      out_name: 'Foden',
+                      out_team: 3,
+                      out_price: 9,
+                      in_id: 17,
+                      in_name: 'AltMid',
+                      in_team: 4,
+                      in_price: 9,
+                      gain: 1.5,
+                      is_free: true,
+                    },
+                  ],
+                  hit_cost: 0,
+                  gw_score: 59,
+                  squad_ids: [1, 2, 3],
+                  bank: 1.5,
+                },
+                28: {
+                  action: 'transfer',
+                  ft_available: 1,
+                  ft_after: 1,
+                  chip_played: 'bench_boost',
+                  moves: [],
+                  hit_cost: 0,
+                  gw_score: 58,
+                  squad_ids: [1, 2, 3],
+                  bank: 1.5,
+                },
+              },
+            },
+          ],
+        }),
+      })
+    })
+
+    await page.goto('/')
+    await page.click('text=Planner')
+    await page.fill('input[placeholder="Enter FPL ID"]', '8028')
+    await page.click('button:has-text("Load")')
+    await page.click('button:has-text("Find Plans")')
+
+    await expect(page.getByTestId('plan-comparison-panel')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByTestId('comparison-row-gw-27')).toContainText('Delta +3.0')
+    await expect(page.getByTestId('comparison-row-gw-28')).toContainText('Delta -1.0')
+    await expect(page.getByTestId('comparison-row-gw-27')).toContainText(
+      'Transfers: A Saka -> SafeMid | B Foden -> AltMid'
+    )
+    await expect(page.getByTestId('comparison-row-gw-28')).toContainText('Chips: A - | B BB')
+    await expect(page.getByTestId('comparison-cumulative-delta')).toContainText(
+      'Final cumulative delta: +2.0'
+    )
+  })
+
   test('sends constraints and shows infeasible-constraint message', async ({ page }) => {
     let sawConstraints = false
 
