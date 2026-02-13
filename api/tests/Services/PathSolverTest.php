@@ -293,6 +293,50 @@ class PathSolverTest extends TestCase
         $this->assertSame(202, $ceilingMove);
     }
 
+    public function testConstraintsPreventAvoidPlayersAndHitViolations(): void
+    {
+        $gameweeks = [30];
+        [$squadIds, $predictions, $playerMap] = $this->makeSquad($gameweeks, 4.0);
+
+        $predictions[25][30] = 1.0;
+        $this->addCandidates($predictions, $playerMap, [
+            [
+                'id' => 301,
+                'position' => 3,
+                'team' => 18,
+                'cost' => 50,
+                'name' => 'AvoidMid',
+                'predictions' => [30 => 9.0],
+            ],
+            [
+                'id' => 302,
+                'position' => 3,
+                'team' => 19,
+                'cost' => 50,
+                'name' => 'AllowedMid',
+                'predictions' => [30 => 8.0],
+            ],
+        ]);
+
+        $solver = new PathSolver(
+            ftValue: 0.0,
+            depth: 'quick',
+            objectiveMode: 'expected',
+            constraints: [
+                'avoid_ids' => [301],
+                'max_hits' => 0,
+            ]
+        );
+
+        $paths = $solver->solve($squadIds, $predictions, $gameweeks, $playerMap, 5.0, 1);
+        $this->assertNotEmpty($paths);
+        $bestMoves = $paths[0]['transfers_by_gw'][30]['moves'] ?? [];
+        foreach ($bestMoves as $move) {
+            $this->assertNotSame(301, $move['in_id']);
+        }
+        $this->assertLessThanOrEqual(0, $paths[0]['total_hits']);
+    }
+
     // -------------------------------------------------------------------------
     // Test 4: High FT value discourages hits
     // -------------------------------------------------------------------------

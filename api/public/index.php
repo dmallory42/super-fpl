@@ -1142,6 +1142,14 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
     $skipSolve = isset($_GET['skip_solve']) && $_GET['skip_solve'] === '1';
     $chipCompare = isset($_GET['chip_compare']) && $_GET['chip_compare'] === '1';
 
+    $constraints = [];
+    if (isset($_GET['constraints'])) {
+        $decoded = json_decode($_GET['constraints'], true);
+        if (is_array($decoded)) {
+            $constraints = $decoded;
+        }
+    }
+
     if ($managerId === null) {
         http_response_code(400);
         echo json_encode(['error' => 'Missing manager parameter']);
@@ -1173,8 +1181,14 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
             $chipForbid,
             $chipCompare,
             $objectiveMode,
+            $constraints,
         );
         echo json_encode($plan);
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(400);
+        echo json_encode([
+            'error' => $e->getMessage(),
+        ]);
     } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode([

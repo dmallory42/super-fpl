@@ -6,6 +6,7 @@ import {
   type ChipMode,
   type FixedTransfer,
   type PlannerObjectiveMode,
+  type PlannerConstraints,
   type SolverDepth,
   type XMinsOverrides,
 } from '../api/client'
@@ -21,6 +22,7 @@ export function usePlannerOptimize(
   skipSolve: boolean = false,
   chipMode: ChipMode = 'locked',
   objectiveMode: PlannerObjectiveMode = 'expected',
+  constraints: PlannerConstraints = {},
   chipCompare: boolean = false
 ) {
   return useQuery<PlannerOptimizeResponse>({
@@ -36,6 +38,7 @@ export function usePlannerOptimize(
       skipSolve,
       chipMode,
       objectiveMode,
+      JSON.stringify(constraints),
       chipCompare,
     ],
     queryFn: () =>
@@ -50,6 +53,7 @@ export function usePlannerOptimize(
         skipSolve,
         chipMode,
         objectiveMode,
+        constraints,
         [],
         {},
         chipCompare
