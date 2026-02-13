@@ -293,16 +293,16 @@ export function FixtureScores({
                         </span>
                       </>
                     )}
-                    {isLive && (
+                    {isLive ? (
                       <span className="text-xs text-fpl-green font-mono ml-1 animate-pulse font-medium">
                         {fixture.minutes}'
                       </span>
-                    )}
-                    {isFinished && (
+                    ) : null}
+                    {isFinished ? (
                       <span className="text-xs text-foreground-dim font-display uppercase ml-1 tracking-wide">
                         FT
                       </span>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Away team */}
