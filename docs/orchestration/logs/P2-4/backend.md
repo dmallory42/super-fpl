@@ -1,4 +1,5 @@
 # P2-4 Backend Agent Log
 
-- Status: in_progress
+- Status: done
 - Notes:
+- No backend changes required in this test-expansion issue.
