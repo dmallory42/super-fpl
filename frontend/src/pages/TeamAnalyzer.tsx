@@ -1,6 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
-import { useManager, useManagerPicks, useManagerHistory, useManagerSeasonAnalysis } from '../hooks/useManager'
+import {
+  useManager,
+  useManagerPicks,
+  useManagerHistory,
+  useManagerSeasonAnalysis,
+} from '../hooks/useManager'
 import { useLeagueSeasonAnalysis } from '../hooks/useLeagueAnalysis'
 import { ManagerSearch } from '../components/team-analyzer/ManagerSearch'
 import { SquadPitch } from '../components/team-analyzer/SquadPitch'
@@ -13,8 +18,42 @@ import { EmptyState, TrophyIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonPitch, SkeletonCard } from '../components/ui/SkeletonLoader'
 import { GradientText } from '../components/ui/GradientText'
 
+function getInitialManagerId(): number | null {
+  const params = new URLSearchParams(window.location.search)
+  const urlManager = params.get('manager')
+  if (urlManager) {
+    const id = parseInt(urlManager, 10)
+    if (!Number.isNaN(id) && id > 0) {
+      return id
+    }
+  }
+
+  const savedId = localStorage.getItem('fpl_manager_id')
+  if (savedId) {
+    const id = parseInt(savedId, 10)
+    if (!Number.isNaN(id) && id > 0) {
+      return id
+    }
+  }
+
+  return null
+}
+
+function updateUrlManagerId(managerId: number | null) {
+  const params = new URLSearchParams(window.location.search)
+  if (managerId) {
+    params.set('manager', String(managerId))
+  } else {
+    params.delete('manager')
+  }
+
+  const query = params.toString()
+  const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname
+  window.history.replaceState({}, '', newUrl)
+}
+
 export function TeamAnalyzer() {
-  const [managerId, setManagerId] = useState<number | null>(null)
+  const [managerId, setManagerId] = useState<number | null>(() => getInitialManagerId())
   const { data: playersData, isLoading: playersLoading } = usePlayers()
   const { data: manager, isLoading: managerLoading, error: managerError } = useManager(managerId)
   const {
@@ -54,7 +93,15 @@ export function TeamAnalyzer() {
 
   const handleSearch = (id: number) => {
     setManagerId(id)
+    localStorage.setItem('fpl_manager_id', String(id))
+    updateUrlManagerId(id)
   }
+
+  useEffect(() => {
+    if (managerId !== null && !new URLSearchParams(window.location.search).get('manager')) {
+      updateUrlManagerId(managerId)
+    }
+  }, [managerId])
 
   const leagueMedianByGw = useMemo(() => {
     if (!leagueSeasonData?.benchmarks) return undefined

@@ -90,10 +90,10 @@ try {
         preg_match('#^/teams/(\d+)/penalty-takers$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetTeamPenaltyTakers($db, (int) $m[1]),
         $uri === '/penalty-takers' && $_SERVER['REQUEST_METHOD'] === 'GET' => handleGetPenaltyTakers($db),
         preg_match('#^/players/(\d+)$#', $uri, $m) === 1 => handlePlayer($db, (int) $m[1]),
-        preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, (int) $m[1]),
-        preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, (int) $m[1], (int) $m[2]),
-        preg_match('#^/managers/(\d+)/history$#', $uri, $m) === 1 => handleManagerHistory($db, $fplClient, (int) $m[1]),
-        preg_match('#^/managers/(\d+)/season-analysis$#', $uri, $m) === 1 => handleManagerSeasonAnalysis($db, $fplClient, (int) $m[1]),
+        preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, $config, (int) $m[1]),
+        preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
+        preg_match('#^/managers/(\d+)/history$#', $uri, $m) === 1 => handleManagerHistory($db, $fplClient, $config, (int) $m[1]),
+        preg_match('#^/managers/(\d+)/season-analysis$#', $uri, $m) === 1 => handleManagerSeasonAnalysis($db, $fplClient, $config, (int) $m[1]),
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
         preg_match('#^/predictions/(\d+)/accuracy$#', $uri, $m) === 1 => handlePredictionAccuracy($db, (int) $m[1]),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1], $config),
@@ -422,60 +422,68 @@ function handleSyncSeasonHistory(Database $db, FplClient $fplClient): void
     ]);
 }
 
-function handleManager(Database $db, FplClient $fplClient, int $id): void
+function handleManager(Database $db, FplClient $fplClient, array $config, int $id): void
 {
-    $service = new ManagerService($db, $fplClient);
-    $manager = $service->getById($id);
+    withResponseCache($config, 'manager', 120, function () use ($db, $fplClient, $id): void {
+        $service = new ManagerService($db, $fplClient);
+        $manager = $service->getById($id);
 
-    if ($manager === null) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Manager not found']);
-        return;
-    }
+        if ($manager === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Manager not found']);
+            return;
+        }
 
-    echo json_encode($manager);
+        echo json_encode($manager);
+    });
 }
 
-function handleManagerPicks(Database $db, FplClient $fplClient, int $managerId, int $gameweek): void
+function handleManagerPicks(Database $db, FplClient $fplClient, array $config, int $managerId, int $gameweek): void
 {
-    $service = new ManagerService($db, $fplClient);
-    $picks = $service->getPicks($managerId, $gameweek);
+    withResponseCache($config, 'manager-picks', 120, function () use ($db, $fplClient, $managerId, $gameweek): void {
+        $service = new ManagerService($db, $fplClient);
+        $picks = $service->getPicks($managerId, $gameweek);
 
-    if ($picks === null) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Picks not found']);
-        return;
-    }
+        if ($picks === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Picks not found']);
+            return;
+        }
 
-    echo json_encode($picks);
+        echo json_encode($picks);
+    });
 }
 
-function handleManagerHistory(Database $db, FplClient $fplClient, int $managerId): void
+function handleManagerHistory(Database $db, FplClient $fplClient, array $config, int $managerId): void
 {
-    $service = new ManagerService($db, $fplClient);
-    $history = $service->getHistory($managerId);
+    withResponseCache($config, 'manager-history', 120, function () use ($db, $fplClient, $managerId): void {
+        $service = new ManagerService($db, $fplClient);
+        $history = $service->getHistory($managerId);
 
-    if ($history === null) {
-        http_response_code(404);
-        echo json_encode(['error' => 'History not found']);
-        return;
-    }
+        if ($history === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'History not found']);
+            return;
+        }
 
-    echo json_encode($history);
+        echo json_encode($history);
+    });
 }
 
-function handleManagerSeasonAnalysis(Database $db, FplClient $fplClient, int $managerId): void
+function handleManagerSeasonAnalysis(Database $db, FplClient $fplClient, array $config, int $managerId): void
 {
-    $service = new ManagerSeasonAnalysisService($db, $fplClient);
-    $analysis = $service->analyze($managerId);
+    withResponseCache($config, 'manager-season-analysis', 120, function () use ($db, $fplClient, $managerId): void {
+        $service = new ManagerSeasonAnalysisService($db, $fplClient);
+        $analysis = $service->analyze($managerId);
 
-    if ($analysis === null) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Season analysis not found']);
-        return;
-    }
+        if ($analysis === null) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Season analysis not found']);
+            return;
+        }
 
-    echo json_encode($analysis);
+        echo json_encode($analysis);
+    });
 }
 
 function handleSyncManagers(Database $db, FplClient $fplClient): void

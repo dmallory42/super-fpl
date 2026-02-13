@@ -234,12 +234,41 @@ class ManagerSeasonAnalysisService
         try {
             $picksData = $this->fplClient->entry($managerId)->picks($gw);
             if (isset($picksData['picks']) && is_array($picksData['picks'])) {
+                $this->cacheManagerPicks($managerId, $gw, $picksData['picks']);
                 return $picksData['picks'];
             }
         } catch (\Throwable) {
         }
 
         return [];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $picks
+     */
+    private function cacheManagerPicks(int $managerId, int $gw, array $picks): void
+    {
+        $this->db->query(
+            'DELETE FROM manager_picks WHERE manager_id = ? AND gameweek = ?',
+            [$managerId, $gw]
+        );
+
+        foreach ($picks as $pick) {
+            $playerId = (int) ($pick['element'] ?? 0);
+            if ($playerId <= 0) {
+                continue;
+            }
+
+            $this->db->insert('manager_picks', [
+                'manager_id' => $managerId,
+                'gameweek' => $gw,
+                'player_id' => $playerId,
+                'position' => (int) ($pick['position'] ?? 0),
+                'multiplier' => (int) ($pick['multiplier'] ?? 0),
+                'is_captain' => !empty($pick['is_captain']) ? 1 : 0,
+                'is_vice_captain' => !empty($pick['is_vice_captain']) ? 1 : 0,
+            ]);
+        }
     }
 
     private function getPredictedPoints(int $playerId, int $gw): float
@@ -254,10 +283,41 @@ class ManagerSeasonAnalysisService
         );
 
         if ($row === null) {
-            $row = $this->db->fetchOne(
-                'SELECT predicted_points FROM player_predictions WHERE player_id = ? AND gameweek = ?',
+            $fallback = $this->db->fetchOne(
+                'SELECT
+                    predicted_points,
+                    predicted_if_fit,
+                    expected_mins,
+                    expected_mins_if_fit
+                 FROM player_predictions
+                 WHERE player_id = ? AND gameweek = ?',
                 [$playerId, $gw]
             );
+
+            $value = (float) ($fallback['predicted_points'] ?? 0);
+            $predictedIfFit = isset($fallback['predicted_if_fit']) ? (float) $fallback['predicted_if_fit'] : null;
+            $expectedMins = isset($fallback['expected_mins']) ? (float) $fallback['expected_mins'] : null;
+            $expectedMinsIfFit = isset($fallback['expected_mins_if_fit']) ? (float) $fallback['expected_mins_if_fit'] : null;
+
+            // Historical fallback: if a player is effectively hard-zeroed by current availability
+            // (but has meaningful if-fit projection), use if-fit to avoid post-hoc injury distortion.
+            if (
+                $predictedIfFit !== null
+                && (
+                    $value <= 0.05
+                    || (
+                        $expectedMins !== null
+                        && $expectedMinsIfFit !== null
+                        && $expectedMins < 15.0
+                        && $expectedMinsIfFit >= 45.0
+                    )
+                )
+            ) {
+                $value = $predictedIfFit;
+            }
+
+            $this->expectedPointCache[$gw][$playerId] = $value;
+            return $value;
         }
 
         $value = (float) ($row['predicted_points'] ?? 0);

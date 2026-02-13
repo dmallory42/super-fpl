@@ -286,4 +286,13 @@ test.describe('Season Review', () => {
     await expect(rows.nth(0)).toContainText('2')
     await expect(rows.nth(1)).toContainText('3')
   })
+
+  test('loads manager automatically from URL manager param', async ({ page }) => {
+    await page.goto('/?tab=season-review&manager=12345')
+
+    await page.waitForSelector('text=Season Insights', { timeout: 10000 })
+    await expect(page.locator('h3:has-text("Test FC")')).toBeVisible()
+    await expect(page.locator('text=Rank:')).toBeVisible()
+    await expect(page).toHaveURL(/manager=12345/)
+  })
 })
