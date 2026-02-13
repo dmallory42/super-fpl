@@ -25,6 +25,12 @@ class TransferOptimizerService
     private const OBJECTIVE_EXPECTED = 'expected';
     private const OBJECTIVE_FLOOR = 'floor';
     private const OBJECTIVE_CEILING = 'ceiling';
+    private const CONSTRAINT_CHIP_KEYS = [
+        self::CHIP_WILDCARD,
+        self::CHIP_BENCH_BOOST,
+        self::CHIP_FREE_HIT,
+        self::CHIP_TRIPLE_CAPTAIN,
+    ];
 
     public function __construct(
         private Database $db,
@@ -56,6 +62,7 @@ class TransferOptimizerService
         array $chipForbid = [],
         bool $chipCompare = false,
         string $objectiveMode = self::OBJECTIVE_EXPECTED,
+        array $constraints = [],
     ): array {
         $context = $this->buildPlanningContext($managerId, $freeTransfers);
         $planFromGw = $context['plan_from_gw'];
@@ -70,9 +77,16 @@ class TransferOptimizerService
         $solverPredictions = $context['solver_predictions'];
         $dgwTeams = $context['dgw_teams'];
         $objectiveMode = $this->normalizeObjectiveMode($objectiveMode);
+        $normalizedConstraints = $this->normalizeConstraints($constraints, $upcomingGws);
 
         $chipMode = $this->normalizeChipMode($chipMode);
         $requestedChipPlan = $this->normalizeChipPlan($chipPlan, $upcomingGws);
+        $chipForbid = $this->mergeChipWindowsIntoForbid(
+            $chipForbid,
+            $normalizedConstraints['chip_windows'],
+            $upcomingGws
+        );
+        $this->assertChipPlanWithinWindows($requestedChipPlan, $normalizedConstraints['chip_windows']);
         $chipInsights = $this->buildChipInsights(
             $currentSquad,
             $predictions,
@@ -115,7 +129,12 @@ class TransferOptimizerService
         // Run beam search path solver (skip when only squad data is needed)
         $paths = [];
         if (!$skipSolve) {
-            $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth, objectiveMode: $objectiveMode);
+            $pathSolver = new PathSolver(
+                ftValue: $ftValue,
+                depth: $depth,
+                objectiveMode: $objectiveMode,
+                constraints: $normalizedConstraints
+            );
             $paths = $pathSolver->solve(
                 $currentSquad,
                 $solverPredictions,
@@ -135,7 +154,12 @@ class TransferOptimizerService
             if (empty($resolvedChipPlan)) {
                 $noChipPaths = $paths;
             } else {
-                $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth, objectiveMode: $objectiveMode);
+                $pathSolver = new PathSolver(
+                    ftValue: $ftValue,
+                    depth: $depth,
+                    objectiveMode: $objectiveMode,
+                    constraints: $normalizedConstraints
+                );
                 $noChipPaths = $pathSolver->solve(
                     $currentSquad,
                     $solverPredictions,
@@ -159,6 +183,12 @@ class TransferOptimizerService
             ];
         }
 
+        if (!$skipSolve && empty($paths)) {
+            throw new \InvalidArgumentException(
+                'Infeasible constraints: no valid plans satisfy the active lock/avoid/hit/chip-window rules.'
+            );
+        }
+
         return [
             'current_gameweek' => $planFromGw,
             'planning_horizon' => $upcomingGws,
@@ -177,6 +207,7 @@ class TransferOptimizerService
             'chip_suggestions_ranked' => $chipInsights['suggestions'],
             'chip_mode' => $chipMode,
             'objective_mode' => $objectiveMode,
+            'constraints' => $normalizedConstraints,
             'requested_chip_plan' => $requestedChipPlan,
             'resolved_chip_plan' => $resolvedChipPlan,
             'chip_plan' => $resolvedChipPlan,
@@ -307,6 +338,92 @@ class TransferOptimizerService
             self::OBJECTIVE_CEILING => self::OBJECTIVE_CEILING,
             default => self::OBJECTIVE_EXPECTED,
         };
+    }
+
+    private function normalizeConstraints(array $constraints, array $planningHorizon): array
+    {
+        $lockIds = array_values(array_unique(array_filter(array_map(
+            static fn($id): int => (int) $id,
+            is_array($constraints['lock_ids'] ?? null) ? $constraints['lock_ids'] : []
+        ), static fn(int $id): bool => $id > 0)));
+
+        $avoidIds = array_values(array_unique(array_filter(array_map(
+            static fn($id): int => (int) $id,
+            is_array($constraints['avoid_ids'] ?? null) ? $constraints['avoid_ids'] : []
+        ), static fn(int $id): bool => $id > 0)));
+
+        $overlap = array_values(array_intersect($lockIds, $avoidIds));
+        if (!empty($overlap)) {
+            throw new \InvalidArgumentException(
+                'Invalid constraints: lock and avoid lists overlap on player IDs: ' . implode(', ', $overlap)
+            );
+        }
+
+        $maxHits = $constraints['max_hits'] ?? null;
+        $normalizedMaxHits = is_numeric($maxHits) ? max(0, (int) $maxHits) : null;
+
+        $allowedGwSet = array_flip($planningHorizon);
+        $chipWindowsRaw = is_array($constraints['chip_windows'] ?? null) ? $constraints['chip_windows'] : [];
+        $chipWindows = [];
+        foreach (self::CONSTRAINT_CHIP_KEYS as $chip) {
+            $weeks = $chipWindowsRaw[$chip] ?? [];
+            if (!is_array($weeks)) {
+                continue;
+            }
+            $validWeeks = [];
+            foreach ($weeks as $gw) {
+                $gw = (int) $gw;
+                if (isset($allowedGwSet[$gw])) {
+                    $validWeeks[] = $gw;
+                }
+            }
+            if (!empty($validWeeks)) {
+                $chipWindows[$chip] = array_values(array_unique($validWeeks));
+            }
+        }
+
+        return [
+            'lock_ids' => $lockIds,
+            'avoid_ids' => $avoidIds,
+            'max_hits' => $normalizedMaxHits,
+            'chip_windows' => $chipWindows,
+        ];
+    }
+
+    private function mergeChipWindowsIntoForbid(array $chipForbid, array $chipWindows, array $planningHorizon): array
+    {
+        $forbid = $chipForbid;
+        foreach ($chipWindows as $chip => $allowedWeeks) {
+            $allowed = array_flip($allowedWeeks);
+            foreach ($planningHorizon as $gw) {
+                if (!isset($allowed[$gw])) {
+                    $forbid[$chip][] = $gw;
+                }
+            }
+            if (isset($forbid[$chip]) && is_array($forbid[$chip])) {
+                $forbid[$chip] = array_values(array_unique(array_map('intval', $forbid[$chip])));
+            }
+        }
+
+        return $forbid;
+    }
+
+    private function assertChipPlanWithinWindows(array $chipPlan, array $chipWindows): void
+    {
+        foreach ($chipPlan as $chip => $gw) {
+            if (!isset($chipWindows[$chip])) {
+                continue;
+            }
+            if (!in_array((int) $gw, $chipWindows[$chip], true)) {
+                throw new \InvalidArgumentException(
+                    sprintf(
+                        'Invalid constraints: %s is fixed to GW%d which is outside its allowed chip window.',
+                        $chip,
+                        (int) $gw
+                    )
+                );
+            }
+        }
     }
 
     private function normalizeChipMode(string $chipMode): string

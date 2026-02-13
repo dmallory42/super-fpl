@@ -7,6 +7,7 @@ import type {
   ChipMode,
   PlayerMultiWeekPrediction,
   FixedTransfer,
+  PlannerConstraints,
   PlannerObjectiveMode,
   SolverDepth,
   XMinsOverrides,
@@ -54,6 +55,13 @@ interface SavedPlan {
   scoreVsHold: number
 }
 
+interface ConstraintInputState {
+  lockIds: string
+  avoidIds: string
+  maxHits: string
+  chipWindows: Record<keyof ChipPlan, string>
+}
+
 function getInitialManagerId(): { id: number | null; input: string } {
   const params = new URLSearchParams(window.location.search)
   const urlManager = params.get('manager')
@@ -73,6 +81,51 @@ function getInitialManagerId(): { id: number | null; input: string } {
   return { id: null, input: '' }
 }
 
+function getInitialConstraintInputs(): ConstraintInputState {
+  const empty: ConstraintInputState = {
+    lockIds: '',
+    avoidIds: '',
+    maxHits: '',
+    chipWindows: {
+      wildcard: '',
+      free_hit: '',
+      bench_boost: '',
+      triple_captain: '',
+    },
+  }
+
+  const parseConstraints = (raw: string | null): PlannerConstraints | null => {
+    if (!raw) return null
+    try {
+      return JSON.parse(raw) as PlannerConstraints
+    } catch {
+      return null
+    }
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  const fromUrl = parseConstraints(params.get('constraints'))
+  const fromStorage = parseConstraints(localStorage.getItem('fpl_planner_constraints'))
+  const source = fromUrl ?? fromStorage
+  if (!source) {
+    return empty
+  }
+
+  const chipWindows = { ...empty.chipWindows }
+  for (const chip of Object.keys(chipWindows) as (keyof ChipPlan)[]) {
+    const weeks = source.chip_windows?.[chip]
+    chipWindows[chip] = Array.isArray(weeks) ? weeks.join(',') : ''
+  }
+
+  return {
+    lockIds: Array.isArray(source.lock_ids) ? source.lock_ids.join(',') : '',
+    avoidIds: Array.isArray(source.avoid_ids) ? source.avoid_ids.join(',') : '',
+    maxHits:
+      source.max_hits === null || source.max_hits === undefined ? '' : String(source.max_hits),
+    chipWindows,
+  }
+}
+
 export function Planner() {
   const initial = getInitialManagerId()
   const [managerId, setManagerId] = useState<number | null>(initial.id)
@@ -89,6 +142,11 @@ export function Planner() {
   const [ftValue, setFtValue] = useState(1.5)
   const [solverDepth, setSolverDepth] = useState<SolverDepth>('standard')
   const [objectiveMode, setObjectiveMode] = useState<PlannerObjectiveMode>('expected')
+  const initialConstraintInputs = getInitialConstraintInputs()
+  const [lockIdsInput, setLockIdsInput] = useState(initialConstraintInputs.lockIds)
+  const [avoidIdsInput, setAvoidIdsInput] = useState(initialConstraintInputs.avoidIds)
+  const [maxHitsInput, setMaxHitsInput] = useState(initialConstraintInputs.maxHits)
+  const [chipWindowInputs, setChipWindowInputs] = useState(initialConstraintInputs.chipWindows)
 
   // User transfers (replaces old fixedTransfers concept)
   const [userTransfers, setUserTransfers] = useState<FixedTransfer[]>([])
@@ -102,6 +160,7 @@ export function Planner() {
   const [solveFtValue, setSolveFtValue] = useState(1.5)
   const [solveDepth, setSolveDepth] = useState<SolverDepth>('standard')
   const [solveObjectiveMode, setSolveObjectiveMode] = useState<PlannerObjectiveMode>('expected')
+  const [solveConstraints, setSolveConstraints] = useState<PlannerConstraints>({})
   const [showSolveLoader, setShowSolveLoader] = useState(false)
 
   // Player detail sidebar state
@@ -135,6 +194,74 @@ export function Planner() {
     }
   }, [xMinsOverrides])
 
+  const parsedConstraints = useMemo(() => {
+    const parseIdList = (raw: string): number[] => {
+      const trimmed = raw.trim()
+      if (!trimmed) return []
+      return Array.from(
+        new Set(
+          trimmed
+            .split(',')
+            .map((part) => parseInt(part.trim(), 10))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        )
+      )
+    }
+
+    const parseGwList = (raw: string): number[] => {
+      const trimmed = raw.trim()
+      if (!trimmed) return []
+      return Array.from(
+        new Set(
+          trimmed
+            .split(',')
+            .map((part) => parseInt(part.trim(), 10))
+            .filter((gw) => Number.isFinite(gw) && gw > 0 && gw <= 38)
+        )
+      )
+    }
+
+    const lockIds = parseIdList(lockIdsInput)
+    const avoidIds = parseIdList(avoidIdsInput)
+    const overlap = lockIds.filter((id) => avoidIds.includes(id))
+
+    const parsedMaxHits = maxHitsInput.trim() === '' ? null : Number(maxHitsInput.trim())
+    const normalizedMaxHits =
+      maxHitsInput.trim() === ''
+        ? null
+        : parsedMaxHits !== null && Number.isInteger(parsedMaxHits) && parsedMaxHits >= 0
+          ? parsedMaxHits
+          : null
+
+    const chipWindows: PlannerConstraints['chip_windows'] = {}
+    for (const chip of Object.keys(chipWindowInputs) as (keyof ChipPlan)[]) {
+      const weeks = parseGwList(chipWindowInputs[chip])
+      if (weeks.length > 0) {
+        chipWindows[chip] = weeks
+      }
+    }
+
+    const errors: string[] = []
+    if (overlap.length > 0) {
+      errors.push(`Lock and avoid overlap on IDs: ${overlap.join(', ')}`)
+    }
+    if (maxHitsInput.trim() !== '' && normalizedMaxHits === null) {
+      errors.push('Max hits must be a non-negative integer')
+    }
+
+    const constraints: PlannerConstraints = {}
+    if (lockIds.length > 0) constraints.lock_ids = lockIds
+    if (avoidIds.length > 0) constraints.avoid_ids = avoidIds
+    if (normalizedMaxHits !== null) constraints.max_hits = normalizedMaxHits
+    if (Object.keys(chipWindows).length > 0) constraints.chip_windows = chipWindows
+
+    return {
+      constraints,
+      errors,
+      hasErrors: errors.length > 0,
+    }
+  }, [lockIdsInput, avoidIdsInput, maxHitsInput, chipWindowInputs])
+
   const { data: playersData } = usePlayers()
 
   // Squad query — always active, skips solver
@@ -153,11 +280,16 @@ export function Planner() {
     true, // skipSolve
     chipMode,
     objectiveMode,
+    parsedConstraints.constraints,
     false
   )
 
   // Solve query — only when requested
-  const { data: solveData, isFetching: isFetchingSolve } = usePlannerOptimize(
+  const {
+    data: solveData,
+    isFetching: isFetchingSolve,
+    error: solveError,
+  } = usePlannerOptimize(
     solveRequested ? managerId : null, // null disables the query
     freeTransfers,
     solveChipPlan,
@@ -168,6 +300,7 @@ export function Planner() {
     false, // run solver
     solveChipMode,
     solveObjectiveMode,
+    solveConstraints,
     solveChipCompare
   )
 
@@ -180,7 +313,8 @@ export function Planner() {
       chipCompare !== solveChipCompare ||
       ftValue !== solveFtValue ||
       solverDepth !== solveDepth ||
-      objectiveMode !== solveObjectiveMode)
+      objectiveMode !== solveObjectiveMode ||
+      JSON.stringify(parsedConstraints.constraints) !== JSON.stringify(solveConstraints))
 
   const isSolveActive = showSolveLoader || isFetchingSolve
 
@@ -406,15 +540,27 @@ export function Planner() {
     replacementSearch,
   ])
 
-  // Persist manager ID to URL and localStorage
+  // Persist manager ID + constraints to URL and localStorage
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
     if (managerId) {
       localStorage.setItem('fpl_manager_id', String(managerId))
-      const params = new URLSearchParams(window.location.search)
       params.set('manager', String(managerId))
-      window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
+    } else {
+      params.delete('manager')
     }
-  }, [managerId])
+
+    if (!parsedConstraints.hasErrors && Object.keys(parsedConstraints.constraints).length > 0) {
+      const serialized = JSON.stringify(parsedConstraints.constraints)
+      localStorage.setItem('fpl_planner_constraints', serialized)
+      params.set('constraints', serialized)
+    } else {
+      localStorage.removeItem('fpl_planner_constraints')
+      params.delete('constraints')
+    }
+
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
+  }, [managerId, parsedConstraints])
 
   const handleLoadManager = () => {
     const id = parseInt(managerInput, 10)
@@ -431,6 +577,7 @@ export function Planner() {
       setSolveFtValue(1.5)
       setSolveDepth('standard')
       setSolveObjectiveMode('expected')
+      setSolveConstraints({})
       setFreeTransfers(null)
     }
   }
@@ -505,13 +652,26 @@ export function Planner() {
     setSolveFtValue(1.5)
     setSolveDepth('standard')
     setSolveObjectiveMode('expected')
+    setSolveConstraints({})
     setChipPlan({})
     setChipMode('locked')
     setChipCompare(true)
     setObjectiveMode('expected')
+    setLockIdsInput('')
+    setAvoidIdsInput('')
+    setMaxHitsInput('')
+    setChipWindowInputs({
+      wildcard: '',
+      free_hit: '',
+      bench_boost: '',
+      triple_captain: '',
+    })
   }
 
   const handleFindPlans = () => {
+    if (parsedConstraints.hasErrors) {
+      return
+    }
     setShowSolveLoader(true)
     setSolveTransfers([...userTransfers])
     setSolveChipPlan({ ...chipPlan })
@@ -520,6 +680,7 @@ export function Planner() {
     setSolveFtValue(ftValue)
     setSolveDepth(solverDepth)
     setSolveObjectiveMode(objectiveMode)
+    setSolveConstraints(parsedConstraints.constraints)
     setSolveRequested(true)
     // Minimum display time so the skeleton always appears
     setTimeout(() => setShowSolveLoader(false), 800)
@@ -855,9 +1016,9 @@ export function Planner() {
           </div>
         </div>
 
-        {squadError && (
+        {(squadError || solveError) && (
           <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
-            {squadError.message || 'Failed to load optimization data'}
+            {solveError?.message || squadError?.message || 'Failed to load optimization data'}
           </div>
         )}
 
@@ -921,7 +1082,7 @@ export function Planner() {
                 <div className="flex items-end gap-2 flex-1 min-w-0">
                   <button
                     onClick={handleFindPlans}
-                    disabled={isSolveActive || !managerId}
+                    disabled={isSolveActive || !managerId || parsedConstraints.hasErrors}
                     className={`btn-primary relative ${isStale ? 'ring-2 ring-yellow-400/50' : ''}`}
                   >
                     {isSolveActive ? (
@@ -1081,6 +1242,68 @@ export function Planner() {
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div className="mb-4 p-3 rounded-lg bg-surface-elevated border border-border/60">
+                <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
+                  Constraints
+                </div>
+                <div className="grid md:grid-cols-2 gap-3">
+                  <label className="block text-xs text-foreground-muted">
+                    Lock Player IDs
+                    <input
+                      data-testid="constraints-lock-ids"
+                      value={lockIdsInput}
+                      onChange={(e) => setLockIdsInput(e.target.value)}
+                      placeholder="e.g. 13, 8"
+                      className="input-broadcast mt-1"
+                    />
+                  </label>
+                  <label className="block text-xs text-foreground-muted">
+                    Avoid Player IDs
+                    <input
+                      data-testid="constraints-avoid-ids"
+                      value={avoidIdsInput}
+                      onChange={(e) => setAvoidIdsInput(e.target.value)}
+                      placeholder="e.g. 6, 22"
+                      className="input-broadcast mt-1"
+                    />
+                  </label>
+                  <label className="block text-xs text-foreground-muted">
+                    Max Hits
+                    <input
+                      data-testid="constraints-max-hits"
+                      type="number"
+                      min={0}
+                      value={maxHitsInput}
+                      onChange={(e) => setMaxHitsInput(e.target.value)}
+                      placeholder="No cap"
+                      className="input-broadcast mt-1"
+                    />
+                  </label>
+                  <div className="space-y-1">
+                    <div className="text-xs text-foreground-muted">Chip Windows (comma-separated GWs)</div>
+                    {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
+                      <label key={`window-${chip}`} className="flex items-center gap-2 text-xs text-foreground-muted">
+                        <span className="w-10">{CHIP_SHORT_LABELS[chip]}</span>
+                        <input
+                          data-testid={`constraints-chip-window-${chip}`}
+                          value={chipWindowInputs[chip]}
+                          onChange={(e) =>
+                            setChipWindowInputs((prev) => ({ ...prev, [chip]: e.target.value }))
+                          }
+                          placeholder="27, 30"
+                          className="input-broadcast flex-1 py-1"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {parsedConstraints.hasErrors && (
+                  <div className="mt-2 text-xs text-destructive">
+                    {parsedConstraints.errors.join(' | ')}
+                  </div>
+                )}
               </div>
 
               {/* Loading skeleton */}

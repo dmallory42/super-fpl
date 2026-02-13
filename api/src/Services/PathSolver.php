@@ -28,15 +28,22 @@ class PathSolver
     private int $candidatesPerPos;
     private int $maxTransfersPerGw;
     private string $objectiveMode;
+    /** @var array<int, bool> */
+    private array $lockIds = [];
+    /** @var array<int, bool> */
+    private array $avoidIds = [];
+    private ?int $maxHits = null;
 
     public function __construct(
         private float $ftValue = 1.5,
         private string $depth = 'standard',
         string $objectiveMode = self::OBJECTIVE_EXPECTED,
+        array $constraints = [],
     ) {
         [$this->beamWidth, $this->candidatesPerPos, $this->maxTransfersPerGw] =
             self::DEPTH_PRESETS[$this->depth] ?? self::DEPTH_PRESETS['standard'];
         $this->objectiveMode = $this->normalizeObjectiveMode($objectiveMode);
+        $this->normalizeConstraints($constraints);
     }
 
     /**
@@ -170,6 +177,8 @@ class PathSolver
                     $children[] = $child;
                 }
             }
+
+            $children = array_values(array_filter($children, fn(array $child): bool => $this->passesConstraints($child)));
 
             // Deduplicate by state hash
             $children = $this->deduplicate($children);
@@ -1277,6 +1286,57 @@ class PathSolver
             self::OBJECTIVE_CEILING => self::OBJECTIVE_CEILING,
             default => self::OBJECTIVE_EXPECTED,
         };
+    }
+
+    private function normalizeConstraints(array $constraints): void
+    {
+        $lock = is_array($constraints['lock_ids'] ?? null) ? $constraints['lock_ids'] : [];
+        foreach ($lock as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $this->lockIds[$id] = true;
+            }
+        }
+
+        $avoid = is_array($constraints['avoid_ids'] ?? null) ? $constraints['avoid_ids'] : [];
+        foreach ($avoid as $id) {
+            $id = (int) $id;
+            if ($id > 0) {
+                $this->avoidIds[$id] = true;
+            }
+        }
+
+        $maxHits = $constraints['max_hits'] ?? null;
+        if (is_numeric($maxHits)) {
+            $this->maxHits = max(0, (int) $maxHits);
+        }
+    }
+
+    private function passesConstraints(array $state): bool
+    {
+        if ($this->maxHits !== null && (int) ($state['total_hits'] ?? 0) > $this->maxHits) {
+            return false;
+        }
+
+        $squadIds = $state['squad_ids'] ?? [];
+        $squadSet = [];
+        foreach ($squadIds as $id) {
+            $squadSet[(int) $id] = true;
+        }
+
+        foreach ($this->avoidIds as $id => $_) {
+            if (isset($squadSet[$id])) {
+                return false;
+            }
+        }
+
+        foreach ($this->lockIds as $id => $_) {
+            if (!isset($squadSet[$id])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function getExpectedPoints(array $predictions, int $playerId, int $gameweek): float

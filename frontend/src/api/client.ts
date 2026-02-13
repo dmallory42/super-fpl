@@ -750,6 +750,13 @@ export interface FixedTransfer {
   in: number
 }
 
+export interface PlannerConstraints {
+  lock_ids?: number[]
+  avoid_ids?: number[]
+  max_hits?: number | null
+  chip_windows?: Partial<Record<keyof ChipPlan, number[]>>
+}
+
 export interface PlannerOptimizeResponse {
   current_gameweek: number
   planning_horizon: number[]
@@ -768,6 +775,7 @@ export interface PlannerOptimizeResponse {
   chip_suggestions_ranked?: Record<string, ChipSuggestion[]>
   chip_mode?: ChipMode
   objective_mode?: PlannerObjectiveMode
+  constraints?: PlannerConstraints
   requested_chip_plan?: ChipPlan
   resolved_chip_plan?: ChipPlan
   chip_plan: ChipPlan
@@ -842,6 +850,7 @@ export async function fetchPlannerOptimize(
   skipSolve: boolean = false,
   chipMode: ChipMode = 'locked',
   objectiveMode: PlannerObjectiveMode = 'expected',
+  constraints: PlannerConstraints = {},
   chipAllow: string[] = [],
   chipForbid: Record<string, number[]> = {},
   chipCompare: boolean = false,
@@ -864,6 +873,9 @@ export async function fetchPlannerOptimize(
     params.set('chip_mode', chipMode)
   }
   params.set('objective', objectiveMode)
+  if (Object.keys(constraints).length > 0) {
+    params.set('constraints', JSON.stringify(constraints))
+  }
   if (chipAllow.length > 0) {
     params.set('chip_allow', JSON.stringify(chipAllow))
   }

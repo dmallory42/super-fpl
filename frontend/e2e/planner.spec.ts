@@ -287,4 +287,68 @@ test.describe('Planner Page', () => {
     expect(seenObjectives).toContain('ceiling')
     expect(seenObjectives).not.toContain('missing')
   })
+
+  test('sends constraints and shows infeasible-constraint message', async ({ page }) => {
+    let sawConstraints = false
+
+    await page.route('**/api/planner/optimize**', async (route) => {
+      const url = new URL(route.request().url())
+      const constraintsRaw = url.searchParams.get('constraints')
+      const skipSolve = url.searchParams.get('skip_solve') === '1'
+
+      if (constraintsRaw) {
+        sawConstraints = true
+      }
+
+      if (!skipSolve && constraintsRaw) {
+        await route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error:
+              'Infeasible constraints: no valid plans satisfy the active lock/avoid/hit/chip-window rules.',
+          }),
+        })
+        return
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          current_gameweek: 27,
+          planning_horizon: [27, 28],
+          current_squad: {
+            player_ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            bank: 1.5,
+            squad_value: 102.4,
+            free_transfers: 1,
+            api_free_transfers: 1,
+            predicted_points: { 27: 58, 28: 56, total: 114 },
+          },
+          recommendations: [],
+          chip_suggestions_ranked: {},
+          chip_mode: 'locked',
+          objective_mode: 'expected',
+          constraints: {},
+          requested_chip_plan: [],
+          resolved_chip_plan: [],
+          chip_plan: [],
+          comparisons: null,
+          paths: [],
+        }),
+      })
+    })
+
+    await page.goto('/')
+    await page.click('text=Planner')
+    await page.fill('input[placeholder="Enter FPL ID"]', '8028')
+    await page.click('button:has-text("Load")')
+
+    await page.getByTestId('constraints-lock-ids').fill('999')
+    await page.click('button:has-text("Find Plans")')
+
+    await expect(page.locator('text=Infeasible constraints')).toBeVisible({ timeout: 10000 })
+    expect(sawConstraints).toBe(true)
+  })
 })
