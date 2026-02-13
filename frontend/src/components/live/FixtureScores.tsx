@@ -14,6 +14,8 @@ interface PlayerEvent {
   name: string
   goals: number
   assists: number
+  yellowCards: number
+  redCards: number
   cleanSheet: boolean
   saves: number
   defCon: boolean
@@ -36,6 +38,10 @@ export function FixtureScores({
   playersMap,
   bonusPredictions,
 }: FixtureScoresProps) {
+  const hasLiveClock = (fixture: GameweekFixtureStatus['fixtures'][number]) =>
+    Boolean(fixture.started) && !Boolean(fixture.finished) && (fixture.minutes ?? 0) > 0
+  const fixtureTeamKey = (fixtureId: number, teamId: number) => `${fixtureId}:${teamId}`
+
   const [expandedFixture, setExpandedFixture] = useState<number | null>(null)
   const localTimeZoneShort = useMemo(() => {
     const parts = new Intl.DateTimeFormat(undefined, {
@@ -45,11 +51,43 @@ export function FixtureScores({
     }).formatToParts(new Date())
     return parts.find((part) => part.type === 'timeZoneName')?.value ?? 'local'
   }, [])
+  const kickoffTimeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }),
+    []
+  )
+  const formatKickoffTime = (kickoffTime: string) => {
+    const date = new Date(kickoffTime)
+    if (Number.isNaN(date.getTime())) return '--:--'
+    const parts = kickoffTimeFormatter.formatToParts(date)
+    const hour = parts.find((part) => part.type === 'hour')?.value
+    const minute = parts.find((part) => part.type === 'minute')?.value
+    if (hour && minute) return `${hour}:${minute}`
+    return kickoffTimeFormatter.format(date)
+  }
 
-  const playerEventsByTeam = useMemo(() => {
-    if (!liveElements) return new Map<number, PlayerEvent[]>()
+  const playerEventsByFixtureTeam = useMemo(() => {
+    if (!liveElements) return new Map<string, PlayerEvent[]>()
 
-    const byTeam = new Map<number, PlayerEvent[]>()
+    const byFixtureTeam = new Map<string, PlayerEvent[]>()
+    const activeFixtureByTeam = new Map<number, number | null>()
+
+    for (const fixture of fixtureData?.fixtures ?? []) {
+      if (!fixture.finished && !hasLiveClock(fixture)) continue
+
+      for (const teamId of [fixture.home_club_id, fixture.away_club_id]) {
+        if (!activeFixtureByTeam.has(teamId)) {
+          activeFixtureByTeam.set(teamId, fixture.id)
+        } else {
+          // Multiple active fixtures for same team (rare DGW edge case) => ambiguous, skip mapping.
+          activeFixtureByTeam.set(teamId, null)
+        }
+      }
+    }
 
     for (const element of liveElements) {
       const info = playersMap.get(element.id)
@@ -58,46 +96,50 @@ export function FixtureScores({
       const stats = element.stats
       if (!stats) continue
 
+      const fixtureId = activeFixtureByTeam.get(info.team)
+      if (!fixtureId) continue
+
       const hasCleanSheet =
         stats.clean_sheets > 0 && (info.element_type === 1 || info.element_type === 2)
       const hasSaves = stats.saves >= 3 && info.element_type === 1
-
       const hasDefCon =
-        element.explain?.some((e) =>
-          e.stats.some((s) => s.identifier === 'defensive_contribution' && s.points > 0)
-        ) ?? false
+        (element.explain
+          ?.find((entry) => entry.fixture === fixtureId)
+          ?.stats.find((stat) => stat.identifier === 'defensive_contribution')?.points ?? 0) > 0
+      const hasCards = stats.yellow_cards > 0 || stats.red_cards > 0
 
       if (
         stats.goals_scored === 0 &&
         stats.assists === 0 &&
+        !hasCards &&
         !hasCleanSheet &&
         !hasSaves &&
         !hasDefCon &&
         stats.bonus === 0
-      )
+      ) {
         continue
+      }
 
-      const bonus = bonusPredictions?.find((bp) => bp.player_id === element.id)
-
-      const event: PlayerEvent = {
+      const key = fixtureTeamKey(fixtureId, info.team)
+      const teamEvents = byFixtureTeam.get(key) || []
+      teamEvents.push({
         playerId: element.id,
         name: info.web_name,
         goals: stats.goals_scored,
         assists: stats.assists,
+        yellowCards: stats.yellow_cards,
+        redCards: stats.red_cards,
         cleanSheet: hasCleanSheet,
         saves: stats.saves,
         defCon: hasDefCon,
-        bonus: stats.bonus || bonus?.predicted_bonus || 0,
+        bonus: stats.bonus,
         bps: stats.bps,
         position: info.element_type,
-      }
-
-      const teamEvents = byTeam.get(info.team) || []
-      teamEvents.push(event)
-      byTeam.set(info.team, teamEvents)
+      })
+      byFixtureTeam.set(key, teamEvents)
     }
 
-    for (const [, events] of byTeam) {
+    for (const [, events] of byFixtureTeam) {
       events.sort((a, b) => {
         if (b.goals !== a.goals) return b.goals - a.goals
         if (b.assists !== a.assists) return b.assists - a.assists
@@ -105,8 +147,8 @@ export function FixtureScores({
       })
     }
 
-    return byTeam
-  }, [liveElements, playersMap, bonusPredictions])
+    return byFixtureTeam
+  }, [fixtureData, liveElements, playersMap])
 
   const getBonusForFixture = (fixtureId: number) => {
     if (!bonusPredictions) return []
@@ -128,8 +170,8 @@ export function FixtureScores({
     const upcoming: typeof fixtureData.fixtures = []
 
     for (const f of fixtureData.fixtures) {
-      if (f.started && !f.finished) live.push(f)
-      else if (f.finished) finished.push(f)
+      if (f.finished) finished.push(f)
+      else if (hasLiveClock(f)) live.push(f)
       else upcoming.push(f)
     }
 
@@ -169,14 +211,27 @@ export function FixtureScores({
             const idx = fixtureIdx++
             const homeTeam = teamsMap.get(fixture.home_club_id) || '???'
             const awayTeam = teamsMap.get(fixture.away_club_id) || '???'
-            const isLive = fixture.started && !fixture.finished
-            const isFinished = fixture.finished
-            const isUpcoming = !fixture.started
+            const isLive = hasLiveClock(fixture)
+            const isFinished = Boolean(fixture.finished)
+            const isUpcoming = !isFinished && !isLive
             const isExpanded = expandedFixture === fixture.id
 
-            const homeEvents = playerEventsByTeam.get(fixture.home_club_id) || []
-            const awayEvents = playerEventsByTeam.get(fixture.away_club_id) || []
-            const bonusPlayers = getBonusForFixture(fixture.id)
+            const homeEvents =
+              playerEventsByFixtureTeam.get(fixtureTeamKey(fixture.id, fixture.home_club_id)) || []
+            const awayEvents =
+              playerEventsByFixtureTeam.get(fixtureTeamKey(fixture.id, fixture.away_club_id)) || []
+            const projectedBonusPlayers = getBonusForFixture(fixture.id)
+            const officialBonusPlayers = [...homeEvents, ...awayEvents]
+              .filter((event) => event.bonus > 0)
+              .map((event) => ({
+                player_id: event.playerId,
+                bps: event.bps,
+                predicted_bonus: event.bonus,
+                fixture_id: fixture.id,
+              }))
+              .sort((a, b) => b.predicted_bonus - a.predicted_bonus || b.bps - a.bps)
+
+            const bonusPlayers = isFinished ? officialBonusPlayers : projectedBonusPlayers
 
             const hasDetails =
               homeEvents.length > 0 || awayEvents.length > 0 || bonusPlayers.length > 0
@@ -217,11 +272,7 @@ export function FixtureScores({
                   >
                     {isUpcoming ? (
                       <span className="font-mono text-sm text-foreground-dim">
-                        {new Date(fixture.kickoff_time).toLocaleTimeString(undefined, {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: false,
-                        })}
+                        {formatKickoffTime(fixture.kickoff_time)}
                       </span>
                     ) : (
                       <>
@@ -292,6 +343,22 @@ export function FixtureScores({
                                 {event.assists > 0 && (
                                   <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
                                 )}
+                                {event.yellowCards > 0 && (
+                                  <span
+                                    className="text-[11px]"
+                                    title={`${event.yellowCards} yellow card${event.yellowCards > 1 ? 's' : ''}`}
+                                  >
+                                    {'🟨'.repeat(event.yellowCards)}
+                                  </span>
+                                )}
+                                {event.redCards > 0 && (
+                                  <span
+                                    className="text-[11px]"
+                                    title={`${event.redCards} red card${event.redCards > 1 ? 's' : ''}`}
+                                  >
+                                    {'🟥'.repeat(event.redCards)}
+                                  </span>
+                                )}
                                 {event.cleanSheet && (
                                   <span className="text-[11px]" title="Clean sheet">
                                     🛡️
@@ -305,6 +372,11 @@ export function FixtureScores({
                                 {event.defCon && (
                                   <span className="text-[11px]" title="Defensive contribution">
                                     💪
+                                  </span>
+                                )}
+                                {isLive && (
+                                  <span className="text-[10px] font-mono text-foreground-dim ml-1">
+                                    BPS {event.bps}
                                   </span>
                                 )}
                               </span>
@@ -327,6 +399,22 @@ export function FixtureScores({
                                 {event.assists > 0 && (
                                   <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
                                 )}
+                                {event.yellowCards > 0 && (
+                                  <span
+                                    className="text-[11px]"
+                                    title={`${event.yellowCards} yellow card${event.yellowCards > 1 ? 's' : ''}`}
+                                  >
+                                    {'🟨'.repeat(event.yellowCards)}
+                                  </span>
+                                )}
+                                {event.redCards > 0 && (
+                                  <span
+                                    className="text-[11px]"
+                                    title={`${event.redCards} red card${event.redCards > 1 ? 's' : ''}`}
+                                  >
+                                    {'🟥'.repeat(event.redCards)}
+                                  </span>
+                                )}
                                 {event.cleanSheet && (
                                   <span className="text-[11px]" title="Clean sheet">
                                     🛡️
@@ -340,6 +428,11 @@ export function FixtureScores({
                                 {event.defCon && (
                                   <span className="text-[11px]" title="Defensive contribution">
                                     💪
+                                  </span>
+                                )}
+                                {isLive && (
+                                  <span className="text-[10px] font-mono text-foreground-dim ml-1">
+                                    BPS {event.bps}
                                   </span>
                                 )}
                               </span>

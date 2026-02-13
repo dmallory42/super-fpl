@@ -120,6 +120,41 @@ describe('FixtureScores', () => {
     expect(screen.getByText(/\d{2}:\d{2}/)).toBeInTheDocument()
   })
 
+  it('treats started fixtures at 0 minutes as upcoming', () => {
+    const fixtureData: GameweekFixtureStatus = {
+      gameweek: 1,
+      fixtures: [
+        createFixture({
+          started: true,
+          finished: false,
+          minutes: 0,
+          home_score: null,
+          away_score: null,
+        }),
+      ],
+      total: 1,
+      started: 1,
+      finished: 0,
+      first_kickoff: '2024-01-01T15:00:00Z',
+      last_kickoff: '2024-01-01T15:00:00Z',
+    }
+
+    render(
+      <FixtureScores
+        fixtureData={fixtureData}
+        teamsMap={mockTeamsMap}
+        liveElements={[]}
+        playersMap={mockPlayersMap}
+        bonusPredictions={[]}
+      />
+    )
+
+    expect(screen.getByText('Upcoming')).toBeInTheDocument()
+    expect(screen.queryByText('Live')).not.toBeInTheDocument()
+    expect(screen.getByText(/\d{2}:\d{2}/)).toBeInTheDocument()
+    expect(screen.queryByText(/0'/)).not.toBeInTheDocument()
+  })
+
   it('shows FT for finished fixtures', () => {
     const fixtureData: GameweekFixtureStatus = {
       gameweek: 1,
@@ -340,6 +375,45 @@ describe('FixtureScores', () => {
     expect(screen.getAllByText('3').length).toBe(2)
   })
 
+  it('shows official bonus for finished fixtures', () => {
+    const fixtureData: GameweekFixtureStatus = {
+      gameweek: 1,
+      fixtures: [createFixture({ id: 100, started: true, finished: true, minutes: 90 })],
+      total: 1,
+      started: 1,
+      finished: 1,
+      first_kickoff: '2024-01-01T15:00:00Z',
+      last_kickoff: '2024-01-01T15:00:00Z',
+    }
+
+    const liveElements: LiveElement[] = [
+      createLiveElement({
+        id: 1,
+        stats: { ...createLiveElement().stats, goals_scored: 1, bonus: 3, bps: 40 },
+      }),
+      createLiveElement({
+        id: 2,
+        stats: { ...createLiveElement().stats, assists: 1, bonus: 2, bps: 32 },
+      }),
+    ]
+
+    render(
+      <FixtureScores
+        fixtureData={fixtureData}
+        teamsMap={mockTeamsMap}
+        liveElements={liveElements}
+        playersMap={mockPlayersMap}
+        bonusPredictions={[]}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(screen.getByText('Bonus Points')).toBeInTheDocument()
+    expect(screen.getByText('(40)')).toBeInTheDocument()
+    expect(screen.getByText('(32)')).toBeInTheDocument()
+  })
+
   it('shows clean sheet emoji for defenders', () => {
     const fixtureData: GameweekFixtureStatus = {
       gameweek: 1,
@@ -402,6 +476,74 @@ describe('FixtureScores', () => {
     expect(screen.getByTitle('5 saves')).toBeInTheDocument()
   })
 
+  it('shows yellow card indicator', () => {
+    const fixtureData: GameweekFixtureStatus = {
+      gameweek: 1,
+      fixtures: [createFixture()],
+      total: 1,
+      started: 1,
+      finished: 0,
+      first_kickoff: '2024-01-01T15:00:00Z',
+      last_kickoff: '2024-01-01T15:00:00Z',
+    }
+
+    const liveElements: LiveElement[] = [
+      createLiveElement({
+        id: 1,
+        stats: { ...createLiveElement().stats, yellow_cards: 1, total_points: 1 },
+      }),
+    ]
+
+    render(
+      <FixtureScores
+        fixtureData={fixtureData}
+        teamsMap={mockTeamsMap}
+        liveElements={liveElements}
+        playersMap={mockPlayersMap}
+        bonusPredictions={[]}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(screen.getByText('Saka')).toBeInTheDocument()
+    expect(screen.getByTitle('1 yellow card')).toBeInTheDocument()
+  })
+
+  it('shows red card indicator', () => {
+    const fixtureData: GameweekFixtureStatus = {
+      gameweek: 1,
+      fixtures: [createFixture()],
+      total: 1,
+      started: 1,
+      finished: 0,
+      first_kickoff: '2024-01-01T15:00:00Z',
+      last_kickoff: '2024-01-01T15:00:00Z',
+    }
+
+    const liveElements: LiveElement[] = [
+      createLiveElement({
+        id: 1,
+        stats: { ...createLiveElement().stats, red_cards: 1, total_points: -1 },
+      }),
+    ]
+
+    render(
+      <FixtureScores
+        fixtureData={fixtureData}
+        teamsMap={mockTeamsMap}
+        liveElements={liveElements}
+        playersMap={mockPlayersMap}
+        bonusPredictions={[]}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(screen.getByText('Saka')).toBeInTheDocument()
+    expect(screen.getByTitle('1 red card')).toBeInTheDocument()
+  })
+
   it('sorts live fixtures first', () => {
     const fixtureData: GameweekFixtureStatus = {
       gameweek: 1,
@@ -436,5 +578,66 @@ describe('FixtureScores', () => {
     const buttons = screen.getAllByRole('button')
     // First fixture should be the live one (Liverpool vs Arsenal)
     expect(buttons[0]).toHaveTextContent('Liverpool')
+  })
+
+  it('does not leak first DGW fixture events into the second upcoming fixture', () => {
+    const fixtureData: GameweekFixtureStatus = {
+      gameweek: 1,
+      fixtures: [
+        createFixture({
+          id: 100,
+          home_club_id: 1, // Arsenal
+          away_club_id: 2, // Chelsea
+          started: true,
+          finished: false,
+          minutes: 45,
+          home_score: 1,
+          away_score: 0,
+        }),
+        createFixture({
+          id: 101,
+          home_club_id: 3, // Liverpool
+          away_club_id: 1, // Arsenal second fixture (upcoming)
+          started: true,
+          finished: false,
+          minutes: 0,
+          home_score: null,
+          away_score: null,
+        }),
+      ],
+      total: 2,
+      started: 2,
+      finished: 0,
+      first_kickoff: '2024-01-01T15:00:00Z',
+      last_kickoff: '2024-01-01T20:00:00Z',
+    }
+
+    const liveElements = [
+      createLiveElement({
+        id: 1, // Saka on Arsenal
+        stats: { ...createLiveElement().stats, goals_scored: 1, total_points: 8 },
+        explain: [
+          {
+            fixture: 100,
+            stats: [{ identifier: 'goals_scored', points: 5, value: 1, points_modification: 0 }],
+          },
+        ],
+      }),
+    ]
+
+    render(
+      <FixtureScores
+        fixtureData={fixtureData}
+        teamsMap={mockTeamsMap}
+        liveElements={liveElements}
+        playersMap={mockPlayersMap}
+        bonusPredictions={[]}
+      />
+    )
+
+    // Only the live DGW fixture should be expandable.
+    expect(screen.getAllByText('▼')).toHaveLength(1)
+    expect(screen.getByText('Upcoming')).toBeInTheDocument()
+    expect(screen.queryByText("0'")).not.toBeInTheDocument()
   })
 })
