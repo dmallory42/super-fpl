@@ -143,13 +143,15 @@ class UnderstatClient
             }
         }
 
-        $url = self::BASE_URL . "/league/EPL/{$season}";
+        // Preferred endpoint (current Understat implementation)
+        $url = self::BASE_URL . "/getLeagueData/EPL/{$season}";
 
         $context = stream_context_create([
             'http' => [
                 'method' => 'GET',
                 'header' => implode("\r\n", [
                     'X-Requested-With: XMLHttpRequest',
+                    'Accept: application/json',
                     'Accept-Encoding: gzip',
                 ]),
                 'timeout' => 30,
@@ -172,18 +174,42 @@ class UnderstatClient
             }
         }
 
-        // The league page returns HTML with embedded JSON in script tags
-        // Extract teamsData from: var teamsData = JSON.parse('...')
-        if (!preg_match("/var\s+teamsData\s*=\s*JSON\.parse\('(.+?)'\)/", $response, $matches)) {
-            error_log("UnderstatClient: Could not extract teamsData from response");
+        $payload = json_decode($response, true);
+        if (is_array($payload) && isset($payload['teams']) && is_array($payload['teams'])) {
+            $teamsData = $payload['teams'];
+
+            // Cache successful response
+            file_put_contents($cacheFile, json_encode($teamsData));
+            error_log("UnderstatClient: Fetched " . count($teamsData) . " teams, cached for {$this->cacheTtl}s");
+
+            return $teamsData;
+        }
+
+        // Fallback for older page format with embedded teamsData in HTML.
+        $leagueUrl = self::BASE_URL . "/league/EPL/{$season}";
+        $html = @file_get_contents($leagueUrl, false, $context);
+        if ($html === false) {
+            error_log("UnderstatClient: Failed to fetch team data from fallback league page");
+            return [];
+        }
+
+        if (substr($html, 0, 2) === "\x1f\x8b") {
+            $html = gzdecode($html);
+            if ($html === false) {
+                error_log("UnderstatClient: Failed to decode gzip fallback team response");
+                return [];
+            }
+        }
+
+        if (!preg_match("/var\s+teamsData\s*=\s*JSON\.parse\('(.+?)'\)/", $html, $matches)) {
+            error_log("UnderstatClient: Could not extract teamsData from JSON or fallback HTML");
             return [];
         }
 
         $jsonStr = stripcslashes($matches[1]);
         $teamsData = json_decode($jsonStr, true);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log("UnderstatClient: Invalid teamsData JSON");
+        if (!is_array($teamsData)) {
+            error_log("UnderstatClient: Invalid fallback teamsData JSON");
             return [];
         }
 

@@ -23,6 +23,14 @@ class Database
 
         // Enable foreign keys
         $this->pdo->exec('PRAGMA foreign_keys = ON');
+        // Reduce transient write failures under concurrent cron/API access.
+        $this->pdo->exec('PRAGMA busy_timeout = 5000');
+        try {
+            $this->pdo->exec('PRAGMA journal_mode = WAL');
+        } catch (\PDOException) {
+            // Keep default journal mode when WAL is unavailable on the filesystem.
+        }
+        $this->pdo->exec('PRAGMA synchronous = NORMAL');
     }
 
     /**

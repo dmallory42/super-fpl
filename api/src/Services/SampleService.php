@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
+use PDOStatement;
 use SuperFPL\Api\Database;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\ParallelHttpClient;
@@ -169,12 +170,6 @@ class SampleService
      */
     private function sampleTierParallel(int $gameweek, string $tier, array $rankRange): int
     {
-        // Clear existing samples for this tier/gameweek
-        $this->db->query(
-            'DELETE FROM sample_picks WHERE gameweek = ? AND tier = ?',
-            [$gameweek, $tier]
-        );
-
         $minRank = $rankRange['min_rank'];
         $maxRank = $rankRange['max_rank'];
 
@@ -195,22 +190,43 @@ class SampleService
         // Fetch all picks in parallel batches
         $responses = $this->parallelClient->getBatch(array_values($endpoints));
 
-        // Process responses and store picks
+        // Process responses and store picks in one transaction to reduce SQLite I/O churn.
+        $pdo = $this->db->getPdo();
         $sampled = 0;
         $endpointToManager = array_flip($endpoints);
+        $insertStmt = $pdo->prepare(
+            'INSERT OR IGNORE INTO sample_picks (gameweek, tier, manager_id, player_id, multiplier)
+             VALUES (?, ?, ?, ?, ?)'
+        );
 
-        foreach ($responses as $endpoint => $data) {
-            if ($data === null || empty($data['picks'])) {
-                continue;
+        $pdo->beginTransaction();
+        try {
+            // Clear existing samples for this tier/gameweek
+            $this->db->query(
+                'DELETE FROM sample_picks WHERE gameweek = ? AND tier = ?',
+                [$gameweek, $tier]
+            );
+
+            foreach ($responses as $endpoint => $data) {
+                if ($data === null || empty($data['picks'])) {
+                    continue;
+                }
+
+                $managerId = $endpointToManager[$endpoint] ?? null;
+                if ($managerId === null) {
+                    continue;
+                }
+
+                $this->storeManagerPicks($insertStmt, $gameweek, $tier, (int) $managerId, $data['picks']);
+                $sampled++;
             }
 
-            $managerId = $endpointToManager[$endpoint] ?? null;
-            if ($managerId === null) {
-                continue;
+            $pdo->commit();
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
-
-            $this->storeManagerPicks($gameweek, $tier, (int) $managerId, $data['picks']);
-            $sampled++;
+            throw $e;
         }
 
         return $sampled;
@@ -288,7 +304,7 @@ class SampleService
     /**
      * Store manager picks for sampling.
      */
-    private function storeManagerPicks(int $gameweek, string $tier, int $managerId, array $picks): void
+    private function storeManagerPicks(PDOStatement $insertStmt, int $gameweek, string $tier, int $managerId, array $picks): void
     {
         foreach ($picks as $pick) {
             // Only store starting XI (position 1-11) for EO calculation
@@ -296,9 +312,7 @@ class SampleService
                 continue;
             }
 
-            $this->db->query(
-                'INSERT OR IGNORE INTO sample_picks (gameweek, tier, manager_id, player_id, multiplier)
-                 VALUES (?, ?, ?, ?, ?)',
+            $insertStmt->execute(
                 [
                     $gameweek,
                     $tier,

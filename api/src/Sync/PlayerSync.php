@@ -120,6 +120,7 @@ class PlayerSync
         $responses = $parallelClient->getBatch($endpoints, 200);
 
         $count = 0;
+        $seenSeasons = [];
         foreach ($players as $index => $player) {
             $endpoint = $endpoints[$index];
             $data = $responses[$endpoint] ?? null;
@@ -129,9 +130,22 @@ class PlayerSync
             }
 
             foreach ($data['history_past'] as $season) {
+                $seasonId = (string) ($season['season_name'] ?? '');
+                if ($seasonId === '') {
+                    continue;
+                }
+                if (!isset($seenSeasons[$seasonId])) {
+                    $this->db->upsert('seasons', [
+                        'id' => $seasonId,
+                        'start_date' => null,
+                        'end_date' => null,
+                    ], ['id']);
+                    $seenSeasons[$seasonId] = true;
+                }
+
                 $this->db->upsert('player_season_history', [
                     'player_code' => $player['code'],
-                    'season_id' => $season['season_name'] ?? '',
+                    'season_id' => $seasonId,
                     'total_points' => $season['total_points'] ?? 0,
                     'minutes' => $season['minutes'] ?? 0,
                     'goals_scored' => $season['goals_scored'] ?? 0,
