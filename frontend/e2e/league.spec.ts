@@ -249,4 +249,87 @@ test.describe('League Page', () => {
     expect(analysisRequests).toBe(1)
     expect(seasonRequests).toBe(1)
   })
+
+  test('shows sortable decision deltas against league median', async ({ page }) => {
+    await page.route('**/api/leagues/777/season-analysis**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          league: { id: 777, name: 'Mini League' },
+          gw_from: 1,
+          gw_to: 24,
+          gameweek_axis: Array.from({ length: 24 }, (_, i) => i + 1),
+          manager_count: 3,
+          managers: [
+            {
+              manager_id: 101,
+              manager_name: 'Alex',
+              team_name: 'Alpha FC',
+              rank: 1,
+              total: 1500,
+              gameweeks: [],
+              decision_quality: {
+                captain_gains: 30,
+                hit_cost: 4,
+                transfer_net_gain: 12,
+                hit_roi: 3.0,
+                chip_events: 1,
+              },
+            },
+            {
+              manager_id: 202,
+              manager_name: 'Ben',
+              team_name: 'Beta FC',
+              rank: 2,
+              total: 1450,
+              gameweeks: [],
+              decision_quality: {
+                captain_gains: 15,
+                hit_cost: 8,
+                transfer_net_gain: 4,
+                hit_roi: 0.5,
+                chip_events: 0,
+              },
+            },
+            {
+              manager_id: 303,
+              manager_name: 'Chris',
+              team_name: 'Gamma FC',
+              rank: 3,
+              total: 1400,
+              gameweeks: [],
+              decision_quality: {
+                captain_gains: 10,
+                hit_cost: 12,
+                transfer_net_gain: -2,
+                hit_roi: -0.2,
+                chip_events: 0,
+              },
+            },
+          ],
+          benchmarks: [],
+        }),
+      })
+    })
+
+    await page.goto('/?tab=league-analyzer&league_id=777&league_view=decisions')
+
+    await expect(page.getByRole('heading', { name: 'Decision Delta', exact: true })).toBeVisible({
+      timeout: 10000,
+    })
+    await expect(page.getByText('Decision Delta vs League Median')).toBeVisible()
+    await expect(page.getByText('League median (Transfer Net Gain):')).toBeVisible()
+
+    await page.selectOption('#decision-metric-select', 'hit_cost')
+    await expect(page.getByText('League median (Hit Cost):')).toBeVisible()
+
+    const firstManager = page
+      .getByTestId('decision-delta-table')
+      .locator('tbody tr')
+      .first()
+      .locator('td')
+      .nth(1)
+    await expect(firstManager).toHaveText('Alex')
+  })
 })

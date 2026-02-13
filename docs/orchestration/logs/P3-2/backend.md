@@ -1,4 +1,6 @@
 # P3-2 Backend Agent Log
 
-- Status: in_progress
+- Status: done
 - Notes:
+  - No backend changes required.
+  - Module uses existing `decision_quality` fields from league season analysis payload.

@@ -7,6 +7,7 @@ import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, UsersIcon } from '../components/ui/EmptyState'
 import { SkeletonCard, SkeletonTable } from '../components/ui/SkeletonLoader'
 import { GradientText } from '../components/ui/GradientText'
+import { DecisionDeltaModule } from '../components/league/DecisionDeltaModule'
 import { getPositionName } from '../types'
 
 type LeagueView = 'this-gw' | 'season' | 'decisions'
@@ -444,55 +445,61 @@ export function LeagueAnalyzer() {
           )}
 
           {isDecisionsView && seasonData && (
-            <BroadcastCard title="Decision Quality" accentColor="purple" animationDelay={100}>
-              <div className="overflow-x-auto -mx-4">
-                <table className="table-broadcast min-w-[760px]">
-                  <thead>
-                    <tr>
-                      <th>Manager</th>
-                      <th className="text-right">Captain Gain</th>
-                      <th className="text-right">Hit Cost</th>
-                      <th className="text-right">Transfer Net</th>
-                      <th className="text-right">Hit ROI</th>
-                      <th className="text-right">Chip Events</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {seasonData.managers.map((manager, idx) => (
-                      <tr
-                        key={manager.manager_id}
-                        className="animate-fade-in-up opacity-0"
-                        style={{ animationDelay: `${130 + idx * 30}ms` }}
-                      >
-                        <td className="font-medium text-foreground">{manager.team_name}</td>
-                        <td className="text-right font-mono">
-                          {manager.decision_quality.captain_gains.toFixed(1)}
-                        </td>
-                        <td className="text-right font-mono text-destructive">
-                          -{manager.decision_quality.hit_cost}
-                        </td>
-                        <td
-                          className={`text-right font-mono ${
-                            manager.decision_quality.transfer_net_gain >= 0
-                              ? 'text-fpl-green'
-                              : 'text-destructive'
-                          }`}
-                        >
-                          {manager.decision_quality.transfer_net_gain >= 0 ? '+' : ''}
-                          {manager.decision_quality.transfer_net_gain.toFixed(1)}
-                        </td>
-                        <td className="text-right font-mono">
-                          {manager.decision_quality.hit_roi === null
-                            ? '—'
-                            : manager.decision_quality.hit_roi.toFixed(2)}
-                        </td>
-                        <td className="text-right font-mono">{manager.decision_quality.chip_events}</td>
+            <>
+              <BroadcastCard title="Decision Delta" accentColor="highlight" animationDelay={100}>
+                <DecisionDeltaModule managers={seasonData.managers} />
+              </BroadcastCard>
+
+              <BroadcastCard title="Decision Quality" accentColor="purple" animationDelay={160}>
+                <div className="overflow-x-auto -mx-4">
+                  <table className="table-broadcast min-w-[760px]">
+                    <thead>
+                      <tr>
+                        <th>Manager</th>
+                        <th className="text-right">Captain Gain</th>
+                        <th className="text-right">Hit Cost</th>
+                        <th className="text-right">Transfer Net</th>
+                        <th className="text-right">Hit ROI</th>
+                        <th className="text-right">Chip Events</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </BroadcastCard>
+                    </thead>
+                    <tbody>
+                      {seasonData.managers.map((manager, idx) => (
+                        <tr
+                          key={manager.manager_id}
+                          className="animate-fade-in-up opacity-0"
+                          style={{ animationDelay: `${130 + idx * 30}ms` }}
+                        >
+                          <td className="font-medium text-foreground">{manager.team_name}</td>
+                          <td className="text-right font-mono">
+                            {manager.decision_quality.captain_gains.toFixed(1)}
+                          </td>
+                          <td className="text-right font-mono text-destructive">
+                            -{manager.decision_quality.hit_cost}
+                          </td>
+                          <td
+                            className={`text-right font-mono ${
+                              manager.decision_quality.transfer_net_gain >= 0
+                                ? 'text-fpl-green'
+                                : 'text-destructive'
+                            }`}
+                          >
+                            {manager.decision_quality.transfer_net_gain >= 0 ? '+' : ''}
+                            {manager.decision_quality.transfer_net_gain.toFixed(1)}
+                          </td>
+                          <td className="text-right font-mono">
+                            {manager.decision_quality.hit_roi === null
+                              ? '—'
+                              : manager.decision_quality.hit_roi.toFixed(2)}
+                          </td>
+                          <td className="text-right font-mono">{manager.decision_quality.chip_events}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </BroadcastCard>
+            </>
           )}
         </div>
       )}
