@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { PlayerStatusCard, type PlayerStatus } from './PlayerStatusCard'
 import type { LiveManagerPlayer } from '../../api/client'
 import type { GameweekFixtureStatus } from '../../api/client'
+import { getFixturesForTeam, getTeamFixtureStatus } from '../../lib/fixtureMapping'
 
 interface LiveFormationPitchProps {
   players: LiveManagerPlayer[]
@@ -62,15 +63,14 @@ export function LiveFormationPitch({
     const info = playersInfo.get(playerId)
     if (!info || !fixtureData) return { status: 'unknown' }
 
-    const teamId = info.team
-    const fixture = fixtureData.fixtures.find(
-      (f) => f.home_club_id === teamId || f.away_club_id === teamId
-    )
+    const status = getTeamFixtureStatus(fixtureData, info.team)
+    if (status !== 'playing') return { status }
 
-    if (!fixture) return { status: 'unknown' }
-    if (fixture.finished) return { status: 'finished' }
-    if (fixture.started) return { status: 'playing', minutes: fixture.minutes }
-    return { status: 'upcoming' }
+    const fixture = getFixturesForTeam(fixtureData, info.team)
+      .sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0))
+      .find((f) => Boolean(f.started) && !Boolean(f.finished) && (f.minutes ?? 0) > 0)
+
+    return { status: 'playing', minutes: fixture?.minutes }
   }
 
   // Build a flat index mapping for stable animation delays

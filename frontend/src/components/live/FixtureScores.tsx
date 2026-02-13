@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { GameweekFixtureStatus, LiveElement, BonusPrediction } from '../../api/client'
+import { resolveFixtureForTeam, toBoolFlag } from '../../lib/fixtureMapping'
 
 interface FixtureScoresProps {
   fixtureData: GameweekFixtureStatus | undefined
@@ -39,7 +40,7 @@ export function FixtureScores({
   bonusPredictions,
 }: FixtureScoresProps) {
   const hasLiveClock = (fixture: GameweekFixtureStatus['fixtures'][number]) =>
-    Boolean(fixture.started) && !Boolean(fixture.finished) && (fixture.minutes ?? 0) > 0
+    toBoolFlag(fixture.started) && !toBoolFlag(fixture.finished) && (fixture.minutes ?? 0) > 0
   const fixtureTeamKey = (fixtureId: number, teamId: number) => `${fixtureId}:${teamId}`
 
   const [expandedFixture, setExpandedFixture] = useState<number | null>(null)
@@ -74,20 +75,6 @@ export function FixtureScores({
     if (!liveElements) return new Map<string, PlayerEvent[]>()
 
     const byFixtureTeam = new Map<string, PlayerEvent[]>()
-    const activeFixtureByTeam = new Map<number, number | null>()
-
-    for (const fixture of fixtureData?.fixtures ?? []) {
-      if (!fixture.finished && !hasLiveClock(fixture)) continue
-
-      for (const teamId of [fixture.home_club_id, fixture.away_club_id]) {
-        if (!activeFixtureByTeam.has(teamId)) {
-          activeFixtureByTeam.set(teamId, fixture.id)
-        } else {
-          // Multiple active fixtures for same team (rare DGW edge case) => ambiguous, skip mapping.
-          activeFixtureByTeam.set(teamId, null)
-        }
-      }
-    }
 
     for (const element of liveElements) {
       const info = playersMap.get(element.id)
@@ -96,8 +83,14 @@ export function FixtureScores({
       const stats = element.stats
       if (!stats) continue
 
-      const fixtureId = activeFixtureByTeam.get(info.team)
-      if (!fixtureId) continue
+      const explainFixtureIds =
+        element.explain
+          ?.map((entry) => entry.fixture)
+          .filter((fixtureId): fixtureId is number => typeof fixtureId === 'number') ?? []
+
+      const resolvedFixture = resolveFixtureForTeam(fixtureData, info.team, explainFixtureIds)
+      if (!resolvedFixture) continue
+      const fixtureId = resolvedFixture.id
 
       const hasCleanSheet =
         stats.clean_sheets > 0 && (info.element_type === 1 || info.element_type === 2)
@@ -170,7 +163,7 @@ export function FixtureScores({
     const upcoming: typeof fixtureData.fixtures = []
 
     for (const f of fixtureData.fixtures) {
-      if (f.finished) finished.push(f)
+      if (toBoolFlag(f.finished)) finished.push(f)
       else if (hasLiveClock(f)) live.push(f)
       else upcoming.push(f)
     }
@@ -212,7 +205,7 @@ export function FixtureScores({
             const homeTeam = teamsMap.get(fixture.home_club_id) || '???'
             const awayTeam = teamsMap.get(fixture.away_club_id) || '???'
             const isLive = hasLiveClock(fixture)
-            const isFinished = Boolean(fixture.finished)
+            const isFinished = toBoolFlag(fixture.finished)
             const isUpcoming = !isFinished && !isLive
             const isExpanded = expandedFixture === fixture.id
 

@@ -9,6 +9,7 @@
  */
 
 import type { LiveManagerPlayer, GameweekFixtureStatus } from '../api/client'
+import { getTeamFixtureStatus } from './fixtureMapping'
 
 export type PlayerInfo = { web_name: string; team: number; element_type: number }
 
@@ -40,11 +41,7 @@ export function applyAutoSubs(
   const isMatchFinished = (playerId: number): boolean => {
     const info = playersInfo.get(playerId)
     if (!info) return false
-    const teamId = info.team
-    const fixture = fixtureData.fixtures.find(
-      (f) => f.home_club_id === teamId || f.away_club_id === teamId
-    )
-    return fixture?.finished ?? false
+    return getTeamFixtureStatus(fixtureData, info.team) === 'finished'
   }
 
   // Helper to check if player didn't play (0 minutes and match finished)

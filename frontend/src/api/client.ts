@@ -335,8 +335,8 @@ export interface GameweekFixtureStatus {
   fixtures: Array<{
     id: number
     kickoff_time: string
-    started: boolean
-    finished: boolean
+    started: boolean | number
+    finished: boolean | number
     minutes: number
     home_club_id: number
     away_club_id: number

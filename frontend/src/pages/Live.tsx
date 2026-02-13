@@ -21,6 +21,7 @@ import { GoodWeekBanner } from '../components/live/GoodWeekBanner'
 import { formatRank } from '../lib/format'
 import { type Tier, TIER_OPTIONS } from '../lib/tiers'
 import { applyAutoSubs } from '../lib/autosubs'
+import { toBoolFlag } from '../lib/fixtureMapping'
 
 // Get manager ID from URL or localStorage
 function getInitialManagerId(): { id: number | null; input: string } {
@@ -347,8 +348,8 @@ export function Live() {
         userPoints,
         tierAvgPoints,
         impact: userPoints - tierAvgPoints,
-        isLive: fixture.started && !fixture.finished,
-        isFinished: fixture.finished,
+        isLive: toBoolFlag(fixture.started) && !toBoolFlag(fixture.finished),
+        isFinished: toBoolFlag(fixture.finished),
         hasUserPlayer,
       }
     })
