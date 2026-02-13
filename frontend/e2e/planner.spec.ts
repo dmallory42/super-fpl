@@ -275,17 +275,146 @@ test.describe('Planner Page', () => {
     await page.click('button:has-text("Load")')
 
     await page.click('button:has-text("Find Plans")')
-    await expect(page.locator('text=Objective: Expected')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Objective: Expected', { exact: true })).toBeVisible({
+      timeout: 10000,
+    })
     await expect(page.locator('text=SafeMid')).toBeVisible()
 
     await page.click('button:has-text("Ceiling")')
     await page.click('button:has-text("Re-solve")')
-    await expect(page.locator('text=Objective: Ceiling')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Objective: Ceiling', { exact: true })).toBeVisible({
+      timeout: 10000,
+    })
     await expect(page.locator('text=BoomBustMid')).toBeVisible()
 
     expect(seenObjectives).toContain('expected')
     expect(seenObjectives).toContain('ceiling')
     expect(seenObjectives).not.toContain('missing')
+  })
+
+  test('shows per-gw rationale for solved actions with matching values', async ({ page }) => {
+    await page.route('**/api/planner/optimize**', async (route) => {
+      const url = new URL(route.request().url())
+      const objective = (url.searchParams.get('objective') ?? 'expected') as
+        | 'expected'
+        | 'floor'
+        | 'ceiling'
+      const skipSolve = url.searchParams.get('skip_solve') === '1'
+
+      const base = {
+        current_gameweek: 27,
+        planning_horizon: [27, 28],
+        current_squad: {
+          player_ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+          bank: 1.5,
+          squad_value: 102.4,
+          free_transfers: 1,
+          api_free_transfers: 1,
+          predicted_points: { 27: 58, 28: 56, total: 114 },
+        },
+        recommendations: [],
+        chip_suggestions_ranked: {},
+        chip_mode: 'locked',
+        objective_mode: objective,
+        requested_chip_plan: [],
+        resolved_chip_plan: [],
+        chip_plan: [],
+        comparisons: null,
+      }
+
+      if (skipSolve) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ...base, paths: [] }),
+        })
+        return
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ...base,
+          paths: [
+            {
+              id: 1,
+              total_score: 120,
+              score_vs_hold: 4.0,
+              total_hits: 1,
+              transfers_by_gw: {
+                27: {
+                  action: 'transfer',
+                  ft_available: 1,
+                  ft_after: 1,
+                  chip_played: null,
+                  moves: [
+                    {
+                      out_id: 8,
+                      out_name: 'Saka',
+                      out_team: 1,
+                      out_price: 10,
+                      in_id: 16,
+                      in_name: 'MidA',
+                      in_team: 3,
+                      in_price: 10,
+                      gain: 1.2,
+                      is_free: true,
+                    },
+                    {
+                      out_id: 11,
+                      out_name: 'Bowen',
+                      out_team: 7,
+                      out_price: 8,
+                      in_id: 17,
+                      in_name: 'MidB',
+                      in_team: 4,
+                      in_price: 8,
+                      gain: 0.8,
+                      is_free: false,
+                    },
+                  ],
+                  hit_cost: 4,
+                  gw_score: 60,
+                  squad_ids: [1, 2, 3],
+                  bank: 1.5,
+                },
+                28: {
+                  action: 'bank',
+                  ft_available: 1,
+                  ft_after: 2,
+                  chip_played: null,
+                  moves: [],
+                  hit_cost: 0,
+                  gw_score: 60,
+                  squad_ids: [1, 2, 3],
+                  bank: 1.5,
+                },
+              },
+            },
+          ],
+        }),
+      })
+    })
+
+    await page.goto('/')
+    await page.click('text=Planner')
+    await page.fill('input[placeholder="Enter FPL ID"]', '8028')
+    await page.click('button:has-text("Load")')
+
+    await page.click('button:has-text("Ceiling")')
+    await page.click('button:has-text("Find Plans")')
+
+    const gw27Rationale = page.getByTestId('rationale-gw-27')
+    const gw28Rationale = page.getByTestId('rationale-gw-28')
+
+    await expect(gw27Rationale).toBeVisible({ timeout: 10000 })
+    await expect(gw28Rationale).toBeVisible({ timeout: 10000 })
+    await expect(gw27Rationale).toContainText('Expected gain: +2.0')
+    await expect(gw27Rationale).toContainText('Hit cost: -4.0')
+    await expect(gw27Rationale).toContainText('Objective: Ceiling')
+    await expect(gw28Rationale).toContainText('Expected gain: +0.0')
+    await expect(gw28Rationale).toContainText('Hit cost: -0.0')
   })
 
   test('sends constraints and shows infeasible-constraint message', async ({ page }) => {

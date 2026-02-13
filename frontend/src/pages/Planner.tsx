@@ -7,6 +7,7 @@ import type {
   ChipMode,
   PlayerMultiWeekPrediction,
   FixedTransfer,
+  PathGameweek,
   PlannerConstraints,
   PlannerObjectiveMode,
   SolverDepth,
@@ -42,6 +43,11 @@ const OBJECTIVE_LABELS: Record<PlannerObjectiveMode, string> = {
   floor: 'Floor',
   ceiling: 'Ceiling',
 }
+const OBJECTIVE_CONTEXT: Record<PlannerObjectiveMode, string> = {
+  expected: 'Balances upside and downside around median projection.',
+  floor: 'Prioritizes safer minutes and lower downside outcomes.',
+  ceiling: 'Prioritizes upside and high-variance outcomes.',
+}
 
 function formatFixtures(fixtures: FixtureOpponent[]): string {
   return fixtures.map((f) => (f.is_home ? f.opponent : f.opponent.toLowerCase())).join(', ')
@@ -60,6 +66,17 @@ interface ConstraintInputState {
   avoidIds: string
   maxHits: string
   chipWindows: Record<keyof ChipPlan, string>
+}
+
+interface GameweekRationaleRow {
+  gw: number
+  actionLabel: string
+  expectedGain: number | null
+  hitCost: number
+  riskTradeoff: string
+  objectiveMode: PlannerObjectiveMode
+  objectiveContext: string
+  chipLabel: string | null
 }
 
 function getInitialManagerId(): { id: number | null; input: string } {
@@ -479,6 +496,83 @@ export function Planner() {
     ? Math.max(0, firstGwTransfers - (ftByGameweek[firstGw] ?? effectiveFt))
     : 0
   const hitsCost = hitsCount * HIT_COST
+
+  const rationaleByGw = useMemo((): GameweekRationaleRow[] => {
+    if (!predictionsRange?.gameweeks) return []
+
+    const rationalePath = selectedPath ?? paths[0] ?? null
+    const activeObjectiveMode = rationalePath ? solveObjectiveMode : objectiveMode
+
+    const fromPath = (gw: number, pathGw: PathGameweek): GameweekRationaleRow => {
+      const expectedGain = pathGw.moves.reduce((sum, move) => sum + (move.gain ?? 0), 0)
+      const transferCount = pathGw.moves.length
+      const chipKey = (pathGw.chip_played ?? null) as keyof ChipPlan | null
+      const chipLabel = chipKey ? CHIP_LABELS[chipKey] : null
+
+      let riskTradeoff = 'Single move keeps variance contained.'
+      if (pathGw.action === 'bank') {
+        riskTradeoff = `Roll preserves flexibility with ${pathGw.ft_after} FT available next GW.`
+      } else if (pathGw.hit_cost > 0) {
+        riskTradeoff = 'Hit cost accepted for projected upside; downside rises if returns miss.'
+      } else if (chipLabel) {
+        riskTradeoff = `${chipLabel} raises range of outcomes; upside is prioritized.`
+      } else if (transferCount > 1) {
+        riskTradeoff = 'Multiple transfers increase variance and execution risk.'
+      }
+
+      return {
+        gw,
+        actionLabel:
+          pathGw.action === 'bank'
+            ? 'Bank / roll FT'
+            : `${transferCount} transfer${transferCount === 1 ? '' : 's'}`,
+        expectedGain,
+        hitCost: pathGw.hit_cost,
+        riskTradeoff,
+        objectiveMode: activeObjectiveMode,
+        objectiveContext: OBJECTIVE_CONTEXT[activeObjectiveMode],
+        chipLabel,
+      }
+    }
+
+    return predictionsRange.gameweeks.map((gw) => {
+      const pathGw = rationalePath?.transfers_by_gw?.[gw]
+      if (pathGw) {
+        return fromPath(gw, pathGw)
+      }
+
+      const gwTransferCount = userTransfers.filter((transfer) => transfer.gameweek === gw).length
+      const manualHitCost = gw === firstGw ? hitsCost : 0
+      const actionLabel =
+        gwTransferCount > 0
+          ? `${gwTransferCount} manual transfer${gwTransferCount === 1 ? '' : 's'}`
+          : 'Bank / roll FT'
+
+      return {
+        gw,
+        actionLabel,
+        expectedGain: gwTransferCount > 0 ? null : 0,
+        hitCost: manualHitCost,
+        riskTradeoff:
+          gwTransferCount > 0
+            ? 'Manual action queued; run solver to quantify gain and downside.'
+            : 'No move queued; flexibility is preserved for later weeks.',
+        objectiveMode: activeObjectiveMode,
+        objectiveContext: OBJECTIVE_CONTEXT[activeObjectiveMode],
+        chipLabel: chipTimelineByGw[gw] ? `Chip: ${chipTimelineByGw[gw]}` : null,
+      }
+    })
+  }, [
+    predictionsRange?.gameweeks,
+    selectedPath,
+    paths,
+    solveObjectiveMode,
+    objectiveMode,
+    userTransfers,
+    firstGw,
+    hitsCost,
+    chipTimelineByGw,
+  ])
 
   // Get the selected player's data
   const selectedPlayerData = useMemo(() => {
@@ -1494,6 +1588,38 @@ export function Planner() {
                     ? `${selectedPath.total_score.toFixed(1)} pts`
                     : `${squadPredictions?.total.toFixed(1) ?? '...'} pts`}
                 </span>
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-border/50">
+                <div className="text-[10px] font-display uppercase tracking-wider text-foreground-muted mb-2">
+                  Per-GW Rationale
+                </div>
+                <div className="space-y-2">
+                  {rationaleByGw.map((row) => (
+                    <div
+                      key={`rationale-${row.gw}`}
+                      data-testid={`rationale-gw-${row.gw}`}
+                      className="rounded-lg border border-border/50 bg-surface-elevated/60 p-2.5"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-display text-foreground-muted uppercase tracking-wider">
+                          GW{row.gw} - {row.actionLabel}
+                        </span>
+                        {row.chipLabel && <span className="text-fpl-green">{row.chipLabel}</span>}
+                      </div>
+                      <div className="mt-1 text-xs text-foreground">
+                        Expected gain:{' '}
+                        {row.expectedGain === null
+                          ? 'pending'
+                          : `${row.expectedGain >= 0 ? '+' : ''}${row.expectedGain.toFixed(1)}`}{' '}
+                        | Hit cost: -{row.hitCost.toFixed(1)} | Objective:{' '}
+                        {OBJECTIVE_LABELS[row.objectiveMode]}
+                      </div>
+                      <div className="mt-1 text-xs text-foreground-muted">{row.riskTradeoff}</div>
+                      <div className="text-[11px] text-foreground-dim">{row.objectiveContext}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </BroadcastCard>
 
