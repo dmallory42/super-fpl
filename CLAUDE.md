@@ -231,6 +231,26 @@ Cron runs automatically in Docker. To manually sync:
 
 Regenerate predictions after model changes: `docker compose exec php php cron/predictions.php <GW>`
 
+### Cron Schedule (UTC)
+
+Configured in `deploy/crontab` and executed by the `cron` container in `docker-compose.yml`.
+
+- `01:00` daily: `php cron/fixtures-refresh.php`
+- `HH:05` hourly: `php cron/fixtures-post-deadline-refresh.php`
+- `09:00` daily: `php cron/sync-all.php --phase=pre-deadline`
+- `23:59` daily: `php cron/sync-all.php --phase=post-gameweek`
+- `04:00` Monday: `php cron/sync-all.php --phase=slow`
+- `12:00` Saturday: `php cron/sync-all.php --phase=samples`
+
+### Important: Applying Cron Changes
+
+`deploy/crontab` is copied into the image at build time (see `deploy/Dockerfile.php`), so schedule changes do not apply until the cron image is rebuilt.
+
+```bash
+docker compose build cron
+docker compose up -d cron
+```
+
 ## Key Business Logic
 
 | Component | Location | Purpose |
