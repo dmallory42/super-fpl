@@ -12,7 +12,9 @@ use SuperFPL\Api\Services\ManagerService;
 use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\LeagueService;
+use SuperFPL\Api\Services\LeagueSeasonAnalysisService;
 use SuperFPL\Api\Services\ComparisonService;
+use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\Api\Services\LiveService;
 use SuperFPL\Api\Services\SampleService;
 use SuperFPL\Api\Services\TransferService;
@@ -100,6 +102,7 @@ try {
         preg_match('#^/leagues/(\d+)$#', $uri, $m) === 1 => handleLeague($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/standings$#', $uri, $m) === 1 => handleLeagueStandings($db, $fplClient, (int) $m[1]),
         preg_match('#^/leagues/(\d+)/analysis$#', $uri, $m) === 1 => handleLeagueAnalysis($db, $fplClient, (int) $m[1]),
+        preg_match('#^/leagues/(\d+)/season-analysis$#', $uri, $m) === 1 => handleLeagueSeasonAnalysis($db, $fplClient, (int) $m[1]),
         $uri === '/compare' => handleCompare($db, $fplClient),
         $uri === '/live/current' => handleLiveCurrentGameweek($db, $fplClient, $config),
         preg_match('#^/live/(\d+)$#', $uri, $m) === 1 => handleLive($db, $fplClient, $config, (int) $m[1]),
@@ -675,6 +678,27 @@ function handleLeagueAnalysis(Database $db, FplClient $fplClient, int $leagueId)
         }, array_slice($standings, 0, 20)),
         'comparison' => $comparison,
     ]);
+}
+
+function handleLeagueSeasonAnalysis(Database $db, FplClient $fplClient, int $leagueId): void
+{
+    $gwFrom = isset($_GET['gw_from']) ? (int) $_GET['gw_from'] : null;
+    $gwTo = isset($_GET['gw_to']) ? (int) $_GET['gw_to'] : null;
+    $topN = isset($_GET['top_n']) ? (int) $_GET['top_n'] : 20;
+    $topN = max(2, min($topN, 50));
+
+    $leagueService = new LeagueService($db, $fplClient);
+    $managerSeasonAnalysisService = new ManagerSeasonAnalysisService($db, $fplClient);
+    $service = new LeagueSeasonAnalysisService($leagueService, $managerSeasonAnalysisService);
+    $analysis = $service->analyze($leagueId, $gwFrom, $gwTo, $topN);
+
+    if (isset($analysis['error'])) {
+        http_response_code((int) ($analysis['status'] ?? 400));
+        echo json_encode(['error' => $analysis['error']]);
+        return;
+    }
+
+    echo json_encode($analysis);
 }
 
 function handleCompare(Database $db, FplClient $fplClient): void
