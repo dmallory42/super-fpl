@@ -5,6 +5,7 @@ import {
   type ChipPlan,
   type ChipMode,
   type FixedTransfer,
+  type PlannerObjectiveMode,
   type SolverDepth,
   type XMinsOverrides,
 } from '../api/client'
@@ -19,6 +20,7 @@ export function usePlannerOptimize(
   depth: SolverDepth = 'standard',
   skipSolve: boolean = false,
   chipMode: ChipMode = 'locked',
+  objectiveMode: PlannerObjectiveMode = 'expected',
   chipCompare: boolean = false
 ) {
   return useQuery<PlannerOptimizeResponse>({
@@ -33,6 +35,7 @@ export function usePlannerOptimize(
       depth,
       skipSolve,
       chipMode,
+      objectiveMode,
       chipCompare,
     ],
     queryFn: () =>
@@ -46,6 +49,7 @@ export function usePlannerOptimize(
         depth,
         skipSolve,
         chipMode,
+        objectiveMode,
         [],
         {},
         chipCompare

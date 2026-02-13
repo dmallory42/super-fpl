@@ -739,6 +739,7 @@ export interface TransferPath {
 
 export type SolverDepth = 'quick' | 'standard' | 'deep'
 export type ChipMode = 'none' | 'locked' | 'auto'
+export type PlannerObjectiveMode = 'expected' | 'floor' | 'ceiling'
 
 // xMins overrides: uniform (number) or per-GW (Record<number, number>)
 export type XMinsOverrides = Record<number, number | Record<number, number>>
@@ -766,6 +767,7 @@ export interface PlannerOptimizeResponse {
   chip_suggestions: Record<string, ChipSuggestion>
   chip_suggestions_ranked?: Record<string, ChipSuggestion[]>
   chip_mode?: ChipMode
+  objective_mode?: PlannerObjectiveMode
   requested_chip_plan?: ChipPlan
   resolved_chip_plan?: ChipPlan
   chip_plan: ChipPlan
@@ -839,6 +841,7 @@ export async function fetchPlannerOptimize(
   depth: SolverDepth = 'standard',
   skipSolve: boolean = false,
   chipMode: ChipMode = 'locked',
+  objectiveMode: PlannerObjectiveMode = 'expected',
   chipAllow: string[] = [],
   chipForbid: Record<string, number[]> = {},
   chipCompare: boolean = false,
@@ -860,6 +863,7 @@ export async function fetchPlannerOptimize(
   if (chipMode !== 'locked') {
     params.set('chip_mode', chipMode)
   }
+  params.set('objective', objectiveMode)
   if (chipAllow.length > 0) {
     params.set('chip_allow', JSON.stringify(chipAllow))
   }

@@ -13,6 +13,9 @@ class PathSolver
     private const CHIP_FREE_HIT = 'free_hit';
     private const CHIP_BENCH_BOOST = 'bench_boost';
     private const CHIP_TRIPLE_CAPTAIN = 'triple_captain';
+    public const OBJECTIVE_EXPECTED = 'expected';
+    public const OBJECTIVE_FLOOR = 'floor';
+    public const OBJECTIVE_CEILING = 'ceiling';
 
     // [beamWidth, candidatesPerPos, maxTransfersPerGw]
     private const DEPTH_PRESETS = [
@@ -24,13 +27,16 @@ class PathSolver
     private int $beamWidth;
     private int $candidatesPerPos;
     private int $maxTransfersPerGw;
+    private string $objectiveMode;
 
     public function __construct(
         private float $ftValue = 1.5,
         private string $depth = 'standard',
+        string $objectiveMode = self::OBJECTIVE_EXPECTED,
     ) {
         [$this->beamWidth, $this->candidatesPerPos, $this->maxTransfersPerGw] =
             self::DEPTH_PRESETS[$this->depth] ?? self::DEPTH_PRESETS['standard'];
+        $this->objectiveMode = $this->normalizeObjectiveMode($objectiveMode);
     }
 
     /**
@@ -375,7 +381,7 @@ class PathSolver
                     'in_name' => $playerMap[$inId]['web_name'] ?? '',
                     'in_team' => (int)($playerMap[$inId]['club_id'] ?? 0),
                     'in_price' => round($inPrice, 1),
-                    'gain' => round(($predictions[$inId][$gw] ?? 0) - ($predictions[$outId][$gw] ?? 0), 1),
+                    'gain' => round($this->getExpectedPoints($predictions, $inId, $gw) - $this->getExpectedPoints($predictions, $outId, $gw), 1),
                     'is_free' => $hitCost === 0,
                 ];
 
@@ -531,7 +537,7 @@ class PathSolver
                                     'in_name' => $playerMap[$inId1]['web_name'] ?? '',
                                     'in_team' => (int)($playerMap[$inId1]['club_id'] ?? 0),
                                     'in_price' => round($inPrice1, 1),
-                                    'gain' => round(($predictions[$inId1][$gw] ?? 0) - ($predictions[$outId1][$gw] ?? 0), 1),
+                                    'gain' => round($this->getExpectedPoints($predictions, $inId1, $gw) - $this->getExpectedPoints($predictions, $outId1, $gw), 1),
                                     'is_free' => $hitCost === 0 || 1 <= $ft,
                                 ],
                                 [
@@ -543,7 +549,7 @@ class PathSolver
                                     'in_name' => $playerMap[$inId2]['web_name'] ?? '',
                                     'in_team' => (int)($playerMap[$inId2]['club_id'] ?? 0),
                                     'in_price' => round($inPrice2, 1),
-                                    'gain' => round(($predictions[$inId2][$gw] ?? 0) - ($predictions[$outId2][$gw] ?? 0), 1),
+                                    'gain' => round($this->getExpectedPoints($predictions, $inId2, $gw) - $this->getExpectedPoints($predictions, $outId2, $gw), 1),
                                     'is_free' => $hitCost === 0 || 2 <= $ft,
                                 ],
                             ],
@@ -609,7 +615,7 @@ class PathSolver
                 'in_name' => $inPlayer['web_name'],
                 'in_team' => (int)$inPlayer['club_id'],
                 'in_price' => round($inPrice, 1),
-                'gain' => round(($predictions[$inId][$gw] ?? 0) - ($predictions[$outId][$gw] ?? 0), 1),
+                'gain' => round($this->getExpectedPoints($predictions, $inId, $gw) - $this->getExpectedPoints($predictions, $outId, $gw), 1),
                 'is_free' => true, // Will adjust below
             ];
         }
@@ -678,7 +684,7 @@ class PathSolver
             $player = $playerMap[$playerId] ?? null;
             if (!$player) continue;
             $position = (int)$player['position'];
-            $pred = $predictions[$playerId][$gw] ?? 0;
+            $pred = $this->getObjectivePoints($predictions, $playerId, $gw);
             $byPosition[$position][] = ['id' => $playerId, 'pred' => $pred];
         }
 
@@ -720,7 +726,7 @@ class PathSolver
             if (in_array($playerId, $startingIds, true)) {
                 continue;
             }
-            $benchTotal += (float) ($predictions[$playerId][$gw] ?? 0.0);
+            $benchTotal += $this->getObjectivePoints($predictions, $playerId, $gw);
         }
 
         return $benchTotal;
@@ -835,10 +841,10 @@ class PathSolver
             $score = 0.0;
             if ($chip === self::CHIP_WILDCARD) {
                 foreach ($remainingGws as $g) {
-                    $score += (float) ($predictions[$playerId][$g] ?? 0.0);
+                    $score += $this->getObjectivePoints($predictions, $playerId, $g);
                 }
             } else {
-                $score = (float) ($predictions[$playerId][$gw] ?? 0.0);
+                $score = $this->getObjectivePoints($predictions, $playerId, $gw);
             }
             $objective[$playerId] = $score;
         }
@@ -1048,7 +1054,7 @@ class PathSolver
 
             $totalPred = 0.0;
             foreach ($gameweeks as $gw) {
-                $totalPred += $predictions[$playerId][$gw] ?? 0;
+                $totalPred += $this->getObjectivePoints($predictions, $playerId, $gw);
             }
 
             if ($totalPred < 5.0 && count($gameweeks) > 1) continue;
@@ -1073,7 +1079,7 @@ class PathSolver
             foreach ($playerMap as $playerId => $player) {
                 if (in_array($playerId, $squadIds)) continue;
                 $position = (int)$player['position'];
-                $gwPred = $predictions[$playerId][$gw] ?? 0;
+                $gwPred = $this->getObjectivePoints($predictions, $playerId, $gw);
                 if ($gwPred < 3.0) continue;
                 $byPosGw[$position][] = [
                     'id' => $playerId,
@@ -1093,7 +1099,7 @@ class PathSolver
                         // Calculate total pred for this candidate
                         $totalPred = 0;
                         foreach ($gameweeks as $g) {
-                            $totalPred += $predictions[$candidate['id']][$g] ?? 0;
+                            $totalPred += $this->getObjectivePoints($predictions, $candidate['id'], $g);
                         }
                         $candidate['total_pred'] = $totalPred;
                         unset($candidate['gw_pred']);
@@ -1122,7 +1128,7 @@ class PathSolver
         foreach ($squadIds as $playerId) {
             $total = 0;
             foreach ($remainingGws as $gw) {
-                $total += $predictions[$playerId][$gw] ?? 0;
+                $total += $this->getObjectivePoints($predictions, $playerId, $gw);
             }
             $scores[$playerId] = $total;
         }
@@ -1262,5 +1268,44 @@ class PathSolver
         }
         sort($moves);
         return $moves;
+    }
+
+    private function normalizeObjectiveMode(string $mode): string
+    {
+        return match ($mode) {
+            self::OBJECTIVE_FLOOR => self::OBJECTIVE_FLOOR,
+            self::OBJECTIVE_CEILING => self::OBJECTIVE_CEILING,
+            default => self::OBJECTIVE_EXPECTED,
+        };
+    }
+
+    private function getExpectedPoints(array $predictions, int $playerId, int $gameweek): float
+    {
+        $entry = $predictions[$playerId][$gameweek] ?? 0.0;
+        if (is_array($entry)) {
+            return (float) ($entry['predicted_points'] ?? 0.0);
+        }
+
+        return (float) $entry;
+    }
+
+    private function getObjectivePoints(array $predictions, int $playerId, int $gameweek): float
+    {
+        $entry = $predictions[$playerId][$gameweek] ?? 0.0;
+        if (!is_array($entry)) {
+            return (float) $entry;
+        }
+
+        $expected = (float) ($entry['predicted_points'] ?? 0.0);
+        $confidence = (float) ($entry['confidence'] ?? 1.0);
+        $expectedMins = (float) ($entry['expected_mins'] ?? 90.0);
+        $confidence = max(0.0, min(1.0, $confidence));
+        $availability = max(0.0, min(1.0, $expectedMins / 90.0));
+
+        return match ($this->objectiveMode) {
+            self::OBJECTIVE_FLOOR => round($expected * (0.5 + (0.5 * $confidence)) * (0.6 + (0.4 * $availability)), 4),
+            self::OBJECTIVE_CEILING => round($expected * (1.0 + ((1.0 - $confidence) * 0.9)) * (0.85 + (0.15 * $availability)), 4),
+            default => $expected,
+        };
     }
 }

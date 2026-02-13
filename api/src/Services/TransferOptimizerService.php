@@ -22,6 +22,9 @@ class TransferOptimizerService
         self::CHIP_FREE_HIT,
         self::CHIP_TRIPLE_CAPTAIN,
     ];
+    private const OBJECTIVE_EXPECTED = 'expected';
+    private const OBJECTIVE_FLOOR = 'floor';
+    private const OBJECTIVE_CEILING = 'ceiling';
 
     public function __construct(
         private Database $db,
@@ -52,6 +55,7 @@ class TransferOptimizerService
         array $chipAllow = [],
         array $chipForbid = [],
         bool $chipCompare = false,
+        string $objectiveMode = self::OBJECTIVE_EXPECTED,
     ): array {
         $context = $this->buildPlanningContext($managerId, $freeTransfers);
         $planFromGw = $context['plan_from_gw'];
@@ -63,7 +67,9 @@ class TransferOptimizerService
         $freeTransfers = $context['free_transfers'];
         $playerMap = $context['player_map'];
         $predictions = $context['predictions'];
+        $solverPredictions = $context['solver_predictions'];
         $dgwTeams = $context['dgw_teams'];
+        $objectiveMode = $this->normalizeObjectiveMode($objectiveMode);
 
         $chipMode = $this->normalizeChipMode($chipMode);
         $requestedChipPlan = $this->normalizeChipPlan($chipPlan, $upcomingGws);
@@ -109,10 +115,10 @@ class TransferOptimizerService
         // Run beam search path solver (skip when only squad data is needed)
         $paths = [];
         if (!$skipSolve) {
-            $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
+            $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth, objectiveMode: $objectiveMode);
             $paths = $pathSolver->solve(
                 $currentSquad,
-                $predictions,
+                $solverPredictions,
                 $upcomingGws,
                 $playerMap,
                 $bank,
@@ -129,10 +135,10 @@ class TransferOptimizerService
             if (empty($resolvedChipPlan)) {
                 $noChipPaths = $paths;
             } else {
-                $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth);
+                $pathSolver = new PathSolver(ftValue: $ftValue, depth: $depth, objectiveMode: $objectiveMode);
                 $noChipPaths = $pathSolver->solve(
                     $currentSquad,
-                    $predictions,
+                    $solverPredictions,
                     $upcomingGws,
                     $playerMap,
                     $bank,
@@ -170,6 +176,7 @@ class TransferOptimizerService
             'chip_suggestions' => $chipSuggestions,
             'chip_suggestions_ranked' => $chipInsights['suggestions'],
             'chip_mode' => $chipMode,
+            'objective_mode' => $objectiveMode,
             'requested_chip_plan' => $requestedChipPlan,
             'resolved_chip_plan' => $resolvedChipPlan,
             'chip_plan' => $resolvedChipPlan,
@@ -247,6 +254,7 @@ class TransferOptimizerService
 
         // Get predictions for upcoming gameweeks
         $predictions = [];
+        $solverPredictions = [];
         foreach ($upcomingGws as $gw) {
             $gwPredictions = $this->predictionService->getPredictions($gw);
             foreach ($gwPredictions['predictions'] ?? $gwPredictions as $pred) {
@@ -254,7 +262,15 @@ class TransferOptimizerService
                 if (!isset($predictions[$playerId])) {
                     $predictions[$playerId] = [];
                 }
+                if (!isset($solverPredictions[$playerId])) {
+                    $solverPredictions[$playerId] = [];
+                }
                 $predictions[$playerId][$gw] = (float) ($pred['predicted_points'] ?? 0);
+                $solverPredictions[$playerId][$gw] = [
+                    'predicted_points' => (float) ($pred['predicted_points'] ?? 0),
+                    'confidence' => (float) ($pred['confidence'] ?? 1),
+                    'expected_mins' => (float) ($pred['expected_mins'] ?? 90),
+                ];
             }
         }
 
@@ -279,8 +295,18 @@ class TransferOptimizerService
             'free_transfers' => $freeTransfers,
             'player_map' => $playerMap,
             'predictions' => $predictions,
+            'solver_predictions' => $solverPredictions,
             'dgw_teams' => $dgwTeams,
         ];
+    }
+
+    private function normalizeObjectiveMode(string $objectiveMode): string
+    {
+        return match ($objectiveMode) {
+            self::OBJECTIVE_FLOOR => self::OBJECTIVE_FLOOR,
+            self::OBJECTIVE_CEILING => self::OBJECTIVE_CEILING,
+            default => self::OBJECTIVE_EXPECTED,
+        };
     }
 
     private function normalizeChipMode(string $chipMode): string
