@@ -5,7 +5,7 @@
 | P1-1 | `audit/p1-1-manager-season-analysis` | `.worktrees/p1-1-manager-season-analysis` | done | done | done | done | PR-ready (`5ba9cba`) |
 | P1-2 | `audit/p1-2-league-season-analysis` | `.worktrees/p1-2-league-season-analysis` | done | done | done | done | PR-ready (`e981b4a`) |
 | P1-3 | `audit/p1-3-shared-dgw-fixture-contract` | `.worktrees/p1-3-shared-dgw-fixture-contract` | done | done | done | done | PR-ready (`7b02bcd`) |
-| P1-4 | `audit/p1-4-frontend-types-hooks-expansion` | `.worktrees/p1-4-frontend-types-hooks-expansion` | pending | pending | pending | pending | bootstrapped |
+| P1-4 | `audit/p1-4-frontend-types-hooks-expansion` | `.worktrees/p1-4-frontend-types-hooks-expansion` | done | done | done | done | PR-ready (`d20adcb`) |
 | P2-1 | `audit/p2-1-live-data-confidence-strip` | `.worktrees/p2-1-live-data-confidence-strip` | pending | pending | pending | pending | bootstrapped |
 | P2-2 | `audit/p2-2-live-rank-swing-decomposition` | `.worktrees/p2-2-live-rank-swing-decomposition` | pending | pending | pending | pending | bootstrapped |
 | P2-3 | `audit/p2-3-cross-widget-dgw-consistency` | `.worktrees/p2-3-cross-widget-dgw-consistency` | pending | pending | pending | pending | bootstrapped |
@@ -21,5 +21,5 @@
 
 ## Current Focus
 
-- Active issue: `P1-4`
+- Active issue: `P2-1`
 - Execution order: from `docs/page-audit-fixes-plan.md` suggested order.
