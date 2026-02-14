@@ -361,7 +361,7 @@ export function Planner() {
   }, [solveData, paths.length])
 
   // Get predictions for multiple gameweeks
-  const { data: predictionsRange } = usePredictionsRange()
+  const { data: predictionsRange } = usePredictionsRange(undefined, undefined, !!managerId)
 
   // Get top 10k effective ownership for player explorer
   const { data: samplesData } = useLiveSamples(predictionsRange?.current_gameweek ?? null)
@@ -1448,9 +1448,14 @@ export function Planner() {
                     />
                   </label>
                   <div className="space-y-1">
-                    <div className="text-xs text-foreground-muted">Chip Windows (comma-separated GWs)</div>
+                    <div className="text-xs text-foreground-muted">
+                      Chip Windows (comma-separated GWs)
+                    </div>
                     {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
-                      <label key={`window-${chip}`} className="flex items-center gap-2 text-xs text-foreground-muted">
+                      <label
+                        key={`window-${chip}`}
+                        className="flex items-center gap-2 text-xs text-foreground-muted"
+                      >
                         <span className="w-10">{CHIP_SHORT_LABELS[chip]}</span>
                         <input
                           data-testid={`constraints-chip-window-${chip}`}
@@ -1624,14 +1629,16 @@ export function Planner() {
                             <span className="font-display uppercase tracking-wider text-foreground-muted">
                               GW{row.gw}
                             </span>
-                            <span className={row.gwDelta >= 0 ? 'text-fpl-green' : 'text-destructive'}>
+                            <span
+                              className={row.gwDelta >= 0 ? 'text-fpl-green' : 'text-destructive'}
+                            >
                               Delta {row.gwDelta >= 0 ? '+' : ''}
                               {row.gwDelta.toFixed(1)}
                             </span>
                           </div>
                           <div className="mt-1 text-xs text-foreground">
-                            Points: A {row.pointsA.toFixed(1)} vs B {row.pointsB.toFixed(1)} | Cumulative:{' '}
-                            {row.cumulativeDelta >= 0 ? '+' : ''}
+                            Points: A {row.pointsA.toFixed(1)} vs B {row.pointsB.toFixed(1)} |
+                            Cumulative: {row.cumulativeDelta >= 0 ? '+' : ''}
                             {row.cumulativeDelta.toFixed(1)}
                           </div>
                           <div className="mt-1 text-xs text-foreground-muted">
@@ -1642,9 +1649,18 @@ export function Planner() {
                           </div>
                         </div>
                       ))}
-                      <div className="text-xs text-foreground" data-testid="comparison-cumulative-delta">
+                      <div
+                        className="text-xs text-foreground"
+                        data-testid="comparison-cumulative-delta"
+                      >
                         Final cumulative delta:{' '}
-                        <span className={planComparison.cumulativeDelta >= 0 ? 'text-fpl-green' : 'text-destructive'}>
+                        <span
+                          className={
+                            planComparison.cumulativeDelta >= 0
+                              ? 'text-fpl-green'
+                              : 'text-destructive'
+                          }
+                        >
                           {planComparison.cumulativeDelta >= 0 ? '+' : ''}
                           {planComparison.cumulativeDelta.toFixed(1)}
                         </span>{' '}

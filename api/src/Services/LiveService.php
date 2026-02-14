@@ -29,11 +29,13 @@ class LiveService
      */
     public function getLiveData(int $gameweek): array
     {
+        $fixtures = $this->db->fetchAll('SELECT * FROM fixtures WHERE gameweek = ?', [$gameweek]);
+
         // Check cache first
         $cached = $this->getFromCache($gameweek);
         if ($cached !== null) {
             // Re-apply on cached data so provisional values stay accurate between allocations.
-            $cached = $this->applyProvisionalBonusToLiveData($cached, $gameweek);
+            $cached = $this->applyProvisionalBonusToLiveData($cached, $gameweek, $fixtures);
             $this->saveToCache($gameweek, $cached);
             return $cached;
         }
@@ -43,7 +45,7 @@ class LiveService
 
         // Enrich with player info
         $enriched = $this->enrichLiveData($liveData);
-        $enriched = $this->applyProvisionalBonusToLiveData($enriched, $gameweek);
+        $enriched = $this->applyProvisionalBonusToLiveData($enriched, $gameweek, $fixtures);
 
         // Cache the result
         $this->saveToCache($gameweek, $enriched);
@@ -163,8 +165,17 @@ class LiveService
         $eoData = $ownershipService->getEffectiveOwnership($gameweek, 100);
         $effectiveOwnership = $eoData['effective_ownership'] ?? [];
 
-        // Get player info for enrichment
-        $players = $this->db->fetchAll("SELECT id, web_name, club_id as team, position as element_type FROM players");
+        // Get player info for enrichment (filtered to squad only)
+        $squadIds = array_map(fn($p) => (int) $p['player_id'], $baseData['players']);
+        if (empty($squadIds)) {
+            $players = [];
+        } else {
+            $placeholders = implode(',', array_fill(0, count($squadIds), '?'));
+            $players = $this->db->fetchAll(
+                "SELECT id, web_name, club_id as team, position as element_type FROM players WHERE id IN ($placeholders)",
+                $squadIds
+            );
+        }
         $playerMap = [];
         foreach ($players as $p) {
             $playerMap[(int)$p['id']] = $p;
@@ -239,13 +250,14 @@ class LiveService
      *
      * @return array<int, array{player_id: int, bps: int, predicted_bonus: int}>
      */
-    public function getBonusPredictions(int $gameweek): array
+    public function getBonusPredictions(int $gameweek, ?array $fixtures = null): array
     {
-        // Get current fixtures
-        $fixtures = $this->db->fetchAll(
-            'SELECT * FROM fixtures WHERE gameweek = ?',
-            [$gameweek]
-        );
+        if ($fixtures === null) {
+            $fixtures = $this->db->fetchAll(
+                'SELECT * FROM fixtures WHERE gameweek = ?',
+                [$gameweek]
+            );
+        }
 
         return $this->calculateProvisionalBonusPredictions($gameweek, $fixtures);
     }
@@ -256,13 +268,9 @@ class LiveService
      * @param array<string, mixed> $liveData
      * @return array<string, mixed>
      */
-    private function applyProvisionalBonusToLiveData(array $liveData, int $gameweek): array
+    private function applyProvisionalBonusToLiveData(array $liveData, int $gameweek, array $fixtures): array
     {
         $elements = $liveData['elements'] ?? [];
-        $fixtures = $this->db->fetchAll(
-            'SELECT * FROM fixtures WHERE gameweek = ?',
-            [$gameweek]
-        );
 
         $predictions = $this->calculateProvisionalBonusPredictions($gameweek, $fixtures);
         $provisionalByPlayer = [];
@@ -480,27 +488,43 @@ class LiveService
     private function enrichLiveData(array $liveData): array
     {
         $elements = $liveData['elements'] ?? [];
-        $enrichedElements = [];
+        if (empty($elements)) {
+            return $liveData;
+        }
 
-        foreach ($elements as $element) {
-            $playerId = $element['id'] ?? 0;
+        $playerIds = array_filter(
+            array_map(fn($e) => (int) ($e['id'] ?? 0), $elements),
+            fn($id) => $id > 0
+        );
 
-            // Get player info
-            $player = $this->db->fetchOne(
-                'SELECT web_name, club_id, position FROM players WHERE id = ?',
-                [$playerId]
-            );
+        if (empty($playerIds)) {
+            $liveData['elements'] = $elements;
+            return $liveData;
+        }
 
+        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+        $players = $this->db->fetchAll(
+            "SELECT id, web_name, club_id, position FROM players WHERE id IN ($placeholders)",
+            array_values($playerIds)
+        );
+
+        $playerMap = [];
+        foreach ($players as $p) {
+            $playerMap[(int) $p['id']] = $p;
+        }
+
+        foreach ($elements as &$element) {
+            $playerId = (int) ($element['id'] ?? 0);
+            $player = $playerMap[$playerId] ?? null;
             if ($player) {
                 $element['web_name'] = $player['web_name'];
                 $element['team'] = $player['club_id'];
                 $element['position'] = $player['position'];
             }
-
-            $enrichedElements[] = $element;
         }
+        unset($element);
 
-        $liveData['elements'] = $enrichedElements;
+        $liveData['elements'] = $elements;
         return $liveData;
     }
 

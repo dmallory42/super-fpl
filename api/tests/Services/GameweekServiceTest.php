@@ -178,4 +178,61 @@ class GameweekServiceTest extends TestCase
 
         $this->assertEquals(25, $this->service->getNextActionableGameweek());
     }
+
+    public function testGetMultipleDoubleGameweekTeams(): void
+    {
+        $dgw = $this->service->getMultipleDoubleGameweekTeams([24, 25]);
+
+        // GW24 has no DGW teams
+        $this->assertArrayNotHasKey(24, $dgw);
+
+        // GW25 has team 1 as DGW (2 home fixtures)
+        $this->assertArrayHasKey(25, $dgw);
+        $this->assertContains(1, $dgw[25]);
+        $this->assertNotContains(2, $dgw[25]);
+    }
+
+    public function testGetMultipleDoubleGameweekTeamsNoDgw(): void
+    {
+        // GW24 has no DGW teams
+        $dgw = $this->service->getMultipleDoubleGameweekTeams([24]);
+
+        $this->assertEmpty($dgw);
+    }
+
+    public function testGetMultipleBlankGameweekTeams(): void
+    {
+        $bgw = $this->service->getMultipleBlankGameweekTeams([24, 25]);
+
+        // GW24: teams 5, 6 have no fixtures
+        $this->assertArrayHasKey(24, $bgw);
+        $this->assertContains(5, $bgw[24]);
+        $this->assertContains(6, $bgw[24]);
+        $this->assertNotContains(1, $bgw[24]);
+
+        // GW25: team 6 has no fixtures
+        $this->assertArrayHasKey(25, $bgw);
+        $this->assertContains(6, $bgw[25]);
+        $this->assertNotContains(1, $bgw[25]);
+    }
+
+    public function testGetMultipleBlankGameweekTeamsNoBgw(): void
+    {
+        // Add fixtures so all 6 teams play in GW24
+        $this->db->getPdo()->exec("
+            INSERT INTO fixtures (id, gameweek, home_club_id, away_club_id, kickoff_time, finished) VALUES
+            (50, 24, 5, 6, '2099-06-01 15:00:00', 0)
+        ");
+
+        $bgw = $this->service->getMultipleBlankGameweekTeams([24]);
+
+        $this->assertArrayNotHasKey(24, $bgw);
+    }
+
+    public function testGetMultipleBlankGameweekTeamsEmptyInput(): void
+    {
+        $bgw = $this->service->getMultipleBlankGameweekTeams([]);
+
+        $this->assertEmpty($bgw);
+    }
 }

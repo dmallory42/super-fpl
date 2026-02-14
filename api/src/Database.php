@@ -149,6 +149,15 @@ class Database
                 PRIMARY KEY (team_name, season)
             )
         ");
+
+        // Apply performance indexes (IF NOT EXISTS makes this idempotent)
+        $migrationFile = dirname(__DIR__) . '/data/migrations/add-performance-indexes.sql';
+        if (file_exists($migrationFile)) {
+            $sql = file_get_contents($migrationFile);
+            if ($sql !== false) {
+                $this->pdo->exec($sql);
+            }
+        }
     }
 
     /**

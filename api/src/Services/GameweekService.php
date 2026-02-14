@@ -165,4 +165,48 @@ class GameweekService
         // Return teams without fixtures
         return array_values(array_diff($allTeamIds, $fixtureTeamIds));
     }
+
+    /**
+     * Get DGW teams for multiple gameweeks in a single query batch.
+     * @param int[] $gameweeks
+     * @return array<int, int[]> Map of gameweek => team IDs with 2+ fixtures
+     */
+    public function getMultipleDoubleGameweekTeams(array $gameweeks, ?array $precomputedCounts = null): array
+    {
+        $counts = $precomputedCounts ?? $this->getFixtureCounts($gameweeks);
+        $result = [];
+        foreach ($counts as $gw => $teams) {
+            $dgw = array_keys(array_filter($teams, fn($count) => $count >= 2));
+            if (!empty($dgw)) {
+                $result[$gw] = $dgw;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Get BGW teams for multiple gameweeks in a single query batch.
+     * @param int[] $gameweeks
+     * @return array<int, int[]> Map of gameweek => team IDs with no fixtures
+     */
+    public function getMultipleBlankGameweekTeams(array $gameweeks, ?array $precomputedCounts = null): array
+    {
+        if (empty($gameweeks)) {
+            return [];
+        }
+
+        $allTeams = $this->db->fetchAll("SELECT id FROM clubs");
+        $allTeamIds = array_map(fn($t) => (int) $t['id'], $allTeams);
+
+        $counts = $precomputedCounts ?? $this->getFixtureCounts($gameweeks);
+        $result = [];
+        foreach ($gameweeks as $gw) {
+            $teamsWithFixtures = array_keys($counts[$gw] ?? []);
+            $blank = array_values(array_diff($allTeamIds, $teamsWithFixtures));
+            if (!empty($blank)) {
+                $result[$gw] = $blank;
+            }
+        }
+        return $result;
+    }
 }

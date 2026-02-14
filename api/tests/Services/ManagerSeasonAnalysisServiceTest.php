@@ -203,6 +203,130 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
         $this->assertSame(60.0, $result['benchmarks']['top_10k'][1]['points']);
     }
 
+    public function testBulkPreloadProducesIdenticalResults(): void
+    {
+        // Seed additional player (3) with prediction_snapshots for GW1 but only
+        // player_predictions (with if-fit fallback) for GW2 to exercise both paths.
+        $pdo = $this->db->getPdo();
+
+        // Player 3 picks for manager 100 in both GWs
+        $pdo->exec("
+            INSERT INTO manager_picks (manager_id, gameweek, player_id, position, multiplier, is_captain, is_vice_captain) VALUES
+            (100, 1, 3, 3, 1, 0, 0),
+            (100, 2, 3, 3, 1, 0, 0)
+        ");
+
+        // Player 3 snapshot only for GW1
+        $pdo->exec("
+            INSERT INTO prediction_snapshots (player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapped_at) VALUES
+            (3, 1, 3.0, 0.7, '{}', 'v1', '2026-02-01 00:00:00')
+        ");
+
+        // Player 3 player_predictions for GW2 with if-fit fallback triggered
+        // (predicted_points near zero, predicted_if_fit has real value)
+        $pdo->exec("
+            INSERT INTO player_predictions (player_id, gameweek, predicted_points, predicted_if_fit, expected_mins, expected_mins_if_fit, confidence, model_version, computed_at) VALUES
+            (3, 2, 0.01, 4.5, 5.0, 60.0, 0.7, 'v1', '2026-02-01 00:00:00')
+        ");
+
+        // Player 3 actuals
+        $pdo->exec("
+            INSERT INTO player_gameweek_history (player_id, gameweek, total_points, expected_goals, expected_assists, expected_goals_conceded, value, selected) VALUES
+            (3, 1, 5, 0, 0, 0, 100, 500),
+            (3, 2, 3, 0, 0, 0, 100, 500)
+        ");
+
+        $mockEntry = $this->createMock(EntryEndpoint::class);
+        $mockEntry->method('history')->willReturn([
+            'current' => [
+                [
+                    'event' => 1, 'points' => 12, 'total_points' => 12,
+                    'overall_rank' => 100000, 'bank' => 0, 'value' => 1000,
+                    'event_transfers' => 0, 'event_transfers_cost' => 0, 'points_on_bench' => 0,
+                ],
+                [
+                    'event' => 2, 'points' => 10, 'total_points' => 22,
+                    'overall_rank' => 90000, 'bank' => 0, 'value' => 1001,
+                    'event_transfers' => 1, 'event_transfers_cost' => 4, 'points_on_bench' => 2,
+                ],
+            ],
+            'chips' => [],
+        ]);
+        $mockEntry->method('transfers')->willReturn([
+            ['event' => 2, 'element_in' => 2, 'element_out' => 1],
+        ]);
+
+        $mockClient = $this->createMock(FplClient::class);
+        $mockClient->method('entry')->with(100)->willReturn($mockEntry);
+
+        $service = new ManagerSeasonAnalysisService($this->db, $mockClient);
+        $result = $service->analyze(100);
+
+        $this->assertNotNull($result);
+        $this->assertCount(2, $result['gameweeks']);
+
+        // GW1: players 1(cap x2), 2(x1), 3(x1)
+        // Expected = 5.0*2 + 4.0*1 + 3.0*1 = 17.0
+        $gw1 = $result['gameweeks'][0];
+        $this->assertSame(1, $gw1['gameweek']);
+        $this->assertEqualsWithDelta(17.0, $gw1['expected_points'], 0.01);
+
+        // GW2: players 1(x1), 2(cap x2), 3(x1)
+        // Player 3 GW2: if-fit fallback triggers (0.01 <= 0.05 and predicted_if_fit=4.5) → 4.5
+        // Expected = 6.0*1 + 3.5*2 + 4.5*1 = 17.5
+        $gw2 = $result['gameweeks'][1];
+        $this->assertSame(2, $gw2['gameweek']);
+        $this->assertEqualsWithDelta(17.5, $gw2['expected_points'], 0.01);
+
+        // Verify luck_delta = actual - expected for each GW
+        $this->assertEqualsWithDelta(
+            $gw1['actual_points'] - $gw1['expected_points'],
+            $gw1['luck_delta'],
+            0.01
+        );
+        $this->assertEqualsWithDelta(
+            $gw2['actual_points'] - $gw2['expected_points'],
+            $gw2['luck_delta'],
+            0.01
+        );
+    }
+
+    public function testCacheResetsAcrossAnalyzeCalls(): void
+    {
+        // Run analyze for manager 100, then a second call should produce fresh results
+        $mockEntry = $this->createMock(EntryEndpoint::class);
+        $mockEntry->method('history')->willReturn([
+            'current' => [
+                [
+                    'event' => 1, 'points' => 12, 'total_points' => 12,
+                    'overall_rank' => 100000, 'bank' => 0, 'value' => 1000,
+                    'event_transfers' => 0, 'event_transfers_cost' => 0, 'points_on_bench' => 0,
+                ],
+            ],
+            'chips' => [],
+        ]);
+        $mockEntry->method('transfers')->willReturn([]);
+
+        $mockClient = $this->createMock(FplClient::class);
+        $mockClient->method('entry')->with(100)->willReturn($mockEntry);
+
+        $service = new ManagerSeasonAnalysisService($this->db, $mockClient);
+
+        $result1 = $service->analyze(100);
+        $this->assertNotNull($result1);
+
+        // Update prediction data between calls
+        $this->db->getPdo()->exec("UPDATE prediction_snapshots SET predicted_points = 10.0 WHERE player_id = 1 AND gameweek = 1");
+
+        $result2 = $service->analyze(100);
+        $this->assertNotNull($result2);
+
+        // GW1 expected should change: was 5.0*2+4.0=14.0, now 10.0*2+4.0=24.0
+        $this->assertEqualsWithDelta(24.0, $result2['gameweeks'][0]['expected_points'], 0.01);
+        // Confirm first result was different
+        $this->assertEqualsWithDelta(14.0, $result1['gameweeks'][0]['expected_points'], 0.01);
+    }
+
     public function testSeasonAnalysisHandlesNoChipsAndNoHits(): void
     {
         $mockEntry = $this->createMock(EntryEndpoint::class);

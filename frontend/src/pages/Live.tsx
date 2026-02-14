@@ -155,85 +155,147 @@ export function Live() {
     }
   }, [liveManager?.overall_rank, liveManager?.pre_gw_rank])
 
-  // Calculate player impacts on rank (differentials)
-  // Impact = your points from player - average tier points from player
-  // Owned: impact = effective_points * (1 - EO / (100 * multiplier))
-  // Not owned: impact = -points * EO / 100 (you got 0, others got points * EO%)
-  const playerImpacts = useMemo((): PlayerImpact[] => {
-    if (!processedSquad || !tierEO || !playersMap) return []
+  // Consolidated impact computations — single pass over liveData.elements for all three:
+  // playerImpacts (rank impact), fixtureImpacts (threat index), differentialData (EO breakdown)
+  const { playerImpacts, fixtureImpacts, differentialData } = useMemo(() => {
+    type DiffPlayer = {
+      playerId: number
+      name: string
+      points: number
+      eo: number
+      impact: number
+      multiplier: number
+    }
+    type FixtImpact = {
+      fixtureId: number
+      homeTeam: string
+      awayTeam: string
+      userPoints: number
+      tierAvgPoints: number
+      impact: number
+      isLive: boolean
+      isFinished: boolean
+      hasUserPlayer: boolean
+    }
+    const empty = {
+      playerImpacts: [] as PlayerImpact[],
+      fixtureImpacts: [] as FixtImpact[],
+      differentialData: [] as DiffPlayer[],
+    }
+    if (!processedSquad || !tierEO || !playersMap) return empty
 
     const ownedPlayerIds = new Set(processedSquad.players.map((p) => p.player_id))
-    const ownedImpacts: PlayerImpact[] = []
-    const notOwnedImpacts: PlayerImpact[] = []
+    const startingXI = processedSquad.players.filter((p) => p.position <= 11)
 
-    // Calculate impact for owned players (in starting XI only)
-    for (const player of processedSquad.players.filter((p) => p.position <= 11)) {
+    // 1. Process owned starting XI — builds both differentialData and owned portion of playerImpacts
+    const diffPlayers: DiffPlayer[] = []
+    const ownedImpacts: PlayerImpact[] = []
+    for (const player of startingXI) {
       const info = playersMap.get(player.player_id)
       if (!info) continue
 
       const eo = tierEO[player.player_id] ?? 0
-      const multiplier = player.multiplier || 1 // 1 = normal, 2 = captain, 3 = triple captain
-      const yourExposure = multiplier * 100 // 100% normal, 200% captain, 300% TC
-      const relativeEO = yourExposure - eo // positive = you have more exposure than field
-
-      // Impact formula accounts for captaincy:
-      // If you captain (2x) a player with 100% EO, you still gain vs field
-      // If you captain (2x) a player with 200% EO, you're even with field
+      const multiplier = player.multiplier || 1
       const impact = player.effective_points * (1 - eo / (100 * multiplier))
+
+      diffPlayers.push({
+        playerId: player.player_id,
+        name: info.web_name,
+        points: player.effective_points,
+        eo,
+        impact,
+        multiplier,
+      })
 
       ownedImpacts.push({
         playerId: player.player_id,
         name: info.web_name,
         points: player.effective_points,
         eo,
-        relativeEO,
+        relativeEO: multiplier * 100 - eo,
         impact,
         owned: true,
       })
     }
 
-    // Calculate impact for NOT owned players with high EO (these hurt your rank)
-    if (liveData?.elements) {
+    // 2. Single pass over liveData.elements — accumulates not-owned impacts AND per-fixture tier avg points
+    const notOwnedImpacts: PlayerImpact[] = []
+    const fixtureTierPoints = new Map<number, number>()
+
+    if (liveData?.elements && gameweekData?.fixtures) {
       for (const element of liveData.elements) {
-        if (ownedPlayerIds.has(element.id)) continue // Skip owned players
-
-        const eo = tierEO[element.id]
-        if (!eo || eo < 15) continue // Only care about reasonably popular players
-
-        const points = element.stats?.total_points ?? 0
-        if (points <= 2) continue // Only care about players who actually scored
-
         const info = playersMap.get(element.id)
         if (!info) continue
 
-        // You got 0 from this player, others in tier got points * EO/100
-        const impact = -((points * eo) / 100)
-        const relativeEO = -eo // 0% yours - eo% theirs = negative
+        const eo = tierEO[element.id] ?? 0
+        const points = element.stats?.total_points ?? 0
 
-        notOwnedImpacts.push({
-          playerId: element.id,
-          name: info.web_name,
-          points,
-          eo,
-          relativeEO,
-          impact,
-          owned: false,
-        })
+        // Accumulate fixture tier points for FixtureThreatIndex
+        for (const f of gameweekData.fixtures) {
+          if (info.team === f.home_club_id || info.team === f.away_club_id) {
+            fixtureTierPoints.set(f.id, (fixtureTierPoints.get(f.id) ?? 0) + (points * eo) / 100)
+            break // Player can only be in one fixture
+          }
+        }
+
+        // Not-owned player impact
+        if (!ownedPlayerIds.has(element.id) && eo >= 15 && points > 2) {
+          notOwnedImpacts.push({
+            playerId: element.id,
+            name: info.web_name,
+            points,
+            eo,
+            relativeEO: -eo,
+            impact: -((points * eo) / 100),
+            owned: false,
+          })
+        }
       }
     }
 
-    // Sort by impact
+    // 3. Assemble playerImpacts
     const gainers = ownedImpacts
       .filter((p) => p.impact > 0.5)
       .sort((a, b) => b.impact - a.impact)
       .slice(0, 5)
-    // For losers, combine owned (negative impact) and not owned (all negative)
     const allLosers = [...ownedImpacts.filter((p) => p.impact < -0.5), ...notOwnedImpacts]
       .sort((a, b) => a.impact - b.impact)
       .slice(0, 5)
 
-    return [...gainers, ...allLosers]
-  }, [processedSquad, tierEO, playersMap, liveData])
+    // 4. Assemble fixtureImpacts using precomputed tier points
+    const fixtureImpactList = (gameweekData?.fixtures ?? []).map((fixture) => {
+      let userPoints = 0
+      let hasUserPlayer = false
+      for (const player of startingXI) {
+        const info = playersMap.get(player.player_id)
+        if (!info) continue
+        if (info.team === fixture.home_club_id || info.team === fixture.away_club_id) {
+          userPoints += player.effective_points
+          hasUserPlayer = true
+        }
+      }
+
+      const tierAvgPoints = fixtureTierPoints.get(fixture.id) ?? 0
+
+      return {
+        fixtureId: fixture.id,
+        homeTeam: teamsMap.get(fixture.home_club_id) ?? '???',
+        awayTeam: teamsMap.get(fixture.away_club_id) ?? '???',
+        userPoints,
+        tierAvgPoints,
+        impact: userPoints - tierAvgPoints,
+        isLive: toBoolFlag(fixture.started) && !toBoolFlag(fixture.finished),
+        isFinished: toBoolFlag(fixture.finished),
+        hasUserPlayer,
+      }
+    })
+
+    return {
+      playerImpacts: [...gainers, ...allLosers],
+      fixtureImpacts: fixtureImpactList,
+      differentialData: diffPlayers,
+    }
+  }, [processedSquad, tierEO, playersMap, liveData, gameweekData, teamsMap])
 
   // Get user's captain info
   const userCaptain = useMemo(() => {
@@ -307,88 +369,7 @@ export function Live() {
     }
   }, [processedSquad, predictionsMap, playersMap, startedTeamIds])
 
-  // Calculate fixture impacts for threat index (user points vs tier avg per fixture)
-  const fixtureImpacts = useMemo(() => {
-    if (!gameweekData || !processedSquad || !tierEO || !liveData?.elements) return []
-
-    const startingXI = processedSquad.players.filter((p) => p.position <= 11)
-
-    return gameweekData.fixtures.map((fixture) => {
-      const homeTeam = teamsMap.get(fixture.home_club_id) ?? '???'
-      const awayTeam = teamsMap.get(fixture.away_club_id) ?? '???'
-
-      // Calculate user's points from this fixture
-      let userPoints = 0
-      let hasUserPlayer = false
-      for (const player of startingXI) {
-        const info = playersMap.get(player.player_id)
-        if (!info) continue
-        if (info.team === fixture.home_club_id || info.team === fixture.away_club_id) {
-          userPoints += player.effective_points
-          hasUserPlayer = true
-        }
-      }
-
-      // Calculate tier average points from this fixture
-      let tierAvgPoints = 0
-      for (const element of liveData.elements) {
-        const info = playersMap.get(element.id)
-        if (!info) continue
-        if (info.team === fixture.home_club_id || info.team === fixture.away_club_id) {
-          const eo = tierEO[element.id] ?? 0
-          const points = element.stats?.total_points ?? 0
-          tierAvgPoints += (points * eo) / 100
-        }
-      }
-
-      return {
-        fixtureId: fixture.id,
-        homeTeam,
-        awayTeam,
-        userPoints,
-        tierAvgPoints,
-        impact: userPoints - tierAvgPoints,
-        isLive: toBoolFlag(fixture.started) && !toBoolFlag(fixture.finished),
-        isFinished: toBoolFlag(fixture.finished),
-        hasUserPlayer,
-      }
-    })
-  }, [gameweekData, processedSquad, tierEO, liveData, playersMap, teamsMap])
-
-  // Calculate differential analysis data
-  const differentialData = useMemo(() => {
-    if (!processedSquad || !tierEO) return []
-
-    const startingXI = processedSquad.players.filter((p) => p.position <= 11)
-    const players: Array<{
-      playerId: number
-      name: string
-      points: number
-      eo: number
-      impact: number
-      multiplier: number
-    }> = []
-
-    for (const player of startingXI) {
-      const info = playersMap.get(player.player_id)
-      if (!info) continue
-
-      const eo = tierEO[player.player_id] ?? 0
-      const multiplier = player.multiplier || 1
-      const impact = player.effective_points * (1 - eo / (100 * multiplier))
-
-      players.push({
-        playerId: player.player_id,
-        name: info.web_name,
-        points: player.effective_points,
-        eo,
-        impact,
-        multiplier,
-      })
-    }
-
-    return players
-  }, [processedSquad, tierEO, playersMap])
+  // fixtureImpacts and differentialData are computed in the consolidated memo above
 
   // Get tier label for differential analysis
   const tierLabel = TIER_OPTIONS.find((t) => t.value === comparisonTier)?.label ?? comparisonTier

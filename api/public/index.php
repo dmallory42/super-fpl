@@ -95,7 +95,7 @@ try {
         preg_match('#^/managers/(\d+)/history$#', $uri, $m) === 1 => handleManagerHistory($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/managers/(\d+)/season-analysis$#', $uri, $m) === 1 => handleManagerSeasonAnalysis($db, $fplClient, $config, (int) $m[1]),
         $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
-        preg_match('#^/predictions/(\d+)/accuracy$#', $uri, $m) === 1 => handlePredictionAccuracy($db, (int) $m[1]),
+        preg_match('#^/predictions/(\d+)/accuracy$#', $uri, $m) === 1 => handlePredictionAccuracy($db, (int) $m[1], $config),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1], $config),
         preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
         $uri === '/predictions/range' => handlePredictionsRange($db, $config),
@@ -546,24 +546,26 @@ function handlePredictions(Database $db, int $gameweek, array $config): void
     });
 }
 
-function handlePredictionAccuracy(Database $db, int $gameweek): void
+function handlePredictionAccuracy(Database $db, int $gameweek, array $config): void
 {
-    $service = new PredictionService($db);
-    $accuracy = $service->getAccuracy($gameweek);
+    withResponseCache($config, 'prediction-accuracy', 600, function () use ($db, $gameweek): void {
+        $service = new PredictionService($db);
+        $accuracy = $service->getAccuracy($gameweek);
 
-    if ($accuracy['summary']['count'] === 0) {
-        http_response_code(404);
+        if ($accuracy['summary']['count'] === 0) {
+            http_response_code(404);
+            echo json_encode([
+                'error' => 'No accuracy data available for this gameweek',
+                'gameweek' => $gameweek,
+            ]);
+            return;
+        }
+
         echo json_encode([
-            'error' => 'No accuracy data available for this gameweek',
             'gameweek' => $gameweek,
+            'accuracy' => $accuracy,
         ]);
-        return;
-    }
-
-    echo json_encode([
-        'gameweek' => $gameweek,
-        'accuracy' => $accuracy,
-    ]);
+    });
 }
 
 function handlePredictionsRange(Database $db, array $config): void
@@ -685,19 +687,9 @@ function handleCurrentGameweek(Database $db): void
     $upcoming = $service->getUpcomingGameweeks(6);
     $fixtureCounts = $service->getFixtureCounts($upcoming);
 
-    // Find DGW and BGW teams
-    $dgwTeams = [];
-    $bgwTeams = [];
-    foreach ($upcoming as $gw) {
-        $dgw = $service->getDoubleGameweekTeams($gw);
-        $bgw = $service->getBlankGameweekTeams($gw);
-        if (!empty($dgw)) {
-            $dgwTeams[$gw] = $dgw;
-        }
-        if (!empty($bgw)) {
-            $bgwTeams[$gw] = $bgw;
-        }
-    }
+    // Find DGW and BGW teams (batch queries, reuse fixture counts)
+    $dgwTeams = $service->getMultipleDoubleGameweekTeams($upcoming, $fixtureCounts);
+    $bgwTeams = $service->getMultipleBlankGameweekTeams($upcoming, $fixtureCounts);
 
     echo json_encode([
         'current_gameweek' => $current,

@@ -26,6 +26,10 @@ class ManagerSeasonAnalysisService
      */
     public function analyze(int $managerId): ?array
     {
+        // Reset caches so consecutive calls for different managers don't leak
+        $this->expectedPointCache = [];
+        $this->actualPointCache = [];
+
         $managerService = new ManagerService($this->db, $this->fplClient);
         $history = $managerService->getHistory($managerId);
 
@@ -35,6 +39,39 @@ class ManagerSeasonAnalysisService
 
         $chipsByGw = $this->groupChipsByGameweek($history['chips'] ?? []);
         $transfersByGw = $this->groupTransfersByGameweek($managerId);
+
+        // Collect all player IDs from picks and transfers for bulk preload
+        $allPlayerIds = [];
+
+        foreach ($history['current'] as $gwEntry) {
+            $gw = (int) ($gwEntry['event'] ?? 0);
+            if ($gw <= 0) {
+                continue;
+            }
+            $picks = $this->getManagerPicks($managerId, $gw);
+            foreach ($picks as $pick) {
+                $pid = (int) ($pick['element'] ?? 0);
+                if ($pid > 0) {
+                    $allPlayerIds[$pid] = true;
+                }
+            }
+        }
+
+        foreach ($transfersByGw as $transfers) {
+            foreach ($transfers as $t) {
+                $in = (int) ($t['element_in'] ?? 0);
+                $out = (int) ($t['element_out'] ?? 0);
+                if ($in > 0) {
+                    $allPlayerIds[$in] = true;
+                }
+                if ($out > 0) {
+                    $allPlayerIds[$out] = true;
+                }
+            }
+        }
+
+        $this->preloadPredictions(array_keys($allPlayerIds));
+        $this->preloadActuals(array_keys($allPlayerIds));
 
         $gameweeks = [];
         $transferAnalytics = [];
@@ -341,6 +378,89 @@ class ManagerSeasonAnalysisService
         $this->actualPointCache[$gw][$playerId] = $value;
 
         return $value;
+    }
+
+    /**
+     * Preload all predicted points for a set of player IDs across all gameweeks.
+     * Populates $this->expectedPointCache to avoid per-player queries.
+     *
+     * @param array<int, int> $playerIds
+     */
+    private function preloadPredictions(array $playerIds): void
+    {
+        if (empty($playerIds)) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+
+        // Load from snapshots first (preferred source)
+        $snapshots = $this->db->fetchAll(
+            "SELECT player_id, gameweek, predicted_points FROM prediction_snapshots WHERE player_id IN ($placeholders)",
+            $playerIds
+        );
+        foreach ($snapshots as $row) {
+            $this->expectedPointCache[(int) $row['gameweek']][(int) $row['player_id']] = (float) $row['predicted_points'];
+        }
+
+        // Load fallback predictions for any gaps
+        $predictions = $this->db->fetchAll(
+            "SELECT player_id, gameweek, predicted_points, predicted_if_fit, expected_mins, expected_mins_if_fit
+             FROM player_predictions WHERE player_id IN ($placeholders)",
+            $playerIds
+        );
+        foreach ($predictions as $row) {
+            $gw = (int) $row['gameweek'];
+            $pid = (int) $row['player_id'];
+            if (isset($this->expectedPointCache[$gw][$pid])) {
+                continue; // Snapshot takes priority
+            }
+
+            $value = (float) ($row['predicted_points'] ?? 0);
+            $predictedIfFit = isset($row['predicted_if_fit']) ? (float) $row['predicted_if_fit'] : null;
+            $expectedMins = isset($row['expected_mins']) ? (float) $row['expected_mins'] : null;
+            $expectedMinsIfFit = isset($row['expected_mins_if_fit']) ? (float) $row['expected_mins_if_fit'] : null;
+
+            // Apply the same if-fit fallback logic as getPredictedPoints()
+            if (
+                $predictedIfFit !== null
+                && (
+                    $value <= 0.05
+                    || (
+                        $expectedMins !== null
+                        && $expectedMinsIfFit !== null
+                        && $expectedMins < 15.0
+                        && $expectedMinsIfFit >= 45.0
+                    )
+                )
+            ) {
+                $value = $predictedIfFit;
+            }
+
+            $this->expectedPointCache[$gw][$pid] = $value;
+        }
+    }
+
+    /**
+     * Preload all actual points for a set of player IDs across all gameweeks.
+     * Populates $this->actualPointCache to avoid per-player queries.
+     *
+     * @param array<int, int> $playerIds
+     */
+    private function preloadActuals(array $playerIds): void
+    {
+        if (empty($playerIds)) {
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
+        $rows = $this->db->fetchAll(
+            "SELECT player_id, gameweek, total_points FROM player_gameweek_history WHERE player_id IN ($placeholders)",
+            $playerIds
+        );
+        foreach ($rows as $row) {
+            $this->actualPointCache[(int) $row['gameweek']][(int) $row['player_id']] = (float) $row['total_points'];
+        }
     }
 
     /**
