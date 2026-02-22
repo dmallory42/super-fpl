@@ -8,17 +8,39 @@ class RateLimiter
 {
     private readonly string $lockFile;
     private readonly int $minInterval;
+    private bool $usesFileLock = false;
+    private static int $fallbackLastRequestTimeMs = 0;
 
     public function __construct(
         string $lockDir = '/tmp',
         int $minIntervalMs = 1000
     ) {
-        if (!is_dir($lockDir)) {
-            mkdir($lockDir, 0755, true);
+        $normalizedLockDir = rtrim($lockDir, '/');
+        if ($normalizedLockDir === '') {
+            $normalizedLockDir = '/tmp';
         }
 
-        $this->lockFile = $lockDir . '/fpl_client_rate_limit.lock';
+        if (!is_dir($normalizedLockDir)) {
+            @mkdir($normalizedLockDir, 0777, true);
+        }
+
+        // Keep lock dir/file writable across php-fpm (www-data) and cron/root processes.
+        @chmod($normalizedLockDir, 0777);
+
+        $this->lockFile = $normalizedLockDir . '/fpl_client_rate_limit.lock';
         $this->minInterval = $minIntervalMs;
+
+        if (!file_exists($this->lockFile)) {
+            if (@touch($this->lockFile)) {
+                @chmod($this->lockFile, 0666);
+            }
+        } elseif (!is_writable($this->lockFile)) {
+            @chmod($this->lockFile, 0666);
+        }
+
+        $this->usesFileLock = is_file($this->lockFile)
+            && is_readable($this->lockFile)
+            && is_writable($this->lockFile);
     }
 
     public function wait(): void
@@ -32,16 +54,21 @@ class RateLimiter
             usleep($sleepMs * 1000);
         }
 
-        $this->setLastRequestTime($this->getCurrentTimeMs());
+        $updatedAt = $this->getCurrentTimeMs();
+        $this->setLastRequestTime($updatedAt);
     }
 
     private function getLastRequestTime(): int
     {
+        if (!$this->usesFileLock) {
+            return self::$fallbackLastRequestTimeMs;
+        }
+
         if (!file_exists($this->lockFile)) {
             return 0;
         }
 
-        $content = file_get_contents($this->lockFile);
+        $content = @file_get_contents($this->lockFile);
         if ($content === false) {
             return 0;
         }
@@ -51,7 +78,19 @@ class RateLimiter
 
     private function setLastRequestTime(int $timeMs): void
     {
-        file_put_contents($this->lockFile, (string) $timeMs);
+        if (!$this->usesFileLock) {
+            self::$fallbackLastRequestTimeMs = $timeMs;
+            return;
+        }
+
+        $result = @file_put_contents($this->lockFile, (string) $timeMs, LOCK_EX);
+        if ($result === false) {
+            $this->usesFileLock = false;
+            self::$fallbackLastRequestTimeMs = $timeMs;
+            return;
+        }
+
+        @chmod($this->lockFile, 0666);
     }
 
     private function getCurrentTimeMs(): int
