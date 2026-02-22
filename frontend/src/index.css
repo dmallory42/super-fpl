@@ -414,6 +414,16 @@
     @apply px-4 py-3 text-left font-display text-xs uppercase tracking-wider text-foreground-muted;
   }
 
+  .table-broadcast th.text-right,
+  .table-broadcast td.text-right {
+    text-align: right;
+  }
+
+  .table-broadcast th.text-center,
+  .table-broadcast td.text-center {
+    text-align: center;
+  }
+
   .table-broadcast th:first-child {
     @apply pl-4;
   }

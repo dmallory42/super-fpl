@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { ManagerHistoryResponse } from '../../api/client'
+import type { ManagerHistoryResponse, ManagerSeasonAnalysisResponse } from '../../api/client'
 import type { EntryHistory } from '../../types'
 import { formatRank } from '../../lib/format'
 import { StatPanel, StatPanelGrid } from '../ui/StatPanel'
@@ -7,6 +7,7 @@ import { BroadcastCard } from '../ui/BroadcastCard'
 
 interface SeasonReviewProps {
   history: ManagerHistoryResponse | null
+  benchmarks?: ManagerSeasonAnalysisResponse['benchmarks']
 }
 
 interface ChipInfo {
@@ -14,6 +15,8 @@ interface ChipInfo {
   displayName: string
   event: number
 }
+
+const POINTS_NEUTRAL_RANGE = 5
 
 const chipDisplayNames: Record<string, string> = {
   wildcard: 'Wildcard',
@@ -494,7 +497,31 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
   )
 }
 
-function GameweekTable({ gameweeks }: { gameweeks: EntryHistory[] }) {
+function pointsDeltaClass(value: number): string {
+  if (value > POINTS_NEUTRAL_RANGE) return 'text-fpl-green'
+  if (value < -POINTS_NEUTRAL_RANGE) return 'text-destructive'
+  return 'text-foreground'
+}
+
+function pointsDeltaBadgeClass(value: number): string {
+  if (value > POINTS_NEUTRAL_RANGE) return 'border-fpl-green/30 bg-fpl-green/10 text-fpl-green'
+  if (value < -POINTS_NEUTRAL_RANGE)
+    return 'border-destructive/30 bg-destructive/10 text-destructive'
+  return 'border-border bg-surface text-foreground-muted'
+}
+
+function GameweekTable({
+  gameweeks,
+  benchmarks,
+}: {
+  gameweeks: EntryHistory[]
+  benchmarks?: ManagerSeasonAnalysisResponse['benchmarks']
+}) {
+  const overallByGw = useMemo(
+    () => new Map((benchmarks?.overall ?? []).map((row) => [row.gameweek, row.points])),
+    [benchmarks?.overall]
+  )
+
   // Calculate previous ranks for movement indicators
   const gwWithMovement = gameweeks.map((gw, i) => ({
     ...gw,
@@ -504,8 +531,18 @@ function GameweekTable({ gameweeks }: { gameweeks: EntryHistory[] }) {
 
   return (
     <BroadcastCard title="Gameweek Breakdown" animationDelay={300}>
-      <div className="overflow-x-auto -mx-4 px-4">
-        <table className="table-broadcast w-auto mx-auto">
+      <div className="overflow-x-auto -mx-4">
+        <table className="table-broadcast w-full min-w-[760px] table-fixed">
+          <colgroup>
+            <col className="w-[12%]" />
+            <col className="w-[22%]" />
+            <col className="w-[14%]" />
+            <col className="w-[14%]" />
+            <col className="w-[8%]" />
+            <col className="w-[8%]" />
+            <col className="w-[10%]" />
+            <col className="w-[12%]" />
+          </colgroup>
           <thead>
             <tr>
               <th className="text-left">GW</th>
@@ -521,15 +558,34 @@ function GameweekTable({ gameweeks }: { gameweeks: EntryHistory[] }) {
           <tbody>
             {[...gwWithMovement].reverse().map((gw) => {
               const hasHit = gw.event_transfers_cost > 0
-              const highBench = gw.points_on_bench >= 10
+              const overallPoints = overallByGw.get(gw.event)
+              const overallDelta =
+                typeof overallPoints === 'number' ? gw.points - overallPoints : null
 
               return (
-                <tr
-                  key={gw.event}
-                  className={hasHit ? 'bg-destructive/5' : highBench ? 'bg-fpl-green/5' : ''}
-                >
+                <tr key={gw.event} className={hasHit ? 'bg-destructive/5' : ''}>
                   <td className="font-display text-foreground">GW{gw.event}</td>
-                  <td className="text-center font-mono text-fpl-green font-medium">{gw.points}</td>
+                  <td
+                    className={`text-center font-mono font-medium ${
+                      overallDelta === null ? 'text-fpl-green' : pointsDeltaClass(overallDelta)
+                    }`}
+                    title={
+                      overallDelta === null
+                        ? 'No average data'
+                        : `vs avg: ${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(1)} (neutral within ±${POINTS_NEUTRAL_RANGE})`
+                    }
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <span>{gw.points}</span>
+                      {typeof overallPoints === 'number' && (
+                        <span
+                          className={`rounded border px-1.5 py-0.5 text-[10px] leading-none ${pointsDeltaBadgeClass(overallDelta ?? 0)}`}
+                        >
+                          AVG {Math.round(overallPoints)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="text-center font-mono text-foreground-muted">{gw.total_points}</td>
                   <td className="text-center font-mono text-foreground-muted">
                     {formatRank(gw.overall_rank)}
@@ -544,12 +600,14 @@ function GameweekTable({ gameweeks }: { gameweeks: EntryHistory[] }) {
                   <td className="text-center font-mono text-foreground-muted">
                     {gw.event_transfers}
                   </td>
-                  <td className="text-center font-mono text-destructive">
+                  <td
+                    className={`text-center font-mono ${
+                      gw.event_transfers_cost > 0 ? 'text-destructive' : 'text-foreground-dim'
+                    }`}
+                  >
                     {gw.event_transfers_cost > 0 ? `-${gw.event_transfers_cost}` : '-'}
                   </td>
-                  <td
-                    className={`text-center font-mono ${highBench ? 'text-fpl-green font-medium' : 'text-foreground-muted'}`}
-                  >
+                  <td className="text-center font-mono text-foreground-muted">
                     {gw.points_on_bench}
                   </td>
                 </tr>
@@ -586,7 +644,7 @@ function ChipsTimeline({ chips }: { chips: ChipInfo[] }) {
   )
 }
 
-export function SeasonReview({ history }: SeasonReviewProps) {
+export function SeasonReview({ history, benchmarks }: SeasonReviewProps) {
   const processedChips: ChipInfo[] = useMemo(() => {
     if (!history?.chips) return []
     return history.chips.map((chip) => ({
@@ -622,7 +680,7 @@ export function SeasonReview({ history }: SeasonReviewProps) {
         </BroadcastCard>
       </div>
 
-      <GameweekTable gameweeks={history.current} />
+      <GameweekTable gameweeks={history.current} benchmarks={benchmarks} />
       <ChipsTimeline chips={processedChips} />
     </div>
   )

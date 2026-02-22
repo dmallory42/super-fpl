@@ -15,6 +15,12 @@ class ManagerSeasonAnalysisService
     /** @var array<int, array<int, float>> */
     private array $actualPointCache = [];
 
+    /** @var array<int, array<int, float>> */
+    private array $snapshotPointCache = [];
+
+    /** @var array<int, string> */
+    private array $playerNameCache = [];
+
     public function __construct(
         private readonly Database $db,
         private readonly FplClient $fplClient
@@ -29,6 +35,8 @@ class ManagerSeasonAnalysisService
         // Reset caches so consecutive calls for different managers don't leak
         $this->expectedPointCache = [];
         $this->actualPointCache = [];
+        $this->snapshotPointCache = [];
+        $this->playerNameCache = [];
 
         $managerService = new ManagerService($this->db, $this->fplClient);
         $history = $managerService->getHistory($managerId);
@@ -39,6 +47,7 @@ class ManagerSeasonAnalysisService
 
         $chipsByGw = $this->groupChipsByGameweek($history['chips'] ?? []);
         $transfersByGw = $this->groupTransfersByGameweek($managerId);
+        $picksByGw = [];
 
         // Collect all player IDs from picks and transfers for bulk preload
         $allPlayerIds = [];
@@ -49,6 +58,7 @@ class ManagerSeasonAnalysisService
                 continue;
             }
             $picks = $this->getManagerPicks($managerId, $gw);
+            $picksByGw[$gw] = $picks;
             foreach ($picks as $pick) {
                 $pid = (int) ($pick['element'] ?? 0);
                 if ($pid > 0) {
@@ -72,6 +82,7 @@ class ManagerSeasonAnalysisService
 
         $this->preloadPredictions(array_keys($allPlayerIds));
         $this->preloadActuals(array_keys($allPlayerIds));
+        $seasonPlayerPoints = $this->buildSeasonPlayerPoints($history['current'], $picksByGw);
 
         $gameweeks = [];
         $transferAnalytics = [];
@@ -106,8 +117,10 @@ class ManagerSeasonAnalysisService
                     'transfer_count' => $eventTransfers,
                     'transfer_cost' => $eventTransferCost,
                     'foresight_gain' => $transferMetrics['foresight_gain'],
+                    'foresight_complete' => $transferMetrics['foresight_complete'],
                     'hindsight_gain' => $transferMetrics['hindsight_gain'],
                     'net_gain' => round($transferMetrics['hindsight_gain'] - $eventTransferCost, 2),
+                    'transfers' => $transferMetrics['transfers'],
                 ];
             }
 
@@ -131,6 +144,12 @@ class ManagerSeasonAnalysisService
         usort($gameweeks, static fn(array $a, array $b) => $a['gameweek'] <=> $b['gameweek']);
         usort($transferAnalytics, static fn(array $a, array $b) => $a['gameweek'] <=> $b['gameweek']);
 
+        $foresightRows = array_values(array_filter(
+            $transferAnalytics,
+            static fn(array $row): bool =>
+                array_key_exists('foresight_gain', $row) && $row['foresight_gain'] !== null
+        ));
+
         $summary = [
             'actual_points' => round(array_sum(array_column($gameweeks, 'actual_points')), 2),
             'expected_points' => round(array_sum(array_column($gameweeks, 'expected_points')), 2),
@@ -138,7 +157,12 @@ class ManagerSeasonAnalysisService
             'captain_actual_gain' => round($captainTotals['actual_gain'], 2),
             'captain_expected_gain' => round($captainTotals['expected_gain'], 2),
             'captain_luck_delta' => round($captainTotals['luck_delta'], 2),
-            'transfer_foresight_gain' => round(array_sum(array_column($transferAnalytics, 'foresight_gain')), 2),
+            'transfer_foresight_gain' => !empty($foresightRows)
+                ? round(array_sum(array_map(
+                    static fn(array $row): float => (float) $row['foresight_gain'],
+                    $foresightRows
+                )), 2)
+                : null,
             'transfer_hindsight_gain' => round(array_sum(array_column($transferAnalytics, 'hindsight_gain')), 2),
             'transfer_net_gain' => round(array_sum(array_column($transferAnalytics, 'net_gain')), 2),
         ];
@@ -151,17 +175,82 @@ class ManagerSeasonAnalysisService
             'transfer_analytics' => $transferAnalytics,
             'summary' => $summary,
             'benchmarks' => $benchmarkSeries,
+            'season_player_points' => $seasonPlayerPoints,
         ];
     }
 
     /**
+     * Build per-player scoring totals across all gameweeks where the manager owned the player.
+     *
+     * @param array<int, array<string, mixed>> $historyRows
+     * @param array<int, array<int, array<string, mixed>>> $picksByGw
+     * @return array<int, array<string, float|int>>
+     */
+    private function buildSeasonPlayerPoints(array $historyRows, array $picksByGw): array
+    {
+        /** @var array<int, array{player_id: int, owned_points: float, contributed_points: float, owned_gameweeks: int}> $totals */
+        $totals = [];
+
+        foreach ($historyRows as $gwEntry) {
+            $gw = (int) ($gwEntry['event'] ?? 0);
+            if ($gw <= 0) {
+                continue;
+            }
+
+            foreach ($picksByGw[$gw] ?? [] as $pick) {
+                $playerId = (int) ($pick['element'] ?? 0);
+                if ($playerId <= 0) {
+                    continue;
+                }
+
+                if (!isset($totals[$playerId])) {
+                    $totals[$playerId] = [
+                        'player_id' => $playerId,
+                        'owned_points' => 0.0,
+                        'contributed_points' => 0.0,
+                        'owned_gameweeks' => 0,
+                    ];
+                }
+
+                $actualPoints = $this->getActualPlayerPoints($playerId, $gw);
+                $multiplier = max(0, (int) ($pick['multiplier'] ?? 0));
+
+                $totals[$playerId]['owned_points'] += $actualPoints;
+                $totals[$playerId]['contributed_points'] += $actualPoints * $multiplier;
+                $totals[$playerId]['owned_gameweeks'] += 1;
+            }
+        }
+
+        $rows = array_values(array_map(
+            static fn(array $row): array => [
+                'player_id' => $row['player_id'],
+                'owned_points' => round($row['owned_points'], 2),
+                'contributed_points' => round($row['contributed_points'], 2),
+                'owned_gameweeks' => $row['owned_gameweeks'],
+            ],
+            $totals
+        ));
+
+        usort(
+            $rows,
+            static fn(array $a, array $b): int =>
+                ($b['owned_points'] <=> $a['owned_points'])
+                ?: ($b['contributed_points'] <=> $a['contributed_points'])
+                ?: ($a['player_id'] <=> $b['player_id'])
+        );
+
+        return $rows;
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $transfers
-     * @return array<string, float>
+     * @return array<string, mixed>
      */
     private function calculateTransferMetricsForGameweek(int $gw, array $transfers): array
     {
         $foresightGain = 0.0;
         $hindsightGain = 0.0;
+        $moves = [];
 
         foreach ($transfers as $transfer) {
             $inPlayerId = (int) ($transfer['element_in'] ?? 0);
@@ -171,14 +260,62 @@ class ManagerSeasonAnalysisService
                 continue;
             }
 
-            $foresightGain += $this->getPredictedPoints($inPlayerId, $gw) - $this->getPredictedPoints($outPlayerId, $gw);
-            $hindsightGain += $this->getActualPlayerPoints($inPlayerId, $gw) - $this->getActualPlayerPoints($outPlayerId, $gw);
+            $inSnapshot = $this->getSnapshotPredictedPoints($inPlayerId, $gw);
+            $outSnapshot = $this->getSnapshotPredictedPoints($outPlayerId, $gw);
+            $foresightDelta = ($inSnapshot !== null && $outSnapshot !== null)
+                ? $inSnapshot - $outSnapshot
+                : null;
+            $hindsightDelta = $this->getActualPlayerPoints($inPlayerId, $gw) - $this->getActualPlayerPoints($outPlayerId, $gw);
+
+            if ($foresightDelta !== null) {
+                $foresightGain += $foresightDelta;
+            }
+            $hindsightGain += $hindsightDelta;
+
+            $moves[] = [
+                'out_id' => $outPlayerId,
+                'out_name' => $this->getPlayerDisplayName($outPlayerId),
+                'in_id' => $inPlayerId,
+                'in_name' => $this->getPlayerDisplayName($inPlayerId),
+                'foresight_gain' => $foresightDelta === null ? null : round($foresightDelta, 2),
+                'hindsight_gain' => round($hindsightDelta, 2),
+            ];
         }
 
+        $foresightComplete = !empty($moves) && count(array_filter(
+            $moves,
+            static fn(array $move): bool => array_key_exists('foresight_gain', $move) && $move['foresight_gain'] !== null
+        )) === count($moves);
+
         return [
-            'foresight_gain' => round($foresightGain, 2),
+            'foresight_gain' => $foresightComplete ? round($foresightGain, 2) : null,
+            'foresight_complete' => $foresightComplete,
             'hindsight_gain' => round($hindsightGain, 2),
+            'transfers' => $moves,
         ];
+    }
+
+    private function getPlayerDisplayName(int $playerId): string
+    {
+        if ($playerId <= 0) {
+            return 'Unknown';
+        }
+
+        if (isset($this->playerNameCache[$playerId])) {
+            return $this->playerNameCache[$playerId];
+        }
+
+        $row = $this->db->fetchOne(
+            'SELECT web_name FROM players WHERE id = ?',
+            [$playerId]
+        );
+
+        $name = isset($row['web_name']) && is_string($row['web_name']) && $row['web_name'] !== ''
+            ? $row['web_name']
+            : '#' . $playerId;
+
+        $this->playerNameCache[$playerId] = $name;
+        return $name;
     }
 
     /**
@@ -363,6 +500,36 @@ class ManagerSeasonAnalysisService
         return $value;
     }
 
+    private function getSnapshotPredictedPoints(int $playerId, int $gw): ?float
+    {
+        if (
+            isset($this->snapshotPointCache[$gw])
+            && array_key_exists($playerId, $this->snapshotPointCache[$gw])
+        ) {
+            return $this->snapshotPointCache[$gw][$playerId];
+        }
+
+        $row = $this->db->fetchOne(
+            'SELECT predicted_points, is_pre_deadline FROM prediction_snapshots WHERE player_id = ? AND gameweek = ?',
+            [$playerId, $gw]
+        );
+
+        if ($row === null) {
+            $this->snapshotPointCache[$gw][$playerId] = null;
+            return null;
+        }
+
+        $isPreDeadline = (int) ($row['is_pre_deadline'] ?? 0);
+        if (!$this->isSnapshotEligibleForForesight($isPreDeadline)) {
+            $this->snapshotPointCache[$gw][$playerId] = null;
+            return null;
+        }
+
+        $value = (float) ($row['predicted_points'] ?? 0);
+        $this->snapshotPointCache[$gw][$playerId] = $value;
+        return $value;
+    }
+
     private function getActualPlayerPoints(int $playerId, int $gw): float
     {
         if (isset($this->actualPointCache[$gw][$playerId])) {
@@ -396,11 +563,18 @@ class ManagerSeasonAnalysisService
 
         // Load from snapshots first (preferred source)
         $snapshots = $this->db->fetchAll(
-            "SELECT player_id, gameweek, predicted_points FROM prediction_snapshots WHERE player_id IN ($placeholders)",
+            "SELECT player_id, gameweek, predicted_points, is_pre_deadline FROM prediction_snapshots WHERE player_id IN ($placeholders)",
             $playerIds
         );
         foreach ($snapshots as $row) {
-            $this->expectedPointCache[(int) $row['gameweek']][(int) $row['player_id']] = (float) $row['predicted_points'];
+            $gw = (int) $row['gameweek'];
+            $pid = (int) $row['player_id'];
+            $value = (float) $row['predicted_points'];
+            $this->expectedPointCache[$gw][$pid] = $value;
+            $isPreDeadline = (int) ($row['is_pre_deadline'] ?? 0);
+            $this->snapshotPointCache[$gw][$pid] = $this->isSnapshotEligibleForForesight($isPreDeadline)
+                ? $value
+                : null;
         }
 
         // Load fallback predictions for any gaps
@@ -439,6 +613,11 @@ class ManagerSeasonAnalysisService
 
             $this->expectedPointCache[$gw][$pid] = $value;
         }
+    }
+
+    private function isSnapshotEligibleForForesight(int $isPreDeadline): bool
+    {
+        return $isPreDeadline === 1;
     }
 
     /**

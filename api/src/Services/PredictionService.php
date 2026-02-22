@@ -504,24 +504,47 @@ class PredictionService
     }
 
     /**
-     * Snapshot current predictions for a gameweek (for historical accuracy tracking).
-     * Uses INSERT OR IGNORE so re-running is idempotent.
+     * Snapshot current predictions for a gameweek.
      *
-     * @return int Number of rows inserted
+     * @return int Number of rows inserted (or replaced for pre-deadline snapshots)
      */
-    public function snapshotPredictions(int $gameweek): int
+    public function snapshotPredictions(
+        int $gameweek,
+        bool $isPreDeadline = false,
+        string $snapshotSource = 'manual'
+    ): int
     {
         $before = (int) $this->db->fetchOne(
             "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
             [$gameweek]
         )['cnt'];
 
+        $verb = $isPreDeadline ? 'REPLACE' : 'IGNORE';
         $this->db->query(
-            "INSERT OR IGNORE INTO prediction_snapshots (player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapped_at)
-            SELECT player_id, gameweek, predicted_points, confidence, '{}', model_version, datetime('now')
+            "INSERT OR {$verb} INTO prediction_snapshots (
+                player_id,
+                gameweek,
+                predicted_points,
+                confidence,
+                breakdown,
+                model_version,
+                snapshot_source,
+                is_pre_deadline,
+                snapped_at
+            )
+            SELECT
+                player_id,
+                gameweek,
+                predicted_points,
+                confidence,
+                '{}',
+                model_version,
+                ?,
+                ?,
+                datetime('now')
             FROM player_predictions
             WHERE gameweek = ? AND model_version = 'v2.0'",
-            [$gameweek]
+            [$snapshotSource, $isPreDeadline ? 1 : 0, $gameweek]
         );
 
         $after = (int) $this->db->fetchOne(

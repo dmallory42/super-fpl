@@ -109,9 +109,25 @@ export interface ManagerSeasonTransferAnalytics {
   gameweek: number
   transfer_count: number
   transfer_cost: number
-  foresight_gain: number
+  foresight_gain: number | null
+  foresight_complete?: boolean
   hindsight_gain: number
   net_gain: number
+  transfers?: Array<{
+    out_id: number
+    out_name: string
+    in_id: number
+    in_name: string
+    foresight_gain: number | null
+    hindsight_gain: number
+  }>
+}
+
+export interface SeasonPlayerPoints {
+  player_id: number
+  owned_points: number
+  contributed_points: number
+  owned_gameweeks: number
 }
 
 export interface ManagerSeasonAnalysisResponse {
@@ -119,6 +135,7 @@ export interface ManagerSeasonAnalysisResponse {
   generated_at: string
   gameweeks: ManagerSeasonAnalysisGameweek[]
   transfer_analytics: ManagerSeasonTransferAnalytics[]
+  season_player_points?: SeasonPlayerPoints[]
   benchmarks?: {
     overall: Array<{ gameweek: number; points: number | null }>
     top_10k: Array<{ gameweek: number; points: number | null }>
@@ -130,7 +147,7 @@ export interface ManagerSeasonAnalysisResponse {
     captain_actual_gain: number
     captain_expected_gain: number
     captain_luck_delta: number
-    transfer_foresight_gain: number
+    transfer_foresight_gain: number | null
     transfer_hindsight_gain: number
     transfer_net_gain: number
   }

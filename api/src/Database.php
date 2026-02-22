@@ -83,6 +83,9 @@ class Database
             'ALTER TABLE player_season_history ADD COLUMN starts INTEGER',
             // players table - Understat xA
             'ALTER TABLE players ADD COLUMN understat_xa REAL',
+            // prediction_snapshots metadata for reliable pre-deadline detection
+            'ALTER TABLE prediction_snapshots ADD COLUMN snapshot_source TEXT DEFAULT "legacy"',
+            'ALTER TABLE prediction_snapshots ADD COLUMN is_pre_deadline INTEGER DEFAULT 0',
         ];
 
         foreach ($migrations as $sql) {
@@ -115,6 +118,8 @@ class Database
                 confidence REAL,
                 breakdown TEXT,
                 model_version TEXT,
+                snapshot_source TEXT DEFAULT 'legacy',
+                is_pre_deadline INTEGER DEFAULT 0,
                 snapped_at TIMESTAMP,
                 PRIMARY KEY (player_id, gameweek)
             )

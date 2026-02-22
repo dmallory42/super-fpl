@@ -260,6 +260,8 @@ CREATE TABLE prediction_snapshots (
     confidence REAL,
     breakdown TEXT,
     model_version TEXT,
+    snapshot_source TEXT DEFAULT 'legacy',
+    is_pre_deadline INTEGER DEFAULT 0,
     snapped_at TIMESTAMP,
     PRIMARY KEY (player_id, gameweek)
 );

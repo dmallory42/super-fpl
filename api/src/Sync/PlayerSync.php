@@ -75,12 +75,61 @@ class PlayerSync
                 continue;
             }
 
+            /** @var array<int, array<string, int|float|null>> $byGw */
+            $byGw = [];
+
             // Count appearances (gameweeks where minutes > 0)
             $appearances = 0;
-            foreach ($data['history'] as $gw) {
-                if (($gw['minutes'] ?? 0) > 0) {
+            foreach ($data['history'] as $match) {
+                $minutes = (int) ($match['minutes'] ?? 0);
+                if ($minutes > 0) {
                     $appearances++;
                 }
+
+                $gameweek = (int) ($match['round'] ?? 0);
+                if ($gameweek <= 0) {
+                    continue;
+                }
+
+                if (!isset($byGw[$gameweek])) {
+                    $byGw[$gameweek] = [
+                        'fixture_id' => null,
+                        'opponent_team' => null,
+                        'was_home' => null,
+                        'minutes' => 0,
+                        'goals_scored' => 0,
+                        'assists' => 0,
+                        'clean_sheets' => 0,
+                        'goals_conceded' => 0,
+                        'bonus' => 0,
+                        'bps' => 0,
+                        'total_points' => 0,
+                        'expected_goals' => 0.0,
+                        'expected_assists' => 0.0,
+                        'expected_goals_conceded' => 0.0,
+                        'value' => null,
+                        'selected' => null,
+                    ];
+                }
+
+                $row = &$byGw[$gameweek];
+                $row['fixture_id'] = isset($match['fixture']) ? (int) $match['fixture'] : $row['fixture_id'];
+                $row['opponent_team'] = isset($match['opponent_team']) ? (int) $match['opponent_team'] : $row['opponent_team'];
+                $row['was_home'] = isset($match['was_home']) ? ((bool) $match['was_home'] ? 1 : 0) : $row['was_home'];
+                $row['minutes'] += $minutes;
+                $row['goals_scored'] += (int) ($match['goals_scored'] ?? 0);
+                $row['assists'] += (int) ($match['assists'] ?? 0);
+                $row['clean_sheets'] += (int) ($match['clean_sheets'] ?? 0);
+                $row['goals_conceded'] += (int) ($match['goals_conceded'] ?? 0);
+                $row['bonus'] += (int) ($match['bonus'] ?? 0);
+                $row['bps'] += (int) ($match['bps'] ?? 0);
+                $row['total_points'] += (int) ($match['total_points'] ?? 0);
+                $row['expected_goals'] += (float) ($match['expected_goals'] ?? 0.0);
+                $row['expected_assists'] += (float) ($match['expected_assists'] ?? 0.0);
+                $row['expected_goals_conceded'] += (float) ($match['expected_goals_conceded'] ?? 0.0);
+                $row['value'] = isset($match['value']) ? (int) $match['value'] : $row['value'];
+                $row['selected'] = isset($match['selected']) ? (int) $match['selected'] : $row['selected'];
+                unset($row);
             }
 
             // Update player record
@@ -88,6 +137,30 @@ class PlayerSync
                 'UPDATE players SET appearances = ? WHERE id = ?',
                 [$appearances, $playerId]
             );
+
+            foreach ($byGw as $gameweek => $row) {
+                $this->db->upsert('player_gameweek_history', [
+                    'player_id' => $playerId,
+                    'gameweek' => $gameweek,
+                    'fixture_id' => $row['fixture_id'],
+                    'opponent_team' => $row['opponent_team'],
+                    'was_home' => $row['was_home'],
+                    'minutes' => $row['minutes'],
+                    'goals_scored' => $row['goals_scored'],
+                    'assists' => $row['assists'],
+                    'clean_sheets' => $row['clean_sheets'],
+                    'goals_conceded' => $row['goals_conceded'],
+                    'bonus' => $row['bonus'],
+                    'bps' => $row['bps'],
+                    'total_points' => $row['total_points'],
+                    'expected_goals' => round((float) $row['expected_goals'], 3),
+                    'expected_assists' => round((float) $row['expected_assists'], 3),
+                    'expected_goals_conceded' => round((float) $row['expected_goals_conceded'], 3),
+                    'value' => $row['value'],
+                    'selected' => $row['selected'],
+                ], ['player_id', 'gameweek']);
+            }
+
             $count++;
         }
 

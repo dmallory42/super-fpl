@@ -61,6 +61,8 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
                 confidence REAL,
                 breakdown TEXT,
                 model_version TEXT,
+                snapshot_source TEXT DEFAULT 'legacy',
+                is_pre_deadline INTEGER DEFAULT 0,
                 snapped_at TIMESTAMP,
                 PRIMARY KEY (player_id, gameweek)
             )
@@ -94,6 +96,13 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
                 PRIMARY KEY (player_id, gameweek)
             )
         ");
+
+        $pdo->exec("
+            CREATE TABLE players (
+                id INTEGER PRIMARY KEY,
+                web_name TEXT
+            )
+        ");
     }
 
     private function seedData(): void
@@ -125,11 +134,13 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
         ");
 
         $pdo->exec("
-            INSERT INTO prediction_snapshots (player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapped_at) VALUES
-            (1, 1, 5.0, 0.8, '{}', 'v1', '2026-02-01 00:00:00'),
-            (2, 1, 4.0, 0.8, '{}', 'v1', '2026-02-01 00:00:00'),
-            (1, 2, 6.0, 0.8, '{}', 'v1', '2026-02-01 00:00:00'),
-            (2, 2, 3.5, 0.8, '{}', 'v1', '2026-02-01 00:00:00')
+            INSERT INTO prediction_snapshots (
+                player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapshot_source, is_pre_deadline, snapped_at
+            ) VALUES
+            (1, 1, 5.0, 0.8, '{}', 'v1', 'test', 1, '2026-02-01 00:00:00'),
+            (2, 1, 4.0, 0.8, '{}', 'v1', 'test', 1, '2026-02-01 00:00:00'),
+            (1, 2, 6.0, 0.8, '{}', 'v1', 'test', 1, '2026-02-01 00:00:00'),
+            (2, 2, 3.5, 0.8, '{}', 'v1', 'test', 1, '2026-02-01 00:00:00')
         ");
 
         $pdo->exec("
@@ -138,6 +149,13 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
             (2, 1, 2, 0, 0, 0, 100, 1000),
             (1, 2, 1, 0, 0, 0, 100, 1000),
             (2, 2, 8, 0, 0, 0, 100, 1000)
+        ");
+
+        $pdo->exec("
+            INSERT INTO players (id, web_name) VALUES
+            (1, 'PlayerOne'),
+            (2, 'PlayerTwo'),
+            (3, 'PlayerThree')
         ");
     }
 
@@ -195,12 +213,27 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
         $transferGw = $result['transfer_analytics'][0];
         $this->assertSame(2, $transferGw['gameweek']);
         $this->assertSame(1, $transferGw['transfer_count']);
+        $this->assertArrayHasKey('transfers', $transferGw);
+        $this->assertCount(1, $transferGw['transfers']);
+        $this->assertSame('PlayerOne', $transferGw['transfers'][0]['out_name']);
+        $this->assertSame('PlayerTwo', $transferGw['transfers'][0]['in_name']);
 
         $this->assertArrayHasKey('benchmarks', $result);
         $this->assertSame(44.0, $result['benchmarks']['overall'][0]['points']);
         $this->assertSame(36.67, $result['benchmarks']['overall'][1]['points']);
         $this->assertSame(70.0, $result['benchmarks']['top_10k'][0]['points']);
         $this->assertSame(60.0, $result['benchmarks']['top_10k'][1]['points']);
+
+        $this->assertArrayHasKey('season_player_points', $result);
+        $this->assertCount(2, $result['season_player_points']);
+        $this->assertSame(2, $result['season_player_points'][0]['player_id']);
+        $this->assertSame(10.0, $result['season_player_points'][0]['owned_points']);
+        $this->assertSame(18.0, $result['season_player_points'][0]['contributed_points']);
+        $this->assertSame(2, $result['season_player_points'][0]['owned_gameweeks']);
+        $this->assertSame(1, $result['season_player_points'][1]['player_id']);
+        $this->assertSame(8.0, $result['season_player_points'][1]['owned_points']);
+        $this->assertSame(15.0, $result['season_player_points'][1]['contributed_points']);
+        $this->assertSame(2, $result['season_player_points'][1]['owned_gameweeks']);
     }
 
     public function testBulkPreloadProducesIdenticalResults(): void
@@ -218,8 +251,10 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
 
         // Player 3 snapshot only for GW1
         $pdo->exec("
-            INSERT INTO prediction_snapshots (player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapped_at) VALUES
-            (3, 1, 3.0, 0.7, '{}', 'v1', '2026-02-01 00:00:00')
+            INSERT INTO prediction_snapshots (
+                player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapshot_source, is_pre_deadline, snapped_at
+            ) VALUES
+            (3, 1, 3.0, 0.7, '{}', 'v1', 'test', 1, '2026-02-01 00:00:00')
         ");
 
         // Player 3 player_predictions for GW2 with if-fit fallback triggered
@@ -357,5 +392,57 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
         $this->assertNotNull($result);
         $this->assertCount(1, $result['gameweeks']);
         $this->assertSame([], $result['transfer_analytics']);
+    }
+
+    public function testTransferForesightIsNullWhenSnapshotCoverageIsIncomplete(): void
+    {
+        $this->db->query(
+            'DELETE FROM prediction_snapshots WHERE player_id = ? AND gameweek = ?',
+            [2, 2]
+        );
+
+        $mockEntry = $this->createMock(EntryEndpoint::class);
+        $mockEntry->method('history')->willReturn([
+            'current' => [
+                [
+                    'event' => 1,
+                    'points' => 12,
+                    'total_points' => 12,
+                    'overall_rank' => 100000,
+                    'bank' => 0,
+                    'value' => 1000,
+                    'event_transfers' => 0,
+                    'event_transfers_cost' => 0,
+                    'points_on_bench' => 0,
+                ],
+                [
+                    'event' => 2,
+                    'points' => 10,
+                    'total_points' => 22,
+                    'overall_rank' => 90000,
+                    'bank' => 0,
+                    'value' => 1001,
+                    'event_transfers' => 1,
+                    'event_transfers_cost' => 4,
+                    'points_on_bench' => 2,
+                ],
+            ],
+            'chips' => [],
+        ]);
+        $mockEntry->method('transfers')->willReturn([
+            ['event' => 2, 'element_in' => 2, 'element_out' => 1],
+        ]);
+
+        $mockClient = $this->createMock(FplClient::class);
+        $mockClient->method('entry')->with(100)->willReturn($mockEntry);
+
+        $service = new ManagerSeasonAnalysisService($this->db, $mockClient);
+        $result = $service->analyze(100);
+
+        $this->assertNotNull($result);
+        $this->assertCount(1, $result['transfer_analytics']);
+        $this->assertNull($result['transfer_analytics'][0]['foresight_gain']);
+        $this->assertFalse($result['transfer_analytics'][0]['foresight_complete']);
+        $this->assertNull($result['summary']['transfer_foresight_gain']);
     }
 }

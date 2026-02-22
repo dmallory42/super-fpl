@@ -151,15 +151,32 @@ $snapshotPrevGw = function () use ($db) {
         return;
     }
     $service = new PredictionService($db);
-    $count = $service->snapshotPredictions($prevGw);
+    $count = $service->snapshotPredictions($prevGw, false, 'sync_prev_gw');
     echo "  Snapshotted GW{$prevGw}: {$count} predictions\n";
+};
+
+$snapshotCurrentGwPreDeadline = function () use ($db) {
+    $gwService = new GameweekService($db);
+    $currentGw = $gwService->getCurrentGameweek();
+    $existing = $db->fetchOne(
+        "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ? AND is_pre_deadline = 1",
+        [$currentGw]
+    );
+    if ((int) ($existing['cnt'] ?? 0) > 0) {
+        echo "  Skipped (GW{$currentGw} pre-deadline snapshot already exists)\n";
+        return;
+    }
+
+    $service = new PredictionService($db);
+    $count = $service->snapshotPredictions($currentGw, true, 'sync_pre_deadline');
+    echo "  Pre-deadline snapshot GW{$currentGw}: {$count} predictions\n";
 };
 
 $snapshotCurrentGw = function () use ($db) {
     $gwService = new GameweekService($db);
     $currentGw = $gwService->getCurrentGameweek();
     $service = new PredictionService($db);
-    $count = $service->snapshotPredictions($currentGw);
+    $count = $service->snapshotPredictions($currentGw, false, 'sync_post_gameweek');
     echo "  Snapshotted GW{$currentGw}: {$count} predictions\n";
 };
 
@@ -219,6 +236,7 @@ switch ($phase) {
             'understat'   => $syncUnderstat,
             'snapshot'    => $snapshotPrevGw,
             'predictions' => $generatePredictions,
+            'pre-deadline-snapshot' => $snapshotCurrentGwPreDeadline,
             'managers'    => $syncManagers,
         ];
         break;
@@ -254,6 +272,7 @@ switch ($phase) {
             'understat'         => $syncUnderstat,
             'snapshot'          => $snapshotPrevGw,
             'predictions'       => $generatePredictions,
+            'pre-deadline-snapshot' => $snapshotCurrentGwPreDeadline,
             'managers'          => $syncManagers,
             'appearances'       => $syncAppearances,
             'season-history'    => $syncSeasonHistory,

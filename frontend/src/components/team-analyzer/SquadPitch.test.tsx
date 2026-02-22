@@ -144,6 +144,19 @@ describe('SquadPitch', () => {
       expect(screen.getByText('C')).toBeInTheDocument()
     })
 
+    it('hides captain badge and glow when captain indicators are disabled', () => {
+      const player = createPlayer({ id: 1, web_name: 'Haaland' })
+      const playersMap = new Map([[1, player]])
+      const picks = [createPick({ element: 1, position: 1, is_captain: true, multiplier: 2 })]
+
+      const { container } = render(
+        <SquadPitch picks={picks} players={playersMap} teams={teamsMap} hideCaptainIndicators />
+      )
+
+      expect(screen.queryByText('C')).not.toBeInTheDocument()
+      expect(container.querySelector('.animate-pulse-glow')).not.toBeInTheDocument()
+    })
+
     it('shows vice captain badge', () => {
       const player = createPlayer({ id: 1, web_name: 'Salah' })
       const playersMap = new Map([[1, player]])

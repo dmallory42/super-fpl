@@ -3,7 +3,7 @@
 
 /**
  * Snapshot predictions for a gameweek.
- * Usage: php snapshot-predictions.php [gw]
+ * Usage: php snapshot-predictions.php [gw] [--pre-deadline]
  *
  * If no gameweek specified, snapshots the previous gameweek.
  */
@@ -28,6 +28,8 @@ if ($gameweek < 1 || $gameweek > 38) {
 echo "Snapshotting predictions for GW{$gameweek}...\n";
 
 $service = new PredictionService($db);
-$count = $service->snapshotPredictions($gameweek);
+$isPreDeadline = in_array('--pre-deadline', $argv, true);
+$source = $isPreDeadline ? 'manual_pre_deadline' : 'manual';
+$count = $service->snapshotPredictions($gameweek, $isPreDeadline, $source);
 
 echo "Snapshotted {$count} predictions for GW{$gameweek}\n";

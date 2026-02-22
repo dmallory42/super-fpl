@@ -10,6 +10,12 @@ function formatSigned(value: number, precision = 1): string {
   return `${prefix}${value.toFixed(precision)}`
 }
 
+function signedValueClass(value: number): string {
+  if (value > 0) return 'text-fpl-green'
+  if (value < 0) return 'text-destructive'
+  return 'text-foreground'
+}
+
 export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScorecardProps) {
   const rows = useMemo(
     () => [...seasonAnalysis.transfer_analytics].sort((a, b) => a.gameweek - b.gameweek),
@@ -21,17 +27,19 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
       (acc, row) => {
         acc.transferCount += row.transfer_count
         acc.transferCost += row.transfer_cost
-        acc.foresightGain += row.foresight_gain
+        if (row.foresight_gain !== null) {
+          acc.foresightGain += row.foresight_gain
+          acc.foresightWeeks += 1
+        }
         acc.hindsightGain += row.hindsight_gain
-        acc.netGain += row.net_gain
         return acc
       },
       {
         transferCount: 0,
         transferCost: 0,
         foresightGain: 0,
+        foresightWeeks: 0,
         hindsightGain: 0,
-        netGain: 0,
       }
     )
   }, [rows])
@@ -44,58 +52,93 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
     )
   }
 
-  const transferRoi = totals.transferCost > 0 ? totals.netGain / totals.transferCost : null
-
   return (
     <div className="space-y-4" data-testid="transfer-quality-scorecard">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="rounded-lg border border-border p-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-lg border border-border p-3" data-testid="transfer-quality-weeks">
           <div className="text-xs uppercase text-foreground-muted">Transfer Weeks</div>
           <div className="font-mono text-xl text-foreground">{rows.length}</div>
         </div>
-        <div className="rounded-lg border border-border p-3">
+        <div className="rounded-lg border border-border p-3" data-testid="transfer-quality-count">
           <div className="text-xs uppercase text-foreground-muted">Transfers</div>
           <div className="font-mono text-xl text-foreground">{totals.transferCount}</div>
         </div>
-        <div className="rounded-lg border border-fpl-green/30 bg-fpl-green/5 p-3">
-          <div className="text-xs uppercase text-foreground-muted">Foresight Gain</div>
-          <div className="font-mono text-xl text-foreground">{formatSigned(totals.foresightGain)}</div>
+        <div
+          className="rounded-lg border border-fpl-green/30 bg-fpl-green/5 p-3"
+          data-testid="transfer-quality-expected"
+        >
+          <div className="text-xs uppercase text-foreground-muted">Expected Gain (Snapshot)</div>
+          <div
+            className={`font-mono text-xl ${
+              totals.foresightWeeks > 0 ? signedValueClass(totals.foresightGain) : 'text-foreground'
+            }`}
+          >
+            {totals.foresightWeeks > 0 ? formatSigned(totals.foresightGain) : 'N/A'}
+          </div>
+          <div className="text-[11px] text-foreground-dim mt-1">
+            {totals.foresightWeeks}/{rows.length} GWs covered
+          </div>
         </div>
-        <div className="rounded-lg border border-highlight/30 bg-highlight/5 p-3">
-          <div className="text-xs uppercase text-foreground-muted">Hindsight Gain</div>
-          <div className="font-mono text-xl text-foreground">{formatSigned(totals.hindsightGain)}</div>
-        </div>
-        <div className="rounded-lg border border-border p-3">
-          <div className="text-xs uppercase text-foreground-muted">Net ROI</div>
-          <div className="font-mono text-xl text-foreground">
-            {transferRoi === null ? '—' : transferRoi.toFixed(2)}
+        <div
+          className="rounded-lg border border-highlight/30 bg-highlight/5 p-3"
+          data-testid="transfer-quality-realized"
+        >
+          <div className="text-xs uppercase text-foreground-muted">Realized Gain</div>
+          <div className={`font-mono text-xl ${signedValueClass(totals.hindsightGain)}`}>
+            {formatSigned(totals.hindsightGain)}
           </div>
         </div>
       </div>
 
       <div className="overflow-x-auto -mx-4">
-        <table className="table-broadcast min-w-[840px]" data-testid="transfer-quality-table">
+        <table className="table-broadcast min-w-[980px]" data-testid="transfer-quality-table">
           <thead>
             <tr>
               <th>GW</th>
+              <th>Moves</th>
               <th className="text-right">Transfers</th>
               <th className="text-right">Cost</th>
               <th className="text-right">Expected Gain</th>
               <th className="text-right">Realized Gain</th>
-              <th className="text-right">Net ROI</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
-              const rowRoi = row.transfer_cost > 0 ? row.net_gain / row.transfer_cost : null
               return (
                 <tr key={row.gameweek}>
                   <td className="font-mono text-foreground-muted">{row.gameweek}</td>
+                  <td className="py-2">
+                    {row.transfers && row.transfers.length > 0 ? (
+                      <div className="space-y-1">
+                        {row.transfers.map((move, idx) => (
+                          <div
+                            key={`${move.out_id}-${move.in_id}-${idx}`}
+                            className="text-xs font-mono"
+                          >
+                            <span className="text-destructive">{move.out_name}</span>
+                            <span className="text-foreground-dim"> → </span>
+                            <span className="text-fpl-green">{move.in_name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-foreground-dim">—</span>
+                    )}
+                  </td>
                   <td className="text-right font-mono">{row.transfer_count}</td>
                   <td className="text-right font-mono">{row.transfer_cost}</td>
-                  <td className="text-right font-mono">{formatSigned(row.foresight_gain)}</td>
-                  <td className="text-right font-mono">{formatSigned(row.hindsight_gain)}</td>
-                  <td className="text-right font-mono">{rowRoi === null ? '—' : rowRoi.toFixed(2)}</td>
+                  <td
+                    className={`text-right font-mono ${
+                      row.foresight_gain === null
+                        ? 'text-foreground-dim'
+                        : signedValueClass(row.foresight_gain)
+                    }`}
+                  >
+                    {row.foresight_gain === null ? 'N/A' : formatSigned(row.foresight_gain)}
+                  </td>
+                  <td className={`text-right font-mono ${signedValueClass(row.hindsight_gain)}`}>
+                    {formatSigned(row.hindsight_gain)}
+                  </td>
                 </tr>
               )
             })}

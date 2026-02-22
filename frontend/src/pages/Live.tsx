@@ -455,10 +455,7 @@ export function Live() {
           </h2>
           {gwData?.isLive && <LiveIndicator size="lg" />}
           {managerId && (
-            <button
-              onClick={handleClearManager}
-              className="ml-auto btn-secondary text-xs py-1 px-3"
-            >
+            <button onClick={handleClearManager} className="ml-auto btn-primary">
               Change Manager ID
             </button>
           )}

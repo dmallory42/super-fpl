@@ -9,6 +9,7 @@ interface SquadPitchProps {
   players: Map<number, Player>
   teams: Map<number, string>
   playerPoints?: Record<number, number>
+  hideCaptainIndicators?: boolean
 }
 
 interface PlayerSlotData {
@@ -31,7 +32,13 @@ function buildPlayerSlot(
   return { pick, player, teamName, contributedPoints }
 }
 
-export function SquadPitch({ picks, players, teams, playerPoints }: SquadPitchProps) {
+export function SquadPitch({
+  picks,
+  players,
+  teams,
+  playerPoints,
+  hideCaptainIndicators = false,
+}: SquadPitchProps) {
   const { startingXI, bench } = useMemo(() => {
     const starting = picks.filter((p) => p.position <= 11).sort((a, b) => a.position - b.position)
     const benchPlayers = picks
@@ -99,9 +106,9 @@ export function SquadPitch({ picks, players, teams, playerPoints }: SquadPitchPr
                 ? String(Math.round(pick.contributedPoints))
                 : undefined
             }
-            isCaptain={pick.pick.is_captain}
-            isViceCaptain={pick.pick.is_vice_captain}
-            pulseShirt={pick.pick.is_captain}
+            isCaptain={!hideCaptainIndicators && pick.pick.is_captain}
+            isViceCaptain={!hideCaptainIndicators && pick.pick.is_vice_captain}
+            pulseShirt={!hideCaptainIndicators && pick.pick.is_captain}
             animationDelay={(acc.offset + itemIdx) * 50}
           />
         ))
@@ -124,9 +131,9 @@ export function SquadPitch({ picks, players, teams, playerPoints }: SquadPitchPr
           ? String(Math.round(pick.contributedPoints))
           : undefined
       }
-      isCaptain={pick.pick.is_captain}
-      isViceCaptain={pick.pick.is_vice_captain}
-      pulseShirt={pick.pick.is_captain}
+      isCaptain={!hideCaptainIndicators && pick.pick.is_captain}
+      isViceCaptain={!hideCaptainIndicators && pick.pick.is_vice_captain}
+      pulseShirt={!hideCaptainIndicators && pick.pick.is_captain}
       isBench
       animationDelay={(rowElements.offset + idx) * 50}
     />

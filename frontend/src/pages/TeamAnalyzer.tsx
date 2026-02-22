@@ -6,17 +6,16 @@ import {
   useManagerHistory,
   useManagerSeasonAnalysis,
 } from '../hooks/useManager'
-import { useLeagueSeasonAnalysis } from '../hooks/useLeagueAnalysis'
 import { ManagerSearch } from '../components/team-analyzer/ManagerSearch'
 import { SquadPitch } from '../components/team-analyzer/SquadPitch'
 import { SquadStats } from '../components/team-analyzer/SquadStats'
 import { SeasonReview } from '../components/team-analyzer/SeasonReview'
-import { ExpectedActualLuckPanel } from '../components/team-analyzer/ExpectedActualLuckPanel'
 import { TransferQualityScorecard } from '../components/team-analyzer/TransferQualityScorecard'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, TrophyIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonPitch, SkeletonCard } from '../components/ui/SkeletonLoader'
 import { GradientText } from '../components/ui/GradientText'
+import { buildSeasonBestSquad } from '../lib/seasonBestSquad'
 
 function getInitialManagerId(): number | null {
   const params = new URLSearchParams(window.location.search)
@@ -72,15 +71,6 @@ export function TeamAnalyzer() {
     error: seasonAnalysisError,
   } = useManagerSeasonAnalysis(managerId)
 
-  const primaryLeagueId = useMemo(() => {
-    return manager?.leagues?.classic?.find((league) => league.id > 0)?.id ?? null
-  }, [manager?.leagues?.classic])
-  const { data: leagueSeasonData } = useLeagueSeasonAnalysis(
-    primaryLeagueId,
-    {},
-    { enabled: primaryLeagueId !== null && primaryLeagueId > 0 }
-  )
-
   const playersMap = useMemo(() => {
     if (!playersData?.players) return new Map()
     return new Map(playersData.players.map((p) => [p.id, p]))
@@ -90,6 +80,11 @@ export function TeamAnalyzer() {
     if (!playersData?.teams) return new Map()
     return new Map(playersData.teams.map((t) => [t.id, t.short_name]))
   }, [playersData?.teams])
+
+  const seasonBestSquad = useMemo(
+    () => buildSeasonBestSquad(seasonAnalysis?.season_player_points, playersMap),
+    [seasonAnalysis?.season_player_points, playersMap]
+  )
 
   const handleSearch = (id: number) => {
     setManagerId(id)
@@ -102,13 +97,6 @@ export function TeamAnalyzer() {
       updateUrlManagerId(managerId)
     }
   }, [managerId])
-
-  const leagueMedianByGw = useMemo(() => {
-    if (!leagueSeasonData?.benchmarks) return undefined
-    return new Map(
-      leagueSeasonData.benchmarks.map((row) => [row.gameweek, row.median_actual_points] as const)
-    )
-  }, [leagueSeasonData?.benchmarks])
 
   const isLoading =
     playersLoading || managerLoading || picksLoading || historyLoading || seasonAnalysisLoading
@@ -188,7 +176,19 @@ export function TeamAnalyzer() {
         <>
           <SquadStats picks={picks.picks} players={playersMap} entryHistory={picks.entry_history} />
 
-          <SquadPitch picks={picks.picks} players={playersMap} teams={teamsMap} />
+          {seasonBestSquad && (
+            <div className="text-xs text-foreground-dim -mt-2">
+              Most effective XI + bench based on points scored while owned this season.
+            </div>
+          )}
+
+          <SquadPitch
+            picks={seasonBestSquad?.picks ?? picks.picks}
+            players={playersMap}
+            teams={teamsMap}
+            playerPoints={seasonBestSquad?.playerPoints}
+            hideCaptainIndicators
+          />
 
           {/* Active Chip */}
           {picks.active_chip && (
@@ -205,16 +205,8 @@ export function TeamAnalyzer() {
       )}
 
       {/* Season Review */}
-      {manager && history && !isLoading && <SeasonReview history={history} />}
-
-      {/* Expected vs Actual + Luck Trend */}
-      {manager && seasonAnalysis && !isLoading && (
-        <BroadcastCard title="Expected vs Actual" accentColor="highlight" animationDelay={120}>
-          <ExpectedActualLuckPanel
-            seasonAnalysis={seasonAnalysis}
-            leagueMedianByGw={leagueMedianByGw}
-          />
-        </BroadcastCard>
+      {manager && history && !isLoading && (
+        <SeasonReview history={history} benchmarks={seasonAnalysis?.benchmarks} />
       )}
 
       {/* Transfer Quality Scorecard */}
