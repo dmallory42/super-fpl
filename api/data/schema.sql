@@ -253,6 +253,17 @@ CREATE TABLE understat_team_season (
     PRIMARY KEY (team_name, season)
 );
 
+CREATE TABLE prediction_snapshots (
+    player_id INTEGER REFERENCES players(id),
+    gameweek INTEGER,
+    predicted_points REAL,
+    confidence REAL,
+    breakdown TEXT,
+    model_version TEXT,
+    snapped_at TIMESTAMP,
+    PRIMARY KEY (player_id, gameweek)
+);
+
 -- Indexes for common queries
 CREATE INDEX idx_players_club ON players(club_id);
 CREATE INDEX idx_players_position ON players(position);

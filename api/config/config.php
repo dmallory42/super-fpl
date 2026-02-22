@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 return [
     'database' => [
-        'path' => __DIR__ . '/../data/superfpl.db',
+        'path' => getenv('SUPERFPL_DB_PATH') ?: (__DIR__ . '/../data/superfpl.db'),
     ],
     'cache' => [
-        'path' => __DIR__ . '/../cache',
+        'path' => getenv('SUPERFPL_CACHE_PATH') ?: (__DIR__ . '/../cache'),
         'ttl' => 300, // 5 minutes
     ],
     'fpl' => [
-        'rate_limit_dir' => '/tmp/fpl-rate-limit',
+        'rate_limit_dir' => getenv('SUPERFPL_RATE_LIMIT_DIR') ?: '/tmp/fpl-rate-limit',
     ],
     'logs' => [
         'error_log' => __DIR__ . '/../cache/logs/api-error.log',

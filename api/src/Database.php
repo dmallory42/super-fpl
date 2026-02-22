@@ -57,6 +57,7 @@ class Database
         }
 
         $this->pdo->exec($schema);
+        $this->migrate();
     }
 
     /**
