@@ -13,6 +13,9 @@ return [
     'fpl' => [
         'rate_limit_dir' => '/tmp/fpl-rate-limit',
     ],
+    'logs' => [
+        'error_log' => __DIR__ . '/../cache/logs/api-error.log',
+    ],
     'odds_api' => [
         'api_key' => getenv('ODDS_API_KEY') ?: '',
         'enabled' => (bool) getenv('ODDS_API_KEY'),

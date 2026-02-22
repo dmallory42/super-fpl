@@ -15,8 +15,9 @@ async function fetchApi<T>(endpoint: string): Promise<T> {
       parsed = JSON.parse(raw)
     } catch {
       if (response.ok) {
+        const preview = raw.replace(/\s+/g, ' ').trim().slice(0, 180)
         throw new Error(
-          `API returned invalid JSON for ${endpoint} (status ${response.status})`
+          `API returned invalid JSON for ${endpoint} (status ${response.status})${preview ? ` - ${preview}` : ''}`
         )
       }
     }

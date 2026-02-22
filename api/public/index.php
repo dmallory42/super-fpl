@@ -28,6 +28,36 @@ use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\Cache\FileCache;
 use Predis\Client as RedisClient;
 
+// Ensure PHP notices/warnings never corrupt JSON API responses.
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+ini_set('log_errors', '1');
+ini_set('error_log', 'php://stderr');
+error_reporting(E_ALL);
+
+set_error_handler(static function (int $severity, string $message, string $file = '', int $line = 0): bool {
+    if (!(error_reporting() & $severity)) {
+        return false;
+    }
+
+    throw new \ErrorException($message, 0, $severity, $file, $line);
+});
+
+set_exception_handler(static function (Throwable $e): void {
+    $requestId = logUnhandledThrowable($e);
+
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json');
+    }
+
+    echo json_encode([
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString(),
+        'request_id' => $requestId,
+    ]);
+});
+
 // CORS headers
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
@@ -42,6 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Load config
 $config = require __DIR__ . '/../config/config.php';
+configureErrorLogDestination($config);
 
 // Initialize database
 $db = new Database($config['database']['path']);
@@ -122,11 +153,66 @@ try {
         default => handleNotFound(),
     };
 } catch (Throwable $e) {
+    $requestId = logUnhandledThrowable($e);
     http_response_code(500);
     echo json_encode([
         'error' => $e->getMessage(),
         'trace' => $e->getTraceAsString(),
+        'request_id' => $requestId,
     ]);
+}
+
+function configureErrorLogDestination(array $config): void
+{
+    $envPath = trim((string) (getenv('SUPERFPL_ERROR_LOG') ?: ''));
+    $configuredPath = $config['logs']['error_log'] ?? '';
+    $logPath = $envPath !== '' ? $envPath : (is_string($configuredPath) ? $configuredPath : '');
+    if ($logPath === '') {
+        return;
+    }
+
+    $logDir = dirname($logPath);
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0755, true);
+    }
+
+    if (is_dir($logDir) && is_writable($logDir)) {
+        ini_set('error_log', $logPath);
+    }
+}
+
+function logUnhandledThrowable(Throwable $e): string
+{
+    try {
+        $requestId = bin2hex(random_bytes(8));
+    } catch (Throwable) {
+        $requestId = uniqid('req_', true);
+    }
+
+    $payload = [
+        'timestamp' => date('c'),
+        'request_id' => $requestId,
+        'method' => $_SERVER['REQUEST_METHOD'] ?? '',
+        'uri' => $_SERVER['REQUEST_URI'] ?? '',
+        'message' => $e->getMessage(),
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'trace' => $e->getTraceAsString(),
+    ];
+
+    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES);
+    if ($encoded === false) {
+        $encoded = sprintf(
+            '{"timestamp":"%s","request_id":"%s","message":"%s"}',
+            date('c'),
+            $requestId,
+            addslashes($e->getMessage())
+        );
+    }
+
+    error_log('[superfpl] ' . $encoded);
+
+    return $requestId;
 }
 
 function handleHealth(): void

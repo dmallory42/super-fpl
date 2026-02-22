@@ -166,6 +166,12 @@ cd frontend && npm run lint    # ESLint
 php -l api/src/Services/SomeService.php  # PHP syntax check
 ```
 
+## Debug Logs
+
+- API errors/exceptions are written to `api/cache/logs/api-error.log`.
+- Use `npm run api:logs` or `docker compose logs -f nginx php cron` for container-level logs.
+- If an API 500 response includes `request_id`, search that ID in `api/cache/logs/api-error.log` first.
+
 ## Testing
 
 **IMPORTANT: Use Test-Driven Development (TDD) for all new features.**
