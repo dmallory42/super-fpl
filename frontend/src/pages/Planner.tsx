@@ -4,7 +4,6 @@ import { usePlannerOptimize } from '../hooks/usePlannerOptimize'
 import { usePredictionsRange } from '../hooks/usePredictionsRange'
 import type {
   ChipPlan,
-  ChipMode,
   PlayerMultiWeekPrediction,
   FixedTransfer,
   PathGameweek,
@@ -149,8 +148,7 @@ export function Planner() {
   const [managerInput, setManagerInput] = useState(initial.input)
   const [freeTransfers, setFreeTransfers] = useState<number | null>(null)
   const [chipPlan, setChipPlan] = useState<ChipPlan>({})
-  const [chipMode, setChipMode] = useState<ChipMode>('locked')
-  const [chipCompare, setChipCompare] = useState(true)
+  const [controlsTab, setControlsTab] = useState<'basic' | 'advanced'>('basic')
   const [xMinsOverrides, setXMinsOverrides] = useState<XMinsOverrides>({})
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null)
 
@@ -174,8 +172,6 @@ export function Planner() {
   const [solveRequested, setSolveRequested] = useState(false)
   const [solveTransfers, setSolveTransfers] = useState<FixedTransfer[]>([])
   const [solveChipPlan, setSolveChipPlan] = useState<ChipPlan>({})
-  const [solveChipMode, setSolveChipMode] = useState<ChipMode>('locked')
-  const [solveChipCompare, setSolveChipCompare] = useState(true)
   const [solveFtValue, setSolveFtValue] = useState(1.5)
   const [solveDepth, setSolveDepth] = useState<SolverDepth>('standard')
   const [solveObjectiveMode, setSolveObjectiveMode] = useState<PlannerObjectiveMode>('expected')
@@ -297,7 +293,7 @@ export function Planner() {
     ftValue,
     solverDepth,
     true, // skipSolve
-    chipMode,
+    'locked',
     objectiveMode,
     parsedConstraints.constraints,
     false
@@ -317,10 +313,10 @@ export function Planner() {
     solveFtValue,
     solveDepth,
     false, // run solver
-    solveChipMode,
+    'locked',
     solveObjectiveMode,
     solveConstraints,
-    solveChipCompare
+    false
   )
 
   // Stale detection — user changed transfers after solving
@@ -328,8 +324,6 @@ export function Planner() {
     solveRequested &&
     (JSON.stringify(userTransfers) !== JSON.stringify(solveTransfers) ||
       JSON.stringify(chipPlan) !== JSON.stringify(solveChipPlan) ||
-      chipMode !== solveChipMode ||
-      chipCompare !== solveChipCompare ||
       ftValue !== solveFtValue ||
       solverDepth !== solveDepth ||
       objectiveMode !== solveObjectiveMode ||
@@ -340,10 +334,7 @@ export function Planner() {
   // Merge squad + solve data for display
   const optimizeData = squadData
   const paths = solveData?.paths ?? []
-  const chipData = solveData ?? optimizeData
-  const chipSuggestions = chipData?.chip_suggestions_ranked ?? {}
-  const chipResolvedPlan = chipData?.resolved_chip_plan ?? chipData?.chip_plan ?? {}
-  const comparison = solveData?.comparisons
+  const chipResolvedPlan = solveData?.resolved_chip_plan ?? solveData?.chip_plan ?? {}
 
   useEffect(() => {
     if (paths.length >= 2) {
@@ -738,8 +729,6 @@ export function Planner() {
       setSolveRequested(false)
       setSolveTransfers([])
       setSolveChipPlan({})
-      setSolveChipMode('locked')
-      setSolveChipCompare(true)
       setSolveFtValue(1.5)
       setSolveDepth('standard')
       setSolveObjectiveMode('expected')
@@ -813,15 +802,12 @@ export function Planner() {
     setSolveRequested(false)
     setSolveTransfers([])
     setSolveChipPlan({})
-    setSolveChipMode('locked')
-    setSolveChipCompare(true)
     setSolveFtValue(1.5)
     setSolveDepth('standard')
     setSolveObjectiveMode('expected')
     setSolveConstraints({})
     setChipPlan({})
-    setChipMode('locked')
-    setChipCompare(true)
+    setControlsTab('basic')
     setObjectiveMode('expected')
     setLockIdsInput('')
     setAvoidIdsInput('')
@@ -841,8 +827,6 @@ export function Planner() {
     setShowSolveLoader(true)
     setSolveTransfers([...userTransfers])
     setSolveChipPlan({ ...chipPlan })
-    setSolveChipMode(chipMode)
-    setSolveChipCompare(chipCompare)
     setSolveFtValue(ftValue)
     setSolveDepth(solverDepth)
     setSolveObjectiveMode(objectiveMode)
@@ -1317,165 +1301,137 @@ export function Planner() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-3 mb-4">
-                <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
-                      Chip Strategy
-                    </span>
-                    <select
-                      value={chipMode}
-                      onChange={(e) => {
-                        setChipMode(e.target.value as ChipMode)
-                        setSelectedPathIndex(null)
-                      }}
-                      className="input-broadcast py-1 text-xs min-w-[110px]"
-                    >
-                      <option value="locked">Locked</option>
-                      <option value="auto">Auto</option>
-                      <option value="none">None</option>
-                    </select>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
-                      <label key={chip} className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-foreground-muted">
-                          {CHIP_SHORT_LABELS[chip]}
-                        </span>
-                        <select
-                          value={chipPlan[chip] ?? ''}
-                          onChange={(e) => setChipWeek(chip, e.target.value)}
-                          disabled={chipMode === 'none'}
-                          className="input-broadcast py-1 text-xs min-w-[88px]"
-                        >
-                          <option value="">Auto</option>
-                          {optimizeData.planning_horizon.map((gw) => (
-                            <option key={`${chip}-${gw}`} value={gw}>
-                              GW{gw}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ))}
-                  </div>
-                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-foreground-muted">
-                    <input
-                      type="checkbox"
-                      checked={chipCompare}
-                      onChange={(e) => setChipCompare(e.target.checked)}
-                      disabled={chipMode === 'none'}
-                    />
-                    Compare chip plan vs no chips
-                  </label>
-                </div>
-
-                <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
-                  <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
-                    Chip Signals
-                  </div>
-                  <div className="space-y-1 text-xs">
-                    {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => {
-                      const gw = chipResolvedPlan[chip]
-                      const top = chipSuggestions[chip]?.[0]
-                      return (
-                        <div
-                          key={`signal-${chip}`}
-                          className="flex items-center justify-between gap-2"
-                        >
-                          <span className="text-foreground-muted">{CHIP_LABELS[chip]}</span>
-                          <span className="font-mono text-foreground">
-                            {gw ? `GW${gw}` : top ? `Best GW${top.gameweek}` : 'n/a'}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {comparison && (
-                    <div className="mt-3 pt-2 border-t border-border/50 text-xs">
-                      <div className="flex items-center justify-between text-foreground-muted">
-                        <span>Chip delta</span>
-                        <span
-                          className={`font-mono ${
-                            (comparison.chip_delta ?? 0) >= 0
-                              ? 'text-fpl-green'
-                              : 'text-destructive'
-                          }`}
-                        >
-                          {(comparison.chip_delta ?? 0) >= 0 ? '+' : ''}
-                          {(comparison.chip_delta ?? 0).toFixed(1)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+              <div className="mb-4 border-b border-border/60">
+                <div className="inline-flex gap-1 rounded-lg bg-surface-elevated p-1">
+                  <button
+                    onClick={() => setControlsTab('basic')}
+                    className={`px-3 py-1 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
+                      controlsTab === 'basic'
+                        ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
+                        : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
+                    }`}
+                  >
+                    Basic
+                  </button>
+                  <button
+                    onClick={() => setControlsTab('advanced')}
+                    data-testid="planner-controls-advanced-tab"
+                    className={`px-3 py-1 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
+                      controlsTab === 'advanced'
+                        ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
+                        : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
+                    }`}
+                  >
+                    Advanced
+                  </button>
                 </div>
               </div>
 
-              <div className="mb-4 p-3 rounded-lg bg-surface-elevated border border-border/60">
-                <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
-                  Constraints
-                </div>
-                <div className="grid md:grid-cols-2 gap-3">
-                  <label className="block text-xs text-foreground-muted">
-                    Lock Player IDs
-                    <input
-                      data-testid="constraints-lock-ids"
-                      value={lockIdsInput}
-                      onChange={(e) => setLockIdsInput(e.target.value)}
-                      placeholder="e.g. 13, 8"
-                      className="input-broadcast mt-1"
-                    />
-                  </label>
-                  <label className="block text-xs text-foreground-muted">
-                    Avoid Player IDs
-                    <input
-                      data-testid="constraints-avoid-ids"
-                      value={avoidIdsInput}
-                      onChange={(e) => setAvoidIdsInput(e.target.value)}
-                      placeholder="e.g. 6, 22"
-                      className="input-broadcast mt-1"
-                    />
-                  </label>
-                  <label className="block text-xs text-foreground-muted">
-                    Max Hits
-                    <input
-                      data-testid="constraints-max-hits"
-                      type="number"
-                      min={0}
-                      value={maxHitsInput}
-                      onChange={(e) => setMaxHitsInput(e.target.value)}
-                      placeholder="No cap"
-                      className="input-broadcast mt-1"
-                    />
-                  </label>
-                  <div className="space-y-1">
-                    <div className="text-xs text-foreground-muted">
-                      Chip Windows (comma-separated GWs)
+              {controlsTab === 'advanced' && (
+                <div className="mb-4 space-y-3">
+                  <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
+                    <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
+                      Chip Weeks
                     </div>
-                    {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
-                      <label
-                        key={`window-${chip}`}
-                        className="flex items-center gap-2 text-xs text-foreground-muted"
-                      >
-                        <span className="w-10">{CHIP_SHORT_LABELS[chip]}</span>
+                    <div className="text-xs text-foreground-dim mb-2">
+                      Pick exact chip weeks. Auto chip-planning is disabled.
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
+                        <label key={chip} className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-foreground-muted">{CHIP_LABELS[chip]}</span>
+                          <select
+                            value={chipPlan[chip] ?? ''}
+                            onChange={(e) => setChipWeek(chip, e.target.value)}
+                            className="input-broadcast py-1 text-xs min-w-[110px]"
+                          >
+                            <option value="">Not set</option>
+                            {optimizeData.planning_horizon.map((gw) => (
+                              <option key={`${chip}-${gw}`} value={gw}>
+                                GW{gw}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
+                    <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
+                      Constraints
+                    </div>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <label className="block text-xs text-foreground-muted">
+                        Lock Player IDs
                         <input
-                          data-testid={`constraints-chip-window-${chip}`}
-                          value={chipWindowInputs[chip]}
-                          onChange={(e) =>
-                            setChipWindowInputs((prev) => ({ ...prev, [chip]: e.target.value }))
-                          }
-                          placeholder="27, 30"
-                          className="input-broadcast flex-1 py-1"
+                          data-testid="constraints-lock-ids"
+                          value={lockIdsInput}
+                          onChange={(e) => setLockIdsInput(e.target.value)}
+                          placeholder="e.g. 13, 8"
+                          className="input-broadcast mt-1"
                         />
                       </label>
-                    ))}
+                      <label className="block text-xs text-foreground-muted">
+                        Avoid Player IDs
+                        <input
+                          data-testid="constraints-avoid-ids"
+                          value={avoidIdsInput}
+                          onChange={(e) => setAvoidIdsInput(e.target.value)}
+                          placeholder="e.g. 6, 22"
+                          className="input-broadcast mt-1"
+                        />
+                      </label>
+                      <label className="block text-xs text-foreground-muted">
+                        Max Hits
+                        <input
+                          data-testid="constraints-max-hits"
+                          type="number"
+                          min={0}
+                          value={maxHitsInput}
+                          onChange={(e) => setMaxHitsInput(e.target.value)}
+                          placeholder="No cap"
+                          className="input-broadcast mt-1"
+                        />
+                      </label>
+                      <div className="space-y-1">
+                        <div className="text-xs text-foreground-muted">
+                          Chip Windows (comma-separated GWs)
+                        </div>
+                        {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
+                          <label
+                            key={`window-${chip}`}
+                            className="flex items-center gap-2 text-xs text-foreground-muted"
+                          >
+                            <span className="w-10">{CHIP_SHORT_LABELS[chip]}</span>
+                            <input
+                              data-testid={`constraints-chip-window-${chip}`}
+                              value={chipWindowInputs[chip]}
+                              onChange={(e) =>
+                                setChipWindowInputs((prev) => ({ ...prev, [chip]: e.target.value }))
+                              }
+                              placeholder="27, 30"
+                              className="input-broadcast flex-1 py-1"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {parsedConstraints.hasErrors && (
+                      <div className="mt-2 text-xs text-destructive">
+                        {parsedConstraints.errors.join(' | ')}
+                      </div>
+                    )}
                   </div>
                 </div>
-                {parsedConstraints.hasErrors && (
-                  <div className="mt-2 text-xs text-destructive">
-                    {parsedConstraints.errors.join(' | ')}
-                  </div>
-                )}
-              </div>
+              )}
+
+              {controlsTab !== 'advanced' && parsedConstraints.hasErrors && (
+                <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  Advanced settings have invalid constraints. Open Advanced to fix:
+                  {' ' + parsedConstraints.errors.join(' | ')}
+                </div>
+              )}
 
               {/* Loading skeleton */}
               {isSolveActive && (
