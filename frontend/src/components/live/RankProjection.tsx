@@ -3,8 +3,6 @@ import { formatRank } from '../../lib/format'
 interface RankProjectionProps {
   currentRank: number
   previousRank: number
-  currentPoints: number
-  tierAvgPoints: number
   fixturesFinished: number
   fixturesTotal: number
   compact?: boolean
@@ -13,8 +11,6 @@ interface RankProjectionProps {
 export function RankProjection({
   currentRank,
   previousRank,
-  currentPoints,
-  tierAvgPoints,
   fixturesFinished,
   fixturesTotal,
   compact = false,
@@ -28,16 +24,6 @@ export function RankProjection({
   const isGaining = rankMovement > 0
   const isLosing = rankMovement < 0
   const isSteady = rankMovement === 0
-
-  // Calculate pace difference vs tier
-  const paceDifference = currentPoints - tierAvgPoints
-
-  // Calculate velocity label
-  const velocityLabel = isSteady
-    ? 'Steady'
-    : isGaining
-      ? `Gaining ~${formatRank(Math.abs(rankMovement))} places`
-      : `Losing ~${formatRank(Math.abs(rankMovement))} places`
 
   return (
     <div className={compact ? 'space-y-3' : 'space-y-4'}>
@@ -102,37 +88,13 @@ export function RankProjection({
             <span
               className={`font-mono font-bold text-fpl-green ${compact ? 'text-xs' : 'text-sm'}`}
             >
-              {progressPercent}%
+              {fixturesFinished}/{fixturesTotal}
             </span>
             <span className="text-[9px] text-foreground-dim font-display uppercase tracking-wide">
-              GW Complete
+              Matches
             </span>
           </div>
         </div>
-      </div>
-
-      {/* Pace comparison */}
-      <div className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated">
-        <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
-          vs Tier Avg
-        </span>
-        <span
-          className={`font-mono font-bold ${
-            paceDifference > 0
-              ? 'text-fpl-green'
-              : paceDifference < 0
-                ? 'text-destructive'
-                : 'text-foreground-muted'
-          }`}
-        >
-          {paceDifference > 0 ? '+' : ''}
-          {paceDifference.toFixed(1)}
-        </span>
-      </div>
-
-      {/* Velocity indicator */}
-      <div className={`text-center text-foreground-muted ${compact ? 'text-xs' : 'text-sm'}`}>
-        {velocityLabel}
       </div>
     </div>
   )

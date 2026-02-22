@@ -202,6 +202,57 @@ test.describe('Live Page', () => {
     await expect(page.locator('text=You').first()).toBeVisible()
   })
 
+  test('combines tier averages and deltas in summary rows when tiers overlap', async ({ page }) => {
+    // Override default sample points to force clustered tier markers.
+    await page.route('**/api/live/24/samples', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          gameweek: 24,
+          samples: {
+            top_10k: { avg_points: 28, sample_size: 2000, effective_ownership: {} },
+            top_100k: { avg_points: 28, sample_size: 2000, effective_ownership: {} },
+            top_1m: { avg_points: 27, sample_size: 2000, effective_ownership: {} },
+            overall: { avg_points: 23, sample_size: 2000, effective_ownership: {} },
+          },
+          updated_at: '2024-01-15T18:00:00Z',
+        }),
+      })
+    })
+
+    await page.goto('/')
+    await page.click('text=Live')
+    await page.fill('input[placeholder*="Manager ID"]', '12345')
+    await page.click('button:has-text("Track")')
+
+    await page.waitForSelector('text=Gameweek Summary', { timeout: 10000 })
+
+    const top10kSummary = page.getByTestId('tier-summary-top_10k')
+    const top100kSummary = page.getByTestId('tier-summary-top_100k')
+    const top1mSummary = page.getByTestId('tier-summary-top_1m')
+
+    await expect(top10kSummary).toBeVisible()
+    await expect(top100kSummary).toBeVisible()
+    await expect(top1mSummary).toBeVisible()
+
+    await expect(top10kSummary).toContainText('Top 10K')
+    await expect(top10kSummary).toContainText('28')
+    await expect(top10kSummary).toContainText('+39')
+
+    await expect(top100kSummary).toContainText('Top 100K')
+    await expect(top100kSummary).toContainText('28')
+    await expect(top100kSummary).toContainText('+39')
+
+    await expect(top1mSummary).toContainText('Top 1M')
+    await expect(top1mSummary).toContainText('27')
+    await expect(top1mSummary).toContainText('+40')
+
+    // Point values are still available via hover on the clustered markers.
+    await page.getByTestId('tier-marker-top_100k').hover()
+    await expect(page.getByTestId('tier-tooltip-top_100k')).toContainText('100K 28')
+  })
+
   test('shows live points and comparison in stats header', async ({ page }) => {
     await page.goto('/')
     await page.click('text=Live')

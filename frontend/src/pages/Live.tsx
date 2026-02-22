@@ -19,9 +19,13 @@ import { FixtureThreatIndex } from '../components/live/FixtureThreatIndex'
 import { DifferentialAnalysis } from '../components/live/DifferentialAnalysis'
 import { GoodWeekBanner } from '../components/live/GoodWeekBanner'
 import { formatRank } from '../lib/format'
-import { type Tier, TIER_OPTIONS } from '../lib/tiers'
+import { type Tier, TIER_CONFIG, TIER_LABELS, TIER_OPTIONS, TIER_ORDER } from '../lib/tiers'
 import { applyAutoSubs } from '../lib/autosubs'
 import { toBoolFlag } from '../lib/fixtureMapping'
+import {
+  calculateTierEffectivePlayersPlayed,
+  calculateUserEffectivePlayersPlayed,
+} from '../lib/effectivePlayers'
 
 // Get manager ID from URL or localStorage
 function getInitialManagerId(): { id: number | null; input: string } {
@@ -138,6 +142,31 @@ export function Live() {
   const tierEO = samplesData?.samples?.[comparisonTier]?.effective_ownership
   // Also keep top 10k EO for pitch display
   const top10kEO = samplesData?.samples?.top_10k?.effective_ownership
+
+  const effectivePlayersPlayed = useMemo(() => {
+    if (!processedSquad) return null
+
+    const you = calculateUserEffectivePlayersPlayed(
+      processedSquad.players,
+      playersMap,
+      gameweekData
+    )
+    const tiers = TIER_ORDER.filter((tier) => Boolean(samplesData?.samples?.[tier])).map((tier) => {
+      const counts = calculateTierEffectivePlayersPlayed(
+        samplesData?.samples?.[tier]?.effective_ownership,
+        playersMap,
+        gameweekData
+      )
+
+      return {
+        tier,
+        label: TIER_LABELS[tier],
+        ...counts,
+      }
+    })
+
+    return { you, tiers }
+  }, [processedSquad, playersMap, gameweekData, samplesData])
 
   // Calculate rank movement
   const rankMovement = useMemo(() => {
@@ -624,6 +653,17 @@ export function Live() {
           <div className="grid md:grid-cols-2 gap-4 md:gap-6">
             {/* Gameweek Summary */}
             <BroadcastCard title="Gameweek Summary" animationDelay={300}>
+              {rankMovement && gwData && (
+                <div className="pb-3 mb-3 md:pb-4 md:mb-4 border-b border-border/40">
+                  <RankProjection
+                    currentRank={rankMovement.current}
+                    previousRank={rankMovement.previous ?? rankMovement.current}
+                    fixturesFinished={gwData.matchesPlayed}
+                    fixturesTotal={gwData.totalMatches}
+                    compact
+                  />
+                </div>
+              )}
               <ComparisonBars
                 userPoints={processedSquad.totalPoints}
                 comparisons={comparisons}
@@ -633,17 +673,47 @@ export function Live() {
                 showTierSelector={false}
                 animationDelay={350}
               />
-              {rankMovement && gwData && (
+              {effectivePlayersPlayed && (
                 <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
-                  <RankProjection
-                    currentRank={rankMovement.current}
-                    previousRank={rankMovement.previous ?? rankMovement.current}
-                    currentPoints={processedSquad.totalPoints}
-                    tierAvgPoints={samplesData?.samples?.[comparisonTier]?.avg_points ?? 0}
-                    fixturesFinished={gwData.matchesPlayed}
-                    fixturesTotal={gwData.totalMatches}
-                    compact
-                  />
+                  <div className="font-display text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted mb-2">
+                    Effective Players Played
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 md:gap-2">
+                    <div
+                      data-testid="effective-players-you"
+                      className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-fpl-green" />
+                        <span className="font-display text-[11px] md:text-xs uppercase tracking-wide text-fpl-green">
+                          You
+                        </span>
+                      </div>
+                      <div className="font-mono text-sm md:text-base text-foreground">
+                        {effectivePlayersPlayed.you.played.toFixed(1)}/
+                        {effectivePlayersPlayed.you.total.toFixed(1)}
+                      </div>
+                    </div>
+                    {effectivePlayersPlayed.tiers.map((tierData) => (
+                      <div
+                        key={tierData.tier}
+                        data-testid={`effective-players-${tierData.tier}`}
+                        className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`w-2 h-2 rounded-full ${TIER_CONFIG[tierData.tier].color}`}
+                          />
+                          <span className="font-display text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
+                            {tierData.label}
+                          </span>
+                        </div>
+                        <div className="font-mono text-sm md:text-base text-foreground">
+                          {tierData.played.toFixed(1)}/{tierData.total.toFixed(1)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </BroadcastCard>

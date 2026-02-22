@@ -59,13 +59,65 @@ export function ComparisonBars({
     ticks.push(t)
   }
 
+  type MarkerLayout = {
+    position: number
+    lane: number
+    markerOffsetPx: number
+  }
+
+  const markerLayoutsByTier = new Map<string, MarkerLayout>()
+  const overlapThresholdPercent = 4
+  const markerSpreadPx = 22
+
+  const sortedPoints = comparisons
+    .map((comp) => ({
+      tier: comp.tier,
+      position: pointsToPercent(comp.avgPoints),
+    }))
+    .sort((a, b) => a.position - b.position)
+
+  let clusterStart = 0
+  while (clusterStart < sortedPoints.length) {
+    const cluster = [sortedPoints[clusterStart]]
+    let cursor = clusterStart + 1
+
+    while (cursor < sortedPoints.length) {
+      const prev = sortedPoints[cursor - 1]
+      const current = sortedPoints[cursor]
+      if (current.position - prev.position >= overlapThresholdPercent) {
+        break
+      }
+      cluster.push(current)
+      cursor++
+    }
+
+    cluster.forEach((entry, idx) => {
+      const lane = cluster.length > 1 ? idx : 0
+      const markerOffsetPx =
+        cluster.length > 1 ? (idx - (cluster.length - 1) / 2) * markerSpreadPx : 0
+
+      markerLayoutsByTier.set(entry.tier, {
+        position: entry.position,
+        lane,
+        markerOffsetPx,
+      })
+    })
+
+    clusterStart = cursor
+  }
+
+  const trackPaddingBottomPx = 26
+
   return (
     <div
       className="space-y-3 md:space-y-4 animate-fade-in-up opacity-0"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       {/* Race Track */}
-      <div className="relative pt-10 md:pt-12 pb-5 md:pb-6">
+      <div
+        className="relative pt-10 md:pt-12"
+        style={{ paddingBottom: `${trackPaddingBottomPx}px` }}
+      >
         {/* The track line */}
         <div className="absolute left-0 right-0 top-1/2 h-1 bg-gradient-to-r from-surface via-foreground-dim/30 to-surface rounded-full" />
 
@@ -90,14 +142,19 @@ export function ComparisonBars({
             abbrev: comp.tier,
             color: 'bg-slate-500',
           }
-          const position = pointsToPercent(comp.avgPoints)
+          const layout = markerLayoutsByTier.get(comp.tier)
+          const position = layout?.position ?? pointsToPercent(comp.avgPoints)
 
           return (
             <div
               key={comp.tier}
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 animate-fade-in-up opacity-0"
+              className="group absolute top-1/2 -translate-y-1/2 -translate-x-1/2 animate-fade-in-up opacity-0"
+              data-testid={`tier-marker-${comp.tier}`}
+              title={`${comp.tierLabel}: ${comp.avgPoints.toFixed(0)} pts`}
+              aria-label={`${comp.tierLabel} average ${comp.avgPoints.toFixed(0)} points`}
               style={{
                 left: `${position}%`,
+                marginLeft: `${layout?.markerOffsetPx ?? 0}px`,
                 animationDelay: `${animationDelay + 200 + idx * 80}ms`,
               }}
             >
@@ -105,14 +162,11 @@ export function ComparisonBars({
               <div
                 className={`w-3 h-3 rounded-full ${config.color} ring-2 ring-background shadow-md`}
               />
-              {/* Label below */}
-              <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-                <div className="font-display text-xs uppercase tracking-wide text-foreground-muted">
-                  {config.abbrev}
-                </div>
-                <div className="font-mono text-xs text-foreground-dim">
-                  {comp.avgPoints.toFixed(0)}
-                </div>
+              <div
+                className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-mono text-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                data-testid={`tier-tooltip-${comp.tier}`}
+              >
+                {comp.tierLabel} {comp.avgPoints.toFixed(0)}
               </div>
             </div>
           )
@@ -147,6 +201,11 @@ export function ComparisonBars({
         {comparisons.map((comp, idx) => {
           const isAhead = comp.difference > 0
           const isBehind = comp.difference < 0
+          const deltaColorClass = isAhead
+            ? 'text-fpl-green'
+            : isBehind
+              ? 'text-destructive'
+              : 'text-foreground-dim'
           const config = TIER_CONFIG[comp.tier as Tier] || {
             abbrev: comp.tier,
             color: 'bg-slate-500',
@@ -155,6 +214,7 @@ export function ComparisonBars({
           return (
             <div
               key={comp.tier}
+              data-testid={`tier-summary-${comp.tier}`}
               className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated animate-fade-in-up opacity-0"
               style={{ animationDelay: `${animationDelay + 400 + idx * 50}ms` }}
             >
@@ -164,14 +224,15 @@ export function ComparisonBars({
                   {comp.tierLabel}
                 </span>
               </div>
-              <span
-                className={`font-mono text-sm md:text-base font-bold ${
-                  isAhead ? 'text-fpl-green' : isBehind ? 'text-destructive' : 'text-foreground-dim'
-                }`}
-              >
-                {isAhead ? '+' : ''}
-                {comp.difference.toFixed(0)}
-              </span>
+              <div className="font-mono text-sm md:text-base font-bold whitespace-nowrap">
+                <span className="text-foreground">{comp.avgPoints.toFixed(0)}</span>
+                <span className={deltaColorClass}> (</span>
+                <span className={deltaColorClass}>
+                  {isAhead ? '+' : ''}
+                  {comp.difference.toFixed(0)}
+                </span>
+                <span className={deltaColorClass}>)</span>
+              </div>
             </div>
           )
         })}
