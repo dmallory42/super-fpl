@@ -52,6 +52,14 @@ function formatFixtures(fixtures: FixtureOpponent[]): string {
   return fixtures.map((f) => (f.is_home ? f.opponent : f.opponent.toLowerCase())).join(', ')
 }
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
 interface SavedPlan {
   id: string
   name: string
@@ -61,8 +69,8 @@ interface SavedPlan {
 }
 
 interface ConstraintInputState {
-  lockIds: string
-  avoidIds: string
+  lockIds: number[]
+  avoidIds: number[]
   maxHits: string
   chipWindows: Record<keyof ChipPlan, string>
 }
@@ -99,8 +107,8 @@ function getInitialManagerId(): { id: number | null; input: string } {
 
 function getInitialConstraintInputs(): ConstraintInputState {
   const empty: ConstraintInputState = {
-    lockIds: '',
-    avoidIds: '',
+    lockIds: [],
+    avoidIds: [],
     maxHits: '',
     chipWindows: {
       wildcard: '',
@@ -134,8 +142,12 @@ function getInitialConstraintInputs(): ConstraintInputState {
   }
 
   return {
-    lockIds: Array.isArray(source.lock_ids) ? source.lock_ids.join(',') : '',
-    avoidIds: Array.isArray(source.avoid_ids) ? source.avoid_ids.join(',') : '',
+    lockIds: Array.isArray(source.lock_ids)
+      ? source.lock_ids.filter((id) => Number.isInteger(id) && id > 0)
+      : [],
+    avoidIds: Array.isArray(source.avoid_ids)
+      ? source.avoid_ids.filter((id) => Number.isInteger(id) && id > 0)
+      : [],
     maxHits:
       source.max_hits === null || source.max_hits === undefined ? '' : String(source.max_hits),
     chipWindows,
@@ -160,10 +172,12 @@ export function Planner() {
   const [solverDepth, setSolverDepth] = useState<SolverDepth>('standard')
   const [objectiveMode, setObjectiveMode] = useState<PlannerObjectiveMode>('expected')
   const initialConstraintInputs = getInitialConstraintInputs()
-  const [lockIdsInput, setLockIdsInput] = useState(initialConstraintInputs.lockIds)
-  const [avoidIdsInput, setAvoidIdsInput] = useState(initialConstraintInputs.avoidIds)
+  const [lockIds, setLockIds] = useState<number[]>(initialConstraintInputs.lockIds)
+  const [avoidIds, setAvoidIds] = useState<number[]>(initialConstraintInputs.avoidIds)
   const [maxHitsInput, setMaxHitsInput] = useState(initialConstraintInputs.maxHits)
   const [chipWindowInputs, setChipWindowInputs] = useState(initialConstraintInputs.chipWindows)
+  const [lockSearch, setLockSearch] = useState('')
+  const [avoidSearch, setAvoidSearch] = useState('')
 
   // User transfers (replaces old fixedTransfers concept)
   const [userTransfers, setUserTransfers] = useState<FixedTransfer[]>([])
@@ -210,19 +224,6 @@ export function Planner() {
   }, [xMinsOverrides])
 
   const parsedConstraints = useMemo(() => {
-    const parseIdList = (raw: string): number[] => {
-      const trimmed = raw.trim()
-      if (!trimmed) return []
-      return Array.from(
-        new Set(
-          trimmed
-            .split(',')
-            .map((part) => parseInt(part.trim(), 10))
-            .filter((id) => Number.isFinite(id) && id > 0)
-        )
-      )
-    }
-
     const parseGwList = (raw: string): number[] => {
       const trimmed = raw.trim()
       if (!trimmed) return []
@@ -236,9 +237,13 @@ export function Planner() {
       )
     }
 
-    const lockIds = parseIdList(lockIdsInput)
-    const avoidIds = parseIdList(avoidIdsInput)
-    const overlap = lockIds.filter((id) => avoidIds.includes(id))
+    const normalizedLockIds = Array.from(
+      new Set(lockIds.filter((id) => Number.isInteger(id) && id > 0))
+    )
+    const normalizedAvoidIds = Array.from(
+      new Set(avoidIds.filter((id) => Number.isInteger(id) && id > 0))
+    )
+    const overlap = normalizedLockIds.filter((id) => normalizedAvoidIds.includes(id))
 
     const parsedMaxHits = maxHitsInput.trim() === '' ? null : Number(maxHitsInput.trim())
     const normalizedMaxHits =
@@ -265,8 +270,8 @@ export function Planner() {
     }
 
     const constraints: PlannerConstraints = {}
-    if (lockIds.length > 0) constraints.lock_ids = lockIds
-    if (avoidIds.length > 0) constraints.avoid_ids = avoidIds
+    if (normalizedLockIds.length > 0) constraints.lock_ids = normalizedLockIds
+    if (normalizedAvoidIds.length > 0) constraints.avoid_ids = normalizedAvoidIds
     if (normalizedMaxHits !== null) constraints.max_hits = normalizedMaxHits
     if (Object.keys(chipWindows).length > 0) constraints.chip_windows = chipWindows
 
@@ -275,7 +280,7 @@ export function Planner() {
       errors,
       hasErrors: errors.length > 0,
     }
-  }, [lockIdsInput, avoidIdsInput, maxHitsInput, chipWindowInputs])
+  }, [lockIds, avoidIds, maxHitsInput, chipWindowInputs])
 
   const { data: playersData } = usePlayers()
 
@@ -387,6 +392,35 @@ export function Planner() {
       playersData.teams.map((t) => [t.id, { id: t.id, short_name: t.short_name }])
     )
   }, [playersData?.teams])
+
+  const playersById = useMemo(() => {
+    const byId = new Map<number, { id: number; web_name: string; team: number }>()
+    for (const player of playersData?.players ?? []) {
+      byId.set(player.id, player)
+    }
+    return byId
+  }, [playersData?.players])
+
+  const lockSearchResults = useMemo(() => {
+    const q = normalizeSearchText(lockSearch)
+    if (!q || !playersData?.players) return []
+    return playersData.players
+      .filter(
+        (player) => !lockIds.includes(player.id) && normalizeSearchText(player.web_name).includes(q)
+      )
+      .slice(0, 8)
+  }, [playersData?.players, lockSearch, lockIds])
+
+  const avoidSearchResults = useMemo(() => {
+    const q = normalizeSearchText(avoidSearch)
+    if (!q || !playersData?.players) return []
+    return playersData.players
+      .filter(
+        (player) =>
+          !avoidIds.includes(player.id) && normalizeSearchText(player.web_name).includes(q)
+      )
+      .slice(0, 8)
+  }, [playersData?.players, avoidSearch, avoidIds])
 
   // Player predictions map for quick lookup
   const playerPredictionsMap = useMemo(() => {
@@ -680,7 +714,7 @@ export function Planner() {
         if (adjustedCount >= 3) return false
         if (
           replacementSearch &&
-          !p.web_name.toLowerCase().includes(replacementSearch.toLowerCase())
+          !normalizeSearchText(p.web_name).includes(normalizeSearchText(replacementSearch))
         ) {
           return false
         }
@@ -750,6 +784,30 @@ export function Planner() {
     setSelectedPathIndex(null)
   }
 
+  const addLockPlayer = (playerId: number) => {
+    setLockIds((prev) => (prev.includes(playerId) ? prev : [...prev, playerId]))
+    setAvoidIds((prev) => prev.filter((id) => id !== playerId))
+    setLockSearch('')
+    setSelectedPathIndex(null)
+  }
+
+  const removeLockPlayer = (playerId: number) => {
+    setLockIds((prev) => prev.filter((id) => id !== playerId))
+    setSelectedPathIndex(null)
+  }
+
+  const addAvoidPlayer = (playerId: number) => {
+    setAvoidIds((prev) => (prev.includes(playerId) ? prev : [...prev, playerId]))
+    setLockIds((prev) => prev.filter((id) => id !== playerId))
+    setAvoidSearch('')
+    setSelectedPathIndex(null)
+  }
+
+  const removeAvoidPlayer = (playerId: number) => {
+    setAvoidIds((prev) => prev.filter((id) => id !== playerId))
+    setSelectedPathIndex(null)
+  }
+
   const handlePlayerSelect = (playerId: number) => {
     if (selectedPlayer === playerId) {
       setSelectedPlayer(null)
@@ -809,8 +867,10 @@ export function Planner() {
     setChipPlan({})
     setControlsTab('basic')
     setObjectiveMode('expected')
-    setLockIdsInput('')
-    setAvoidIdsInput('')
+    setLockIds([])
+    setAvoidIds([])
+    setLockSearch('')
+    setAvoidSearch('')
     setMaxHitsInput('')
     setChipWindowInputs({
       wildcard: '',
@@ -1362,26 +1422,120 @@ export function Planner() {
                       Constraints
                     </div>
                     <div className="grid md:grid-cols-2 gap-3">
-                      <label className="block text-xs text-foreground-muted">
-                        Lock Player IDs
+                      <div className="space-y-1">
+                        <div className="text-xs text-foreground-muted">Lock Players</div>
                         <input
-                          data-testid="constraints-lock-ids"
-                          value={lockIdsInput}
-                          onChange={(e) => setLockIdsInput(e.target.value)}
-                          placeholder="e.g. 13, 8"
-                          className="input-broadcast mt-1"
+                          data-testid="constraints-lock-search"
+                          value={lockSearch}
+                          onChange={(e) => setLockSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && lockSearchResults.length > 0) {
+                              e.preventDefault()
+                              addLockPlayer(lockSearchResults[0].id)
+                            }
+                          }}
+                          placeholder="Search by name..."
+                          className="input-broadcast"
                         />
-                      </label>
-                      <label className="block text-xs text-foreground-muted">
-                        Avoid Player IDs
+                        {lockSearch.trim().length > 0 && lockSearchResults.length > 0 && (
+                          <div className="max-h-28 overflow-y-auto rounded border border-border bg-surface">
+                            {lockSearchResults.map((player) => (
+                              <button
+                                key={`lock-option-${player.id}`}
+                                type="button"
+                                data-testid={`constraints-lock-option-${player.id}`}
+                                onClick={() => addLockPlayer(player.id)}
+                                className="w-full px-2 py-1.5 text-left text-xs hover:bg-surface-hover flex items-center justify-between gap-2"
+                              >
+                                <span className="text-foreground">{player.web_name}</span>
+                                <span className="text-foreground-muted">
+                                  {teamsMap.get(player.team) ?? '?'}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="min-h-[1.75rem] flex flex-wrap gap-1">
+                          {lockIds.length === 0 ? (
+                            <span className="text-[11px] text-foreground-dim">
+                              No locked players
+                            </span>
+                          ) : (
+                            lockIds.map((id) => {
+                              const player = playersById.get(id)
+                              return (
+                                <button
+                                  key={`lock-selected-${id}`}
+                                  type="button"
+                                  onClick={() => removeLockPlayer(id)}
+                                  className="inline-flex items-center gap-1 rounded border border-fpl-green/30 bg-fpl-green/10 px-2 py-0.5 text-[11px] text-fpl-green"
+                                  title="Remove lock"
+                                >
+                                  <span>{player?.web_name ?? `#${id}`}</span>
+                                  <span className="text-fpl-green/80">×</span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-foreground-muted">Avoid Players</div>
                         <input
-                          data-testid="constraints-avoid-ids"
-                          value={avoidIdsInput}
-                          onChange={(e) => setAvoidIdsInput(e.target.value)}
-                          placeholder="e.g. 6, 22"
-                          className="input-broadcast mt-1"
+                          data-testid="constraints-avoid-search"
+                          value={avoidSearch}
+                          onChange={(e) => setAvoidSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && avoidSearchResults.length > 0) {
+                              e.preventDefault()
+                              addAvoidPlayer(avoidSearchResults[0].id)
+                            }
+                          }}
+                          placeholder="Search by name..."
+                          className="input-broadcast"
                         />
-                      </label>
+                        {avoidSearch.trim().length > 0 && avoidSearchResults.length > 0 && (
+                          <div className="max-h-28 overflow-y-auto rounded border border-border bg-surface">
+                            {avoidSearchResults.map((player) => (
+                              <button
+                                key={`avoid-option-${player.id}`}
+                                type="button"
+                                data-testid={`constraints-avoid-option-${player.id}`}
+                                onClick={() => addAvoidPlayer(player.id)}
+                                className="w-full px-2 py-1.5 text-left text-xs hover:bg-surface-hover flex items-center justify-between gap-2"
+                              >
+                                <span className="text-foreground">{player.web_name}</span>
+                                <span className="text-foreground-muted">
+                                  {teamsMap.get(player.team) ?? '?'}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="min-h-[1.75rem] flex flex-wrap gap-1">
+                          {avoidIds.length === 0 ? (
+                            <span className="text-[11px] text-foreground-dim">
+                              No avoided players
+                            </span>
+                          ) : (
+                            avoidIds.map((id) => {
+                              const player = playersById.get(id)
+                              return (
+                                <button
+                                  key={`avoid-selected-${id}`}
+                                  type="button"
+                                  onClick={() => removeAvoidPlayer(id)}
+                                  className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] text-destructive"
+                                  title="Remove avoid"
+                                >
+                                  <span>{player?.web_name ?? `#${id}`}</span>
+                                  <span className="text-destructive/80">×</span>
+                                </button>
+                              )
+                            })
+                          )}
+                        </div>
+                      </div>
                       <label className="block text-xs text-foreground-muted">
                         Max Hits
                         <input

@@ -627,7 +627,8 @@ test.describe('Planner Page', () => {
     await page.click('button:has-text("Load")')
 
     await page.getByTestId('planner-controls-advanced-tab').click()
-    await page.getByTestId('constraints-lock-ids').fill('999')
+    await page.getByTestId('constraints-lock-search').fill('Saka')
+    await page.getByTestId('constraints-lock-option-8').click()
     await page.click('button:has-text("Find Plans")')
 
     await expect(page.locator('text=Infeasible constraints')).toBeVisible({ timeout: 10000 })
