@@ -359,6 +359,67 @@
     @apply transition-all duration-200;
   }
 
+  /* Shared form primitives */
+  .form-section-card {
+    @apply rounded-lg border border-border/60 bg-surface-elevated p-4;
+  }
+
+  .form-section-title {
+    @apply font-display text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground-muted;
+  }
+
+  .form-help-text {
+    @apply text-sm text-foreground-dim;
+  }
+
+  .form-field {
+    @apply space-y-1.5;
+  }
+
+  .form-label {
+    @apply font-display text-[11px] uppercase tracking-[0.08em] text-foreground-muted;
+  }
+
+  .form-control {
+    @apply input-broadcast h-11 py-2.5 text-sm;
+  }
+
+  .form-results {
+    @apply max-h-36 overflow-y-auto rounded-lg border border-border/70 bg-surface;
+  }
+
+  .form-result-item {
+    @apply flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-hover;
+  }
+
+  .form-empty-text {
+    @apply text-xs text-foreground-dim;
+  }
+
+  .form-pill-list {
+    @apply min-h-[2rem] flex flex-wrap gap-1.5;
+  }
+
+  .form-pill {
+    @apply inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs;
+  }
+
+  .form-pill-lock {
+    @apply border-fpl-green/30 bg-fpl-green/10 text-fpl-green;
+  }
+
+  .form-pill-avoid {
+    @apply border-destructive/30 bg-destructive/10 text-destructive;
+  }
+
+  .form-pill-team {
+    @apply border-highlight/30 bg-highlight/10 text-highlight;
+  }
+
+  .form-error-text {
+    @apply text-xs text-destructive;
+  }
+
   /* Button variants */
   .btn-primary {
     @apply px-6 py-2.5 font-display uppercase tracking-wider text-sm;
