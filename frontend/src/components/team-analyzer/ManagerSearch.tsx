@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { FormInput } from '../ui/form'
 
 interface ManagerSearchProps {
   onSearch: (managerId: number) => void
@@ -34,12 +35,11 @@ export function ManagerSearch({ onSearch, isLoading }: ManagerSearchProps) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
       <div className="flex-1">
-        <input
+        <FormInput
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Enter FPL Manager ID (e.g., 12345)"
-          className="input-broadcast"
           aria-label="Search for manager"
           disabled={isLoading}
         />

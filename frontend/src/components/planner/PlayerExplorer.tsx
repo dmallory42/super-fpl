@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
 import type { PlayerMultiWeekPrediction, XMinsOverrides, FixtureOpponent } from '../../api/client'
 import { BroadcastCard } from '../ui/BroadcastCard'
 import { PositionBadge } from '../common/PositionBadge'
+import { FormInput } from '../ui/form'
 import { scalePoints } from '../../lib/predictions'
 
 interface PlayerExplorerProps {
@@ -231,7 +232,7 @@ export function PlayerExplorer({
     <BroadcastCard accentColor="purple" animationDelay={500}>
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <input
+        <FormInput
           type="text"
           value={searchQuery}
           onChange={(e) => {
@@ -239,7 +240,7 @@ export function PlayerExplorer({
             setVisibleCount(50)
           }}
           placeholder="Search players..."
-          className="input-broadcast flex-1 sm:max-w-xs"
+          className="flex-1 sm:max-w-xs"
         />
         <div className="flex gap-1.5">
           {positions.map((pos) => (

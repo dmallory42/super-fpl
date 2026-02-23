@@ -626,7 +626,7 @@ test.describe('Planner Page', () => {
     await page.fill('input[placeholder="Enter FPL ID"]', '8028')
     await page.click('button:has-text("Load")')
 
-    await page.getByTestId('planner-controls-advanced-tab').click()
+    await page.getByTestId('planner-advanced-toggle').click()
     await page.getByTestId('constraints-lock-search').fill('Saka')
     await page.getByTestId('constraints-lock-option-8').click()
     await page.click('button:has-text("Find Plans")')

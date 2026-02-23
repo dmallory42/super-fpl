@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { LeagueSeasonManager } from '../../api/client'
+import { FormSelect } from '../ui/form'
 
 type DecisionMetricKey =
   | 'captain_gains'
@@ -80,11 +81,7 @@ function computeMedian(values: number[]): number {
   return (sorted[mid - 1] + sorted[mid]) / 2
 }
 
-function compareNullable(
-  a: number | null,
-  b: number | null,
-  direction: SortDirection
-): number {
+function compareNullable(a: number | null, b: number | null, direction: SortDirection): number {
   if (a === null && b === null) return 0
   if (a === null) return 1
   if (b === null) return -1
@@ -135,12 +132,12 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
           <p className="text-xs text-foreground-dim">{metricConfig.description}</p>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="decision-metric-select" className="text-xs text-foreground-muted uppercase">
+          <label htmlFor="decision-metric-select" className="form-label">
             Metric
           </label>
-          <select
+          <FormSelect
             id="decision-metric-select"
-            className="input-broadcast h-10 min-w-[210px]"
+            className="h-10 min-w-[210px]"
             value={metric}
             onChange={(event) => handleMetricChange(event.target.value as DecisionMetricKey)}
           >
@@ -149,7 +146,7 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
                 {entry.label}
               </option>
             ))}
-          </select>
+          </FormSelect>
           <button
             type="button"
             className="btn-secondary h-10"

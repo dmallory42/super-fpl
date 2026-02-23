@@ -8,6 +8,7 @@ import { EmptyState, UsersIcon } from '../components/ui/EmptyState'
 import { SkeletonCard, SkeletonTable } from '../components/ui/SkeletonLoader'
 import { GradientText } from '../components/ui/GradientText'
 import { DecisionDeltaModule } from '../components/league/DecisionDeltaModule'
+import { FormInput, FormSelect } from '../components/ui/form'
 import { getPositionName } from '../types'
 
 type LeagueView = 'this-gw' | 'season' | 'decisions'
@@ -159,12 +160,12 @@ export function LeagueAnalyzer() {
         onSubmit={handleSubmit}
         className="flex gap-2 max-w-md animate-fade-in-up animation-delay-100"
       >
-        <input
+        <FormInput
           type="text"
           value={leagueInput}
           onChange={(e) => setLeagueInput(e.target.value)}
           placeholder="Enter League ID"
-          className="input-broadcast flex-1"
+          className="flex-1"
           aria-label="League ID"
         />
         <button type="submit" className="btn-primary">
@@ -175,17 +176,14 @@ export function LeagueAnalyzer() {
       {/* Gameweek Selector */}
       {leagueId && (
         <div className="flex items-center gap-4 animate-fade-in-up animation-delay-200">
-          <label
-            htmlFor="gameweek-select"
-            className="text-foreground-muted font-display text-sm uppercase tracking-wider"
-          >
+          <label htmlFor="gameweek-select" className="form-label text-sm">
             Gameweek:
           </label>
-          <select
+          <FormSelect
             id="gameweek-select"
             value={gameweek || ''}
             onChange={(e) => setGameweek(e.target.value ? parseInt(e.target.value, 10) : undefined)}
-            className="input-broadcast w-32"
+            className="w-32"
           >
             <option value="">Current</option>
             {Array.from({ length: 38 }, (_, i) => i + 1).map((gw) => (
@@ -193,7 +191,7 @@ export function LeagueAnalyzer() {
                 GW{gw}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
       )}
 
@@ -364,7 +362,10 @@ export function LeagueAnalyzer() {
                             {diffs.slice(0, 5).map((diff) => {
                               const player = analysisData.comparison.players[diff.player_id]
                               return (
-                                <li key={diff.player_id} className="flex items-center gap-2 text-sm">
+                                <li
+                                  key={diff.player_id}
+                                  className="flex items-center gap-2 text-sm"
+                                >
                                   <span className="font-mono text-xs w-8 text-foreground-muted">
                                     {player ? getPositionName(player.position) : ''}
                                   </span>
@@ -430,7 +431,11 @@ export function LeagueAnalyzer() {
                         <td className="text-right font-mono">{manager.expected.toFixed(1)}</td>
                         <td
                           className={`text-right font-mono font-bold ${
-                            manager.luck > 0 ? 'text-fpl-green' : manager.luck < 0 ? 'text-destructive' : 'text-foreground-muted'
+                            manager.luck > 0
+                              ? 'text-fpl-green'
+                              : manager.luck < 0
+                                ? 'text-destructive'
+                                : 'text-foreground-muted'
                           }`}
                         >
                           {manager.luck > 0 ? '+' : ''}
@@ -492,7 +497,9 @@ export function LeagueAnalyzer() {
                               ? '—'
                               : manager.decision_quality.hit_roi.toFixed(2)}
                           </td>
-                          <td className="text-right font-mono">{manager.decision_quality.chip_events}</td>
+                          <td className="text-right font-mono">
+                            {manager.decision_quality.chip_events}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

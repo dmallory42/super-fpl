@@ -17,6 +17,16 @@ import { StatPanel, StatPanelGrid } from '../components/ui/StatPanel'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, ChartIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonCard } from '../components/ui/SkeletonLoader'
+import {
+  FormSectionCard,
+  FormField,
+  FormInput,
+  FormSelect,
+  SearchResultsList,
+  SearchResultButton,
+  SelectionPill,
+  SelectionPillList,
+} from '../components/ui/form'
 import { FormationPitch } from '../components/live/FormationPitch'
 import { useLiveSamples } from '../hooks/useLiveSamples'
 import { PlayerExplorer } from '../components/planner/PlayerExplorer'
@@ -71,8 +81,7 @@ interface SavedPlan {
 interface ConstraintInputState {
   lockIds: number[]
   avoidIds: number[]
-  maxHits: string
-  chipWindows: Record<keyof ChipPlan, string>
+  avoidTeams: number[]
 }
 
 interface GameweekRationaleRow {
@@ -109,13 +118,7 @@ function getInitialConstraintInputs(): ConstraintInputState {
   const empty: ConstraintInputState = {
     lockIds: [],
     avoidIds: [],
-    maxHits: '',
-    chipWindows: {
-      wildcard: '',
-      free_hit: '',
-      bench_boost: '',
-      triple_captain: '',
-    },
+    avoidTeams: [],
   }
 
   const parseConstraints = (raw: string | null): PlannerConstraints | null => {
@@ -135,12 +138,6 @@ function getInitialConstraintInputs(): ConstraintInputState {
     return empty
   }
 
-  const chipWindows = { ...empty.chipWindows }
-  for (const chip of Object.keys(chipWindows) as (keyof ChipPlan)[]) {
-    const weeks = source.chip_windows?.[chip]
-    chipWindows[chip] = Array.isArray(weeks) ? weeks.join(',') : ''
-  }
-
   return {
     lockIds: Array.isArray(source.lock_ids)
       ? source.lock_ids.filter((id) => Number.isInteger(id) && id > 0)
@@ -148,9 +145,11 @@ function getInitialConstraintInputs(): ConstraintInputState {
     avoidIds: Array.isArray(source.avoid_ids)
       ? source.avoid_ids.filter((id) => Number.isInteger(id) && id > 0)
       : [],
-    maxHits:
-      source.max_hits === null || source.max_hits === undefined ? '' : String(source.max_hits),
-    chipWindows,
+    avoidTeams: Array.isArray((source as { avoid_teams?: unknown }).avoid_teams)
+      ? ((source as { avoid_teams: unknown[] }).avoid_teams as number[]).filter(
+          (id) => Number.isInteger(id) && id > 0
+        )
+      : [],
   }
 }
 
@@ -160,7 +159,6 @@ export function Planner() {
   const [managerInput, setManagerInput] = useState(initial.input)
   const [freeTransfers, setFreeTransfers] = useState<number | null>(null)
   const [chipPlan, setChipPlan] = useState<ChipPlan>({})
-  const [controlsTab, setControlsTab] = useState<'basic' | 'advanced'>('basic')
   const [xMinsOverrides, setXMinsOverrides] = useState<XMinsOverrides>({})
   const [selectedGameweek, setSelectedGameweek] = useState<number | null>(null)
 
@@ -174,10 +172,10 @@ export function Planner() {
   const initialConstraintInputs = getInitialConstraintInputs()
   const [lockIds, setLockIds] = useState<number[]>(initialConstraintInputs.lockIds)
   const [avoidIds, setAvoidIds] = useState<number[]>(initialConstraintInputs.avoidIds)
-  const [maxHitsInput, setMaxHitsInput] = useState(initialConstraintInputs.maxHits)
-  const [chipWindowInputs, setChipWindowInputs] = useState(initialConstraintInputs.chipWindows)
+  const [avoidTeamIds, setAvoidTeamIds] = useState<number[]>(initialConstraintInputs.avoidTeams)
   const [lockSearch, setLockSearch] = useState('')
   const [avoidSearch, setAvoidSearch] = useState('')
+  const [avoidTeamSearch, setAvoidTeamSearch] = useState('')
 
   // User transfers (replaces old fixedTransfers concept)
   const [userTransfers, setUserTransfers] = useState<FixedTransfer[]>([])
@@ -209,6 +207,7 @@ export function Planner() {
   // UI state
   const [showHelp, setShowHelp] = useState(false)
   const [isExplorerExpanded, setIsExplorerExpanded] = useState(false)
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
 
   // Debounce xMinsOverrides so the optimize API call doesn't fire on every keystroke
   const [debouncedXMins, setDebouncedXMins] = useState<XMinsOverrides>(xMinsOverrides)
@@ -223,66 +222,42 @@ export function Planner() {
     }
   }, [xMinsOverrides])
 
-  const parsedConstraints = useMemo(() => {
-    const parseGwList = (raw: string): number[] => {
-      const trimmed = raw.trim()
-      if (!trimmed) return []
-      return Array.from(
-        new Set(
-          trimmed
-            .split(',')
-            .map((part) => parseInt(part.trim(), 10))
-            .filter((gw) => Number.isFinite(gw) && gw > 0 && gw <= 38)
-        )
-      )
-    }
+  const { data: playersData } = usePlayers()
 
+  const parsedConstraints = useMemo(() => {
     const normalizedLockIds = Array.from(
       new Set(lockIds.filter((id) => Number.isInteger(id) && id > 0))
     )
-    const normalizedAvoidIds = Array.from(
+    const normalizedManualAvoidIds = Array.from(
       new Set(avoidIds.filter((id) => Number.isInteger(id) && id > 0))
     )
+    const normalizedAvoidTeams = Array.from(
+      new Set(avoidTeamIds.filter((id) => Number.isInteger(id) && id > 0))
+    )
+    const teamExpandedAvoidIds = (playersData?.players ?? [])
+      .filter((player) => normalizedAvoidTeams.includes(player.team))
+      .map((player) => player.id)
+    const normalizedAvoidIds = Array.from(
+      new Set([...normalizedManualAvoidIds, ...teamExpandedAvoidIds])
+    )
     const overlap = normalizedLockIds.filter((id) => normalizedAvoidIds.includes(id))
-
-    const parsedMaxHits = maxHitsInput.trim() === '' ? null : Number(maxHitsInput.trim())
-    const normalizedMaxHits =
-      maxHitsInput.trim() === ''
-        ? null
-        : parsedMaxHits !== null && Number.isInteger(parsedMaxHits) && parsedMaxHits >= 0
-          ? parsedMaxHits
-          : null
-
-    const chipWindows: PlannerConstraints['chip_windows'] = {}
-    for (const chip of Object.keys(chipWindowInputs) as (keyof ChipPlan)[]) {
-      const weeks = parseGwList(chipWindowInputs[chip])
-      if (weeks.length > 0) {
-        chipWindows[chip] = weeks
-      }
-    }
 
     const errors: string[] = []
     if (overlap.length > 0) {
       errors.push(`Lock and avoid overlap on IDs: ${overlap.join(', ')}`)
     }
-    if (maxHitsInput.trim() !== '' && normalizedMaxHits === null) {
-      errors.push('Max hits must be a non-negative integer')
-    }
 
     const constraints: PlannerConstraints = {}
     if (normalizedLockIds.length > 0) constraints.lock_ids = normalizedLockIds
     if (normalizedAvoidIds.length > 0) constraints.avoid_ids = normalizedAvoidIds
-    if (normalizedMaxHits !== null) constraints.max_hits = normalizedMaxHits
-    if (Object.keys(chipWindows).length > 0) constraints.chip_windows = chipWindows
+    if (normalizedAvoidTeams.length > 0) constraints.avoid_teams = normalizedAvoidTeams
 
     return {
       constraints,
       errors,
       hasErrors: errors.length > 0,
     }
-  }, [lockIds, avoidIds, maxHitsInput, chipWindowInputs])
-
-  const { data: playersData } = usePlayers()
+  }, [lockIds, avoidIds, avoidTeamIds, playersData?.players])
 
   // Squad query — always active, skips solver
   const {
@@ -385,6 +360,14 @@ export function Planner() {
     return new Map(playersData.teams.map((t) => [t.id, t.short_name]))
   }, [playersData?.teams])
 
+  const teamsById = useMemo(() => {
+    const byId = new Map<number, { id: number; name: string; short_name: string }>()
+    for (const team of playersData?.teams ?? []) {
+      byId.set(team.id, team)
+    }
+    return byId
+  }, [playersData?.teams])
+
   // Teams record for FormationPitch
   const teamsRecord = useMemo(() => {
     if (!playersData?.teams) return {}
@@ -421,6 +404,19 @@ export function Planner() {
       )
       .slice(0, 8)
   }, [playersData?.players, avoidSearch, avoidIds])
+
+  const avoidTeamSearchResults = useMemo(() => {
+    const q = normalizeSearchText(avoidTeamSearch)
+    if (!q || !playersData?.teams) return []
+    return playersData.teams
+      .filter(
+        (team) =>
+          !avoidTeamIds.includes(team.id) &&
+          (normalizeSearchText(team.name).includes(q) ||
+            normalizeSearchText(team.short_name).includes(q))
+      )
+      .slice(0, 8)
+  }, [playersData?.teams, avoidTeamSearch, avoidTeamIds])
 
   // Player predictions map for quick lookup
   const playerPredictionsMap = useMemo(() => {
@@ -808,6 +804,17 @@ export function Planner() {
     setSelectedPathIndex(null)
   }
 
+  const addAvoidTeam = (teamId: number) => {
+    setAvoidTeamIds((prev) => (prev.includes(teamId) ? prev : [...prev, teamId]))
+    setAvoidTeamSearch('')
+    setSelectedPathIndex(null)
+  }
+
+  const removeAvoidTeam = (teamId: number) => {
+    setAvoidTeamIds((prev) => prev.filter((id) => id !== teamId))
+    setSelectedPathIndex(null)
+  }
+
   const handlePlayerSelect = (playerId: number) => {
     if (selectedPlayer === playerId) {
       setSelectedPlayer(null)
@@ -865,19 +872,14 @@ export function Planner() {
     setSolveObjectiveMode('expected')
     setSolveConstraints({})
     setChipPlan({})
-    setControlsTab('basic')
+    setShowAdvancedSettings(false)
     setObjectiveMode('expected')
     setLockIds([])
     setAvoidIds([])
+    setAvoidTeamIds([])
     setLockSearch('')
     setAvoidSearch('')
-    setMaxHitsInput('')
-    setChipWindowInputs({
-      wildcard: '',
-      free_hit: '',
-      bench_boost: '',
-      triple_captain: '',
-    })
+    setAvoidTeamSearch('')
   }
 
   const handleFindPlans = () => {
@@ -1190,16 +1192,14 @@ export function Planner() {
         {/* Controls */}
         <div className="grid md:grid-cols-2 gap-4 animate-fade-in-up animation-delay-100">
           <div className="space-y-2">
-            <label className="font-display text-xs uppercase tracking-wider text-foreground-muted">
-              Manager ID
-            </label>
+            <label className="form-label">Manager ID</label>
             <div className="flex gap-2">
-              <input
+              <FormInput
                 type="text"
                 value={managerInput}
                 onChange={(e) => setManagerInput(e.target.value)}
                 placeholder="Enter FPL ID"
-                className="input-broadcast flex-1"
+                className="flex-1"
                 onKeyDown={(e) => e.key === 'Enter' && handleLoadManager()}
               />
               <button onClick={handleLoadManager} className="btn-primary">
@@ -1209,20 +1209,17 @@ export function Planner() {
           </div>
 
           <div className="space-y-2">
-            <label className="font-display text-xs uppercase tracking-wider text-foreground-muted">
-              Free Transfers
-            </label>
-            <select
+            <label className="form-label">Free Transfers</label>
+            <FormSelect
               value={freeTransfers ?? effectiveFt}
               onChange={(e) => setFreeTransfers(parseInt(e.target.value, 10))}
-              className="input-broadcast"
             >
               {[1, 2, 3, 4, 5].map((n) => (
                 <option key={n} value={n}>
                   {n} FT
                 </option>
               ))}
-            </select>
+            </FormSelect>
           </div>
         </div>
 
@@ -1361,228 +1358,9 @@ export function Planner() {
                 </div>
               </div>
 
-              <div className="mb-4 border-b border-border/60">
-                <div className="inline-flex gap-1 rounded-lg bg-surface-elevated p-1">
-                  <button
-                    onClick={() => setControlsTab('basic')}
-                    className={`px-3 py-1 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
-                      controlsTab === 'basic'
-                        ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
-                        : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
-                    }`}
-                  >
-                    Basic
-                  </button>
-                  <button
-                    onClick={() => setControlsTab('advanced')}
-                    data-testid="planner-controls-advanced-tab"
-                    className={`px-3 py-1 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
-                      controlsTab === 'advanced'
-                        ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
-                        : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
-                    }`}
-                  >
-                    Advanced
-                  </button>
-                </div>
-              </div>
-
-              {controlsTab === 'advanced' && (
-                <div className="mb-4 space-y-3">
-                  <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
-                    <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
-                      Chip Weeks
-                    </div>
-                    <div className="text-xs text-foreground-dim mb-2">
-                      Pick exact chip weeks. Auto chip-planning is disabled.
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
-                        <label key={chip} className="flex items-center justify-between gap-2">
-                          <span className="text-xs text-foreground-muted">{CHIP_LABELS[chip]}</span>
-                          <select
-                            value={chipPlan[chip] ?? ''}
-                            onChange={(e) => setChipWeek(chip, e.target.value)}
-                            className="input-broadcast py-1 text-xs min-w-[110px]"
-                          >
-                            <option value="">Not set</option>
-                            {optimizeData.planning_horizon.map((gw) => (
-                              <option key={`${chip}-${gw}`} value={gw}>
-                                GW{gw}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-surface-elevated border border-border/60">
-                    <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted mb-2">
-                      Constraints
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <div className="text-xs text-foreground-muted">Lock Players</div>
-                        <input
-                          data-testid="constraints-lock-search"
-                          value={lockSearch}
-                          onChange={(e) => setLockSearch(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && lockSearchResults.length > 0) {
-                              e.preventDefault()
-                              addLockPlayer(lockSearchResults[0].id)
-                            }
-                          }}
-                          placeholder="Search by name..."
-                          className="input-broadcast"
-                        />
-                        {lockSearch.trim().length > 0 && lockSearchResults.length > 0 && (
-                          <div className="max-h-28 overflow-y-auto rounded border border-border bg-surface">
-                            {lockSearchResults.map((player) => (
-                              <button
-                                key={`lock-option-${player.id}`}
-                                type="button"
-                                data-testid={`constraints-lock-option-${player.id}`}
-                                onClick={() => addLockPlayer(player.id)}
-                                className="w-full px-2 py-1.5 text-left text-xs hover:bg-surface-hover flex items-center justify-between gap-2"
-                              >
-                                <span className="text-foreground">{player.web_name}</span>
-                                <span className="text-foreground-muted">
-                                  {teamsMap.get(player.team) ?? '?'}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <div className="min-h-[1.75rem] flex flex-wrap gap-1">
-                          {lockIds.length === 0 ? (
-                            <span className="text-[11px] text-foreground-dim">
-                              No locked players
-                            </span>
-                          ) : (
-                            lockIds.map((id) => {
-                              const player = playersById.get(id)
-                              return (
-                                <button
-                                  key={`lock-selected-${id}`}
-                                  type="button"
-                                  onClick={() => removeLockPlayer(id)}
-                                  className="inline-flex items-center gap-1 rounded border border-fpl-green/30 bg-fpl-green/10 px-2 py-0.5 text-[11px] text-fpl-green"
-                                  title="Remove lock"
-                                >
-                                  <span>{player?.web_name ?? `#${id}`}</span>
-                                  <span className="text-fpl-green/80">×</span>
-                                </button>
-                              )
-                            })
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-foreground-muted">Avoid Players</div>
-                        <input
-                          data-testid="constraints-avoid-search"
-                          value={avoidSearch}
-                          onChange={(e) => setAvoidSearch(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && avoidSearchResults.length > 0) {
-                              e.preventDefault()
-                              addAvoidPlayer(avoidSearchResults[0].id)
-                            }
-                          }}
-                          placeholder="Search by name..."
-                          className="input-broadcast"
-                        />
-                        {avoidSearch.trim().length > 0 && avoidSearchResults.length > 0 && (
-                          <div className="max-h-28 overflow-y-auto rounded border border-border bg-surface">
-                            {avoidSearchResults.map((player) => (
-                              <button
-                                key={`avoid-option-${player.id}`}
-                                type="button"
-                                data-testid={`constraints-avoid-option-${player.id}`}
-                                onClick={() => addAvoidPlayer(player.id)}
-                                className="w-full px-2 py-1.5 text-left text-xs hover:bg-surface-hover flex items-center justify-between gap-2"
-                              >
-                                <span className="text-foreground">{player.web_name}</span>
-                                <span className="text-foreground-muted">
-                                  {teamsMap.get(player.team) ?? '?'}
-                                </span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <div className="min-h-[1.75rem] flex flex-wrap gap-1">
-                          {avoidIds.length === 0 ? (
-                            <span className="text-[11px] text-foreground-dim">
-                              No avoided players
-                            </span>
-                          ) : (
-                            avoidIds.map((id) => {
-                              const player = playersById.get(id)
-                              return (
-                                <button
-                                  key={`avoid-selected-${id}`}
-                                  type="button"
-                                  onClick={() => removeAvoidPlayer(id)}
-                                  className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[11px] text-destructive"
-                                  title="Remove avoid"
-                                >
-                                  <span>{player?.web_name ?? `#${id}`}</span>
-                                  <span className="text-destructive/80">×</span>
-                                </button>
-                              )
-                            })
-                          )}
-                        </div>
-                      </div>
-                      <label className="block text-xs text-foreground-muted">
-                        Max Hits
-                        <input
-                          data-testid="constraints-max-hits"
-                          type="number"
-                          min={0}
-                          value={maxHitsInput}
-                          onChange={(e) => setMaxHitsInput(e.target.value)}
-                          placeholder="No cap"
-                          className="input-broadcast mt-1"
-                        />
-                      </label>
-                      <div className="space-y-1">
-                        <div className="text-xs text-foreground-muted">
-                          Chip Windows (comma-separated GWs)
-                        </div>
-                        {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
-                          <label
-                            key={`window-${chip}`}
-                            className="flex items-center gap-2 text-xs text-foreground-muted"
-                          >
-                            <span className="w-10">{CHIP_SHORT_LABELS[chip]}</span>
-                            <input
-                              data-testid={`constraints-chip-window-${chip}`}
-                              value={chipWindowInputs[chip]}
-                              onChange={(e) =>
-                                setChipWindowInputs((prev) => ({ ...prev, [chip]: e.target.value }))
-                              }
-                              placeholder="27, 30"
-                              className="input-broadcast flex-1 py-1"
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    {parsedConstraints.hasErrors && (
-                      <div className="mt-2 text-xs text-destructive">
-                        {parsedConstraints.errors.join(' | ')}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {controlsTab !== 'advanced' && parsedConstraints.hasErrors && (
+              {parsedConstraints.hasErrors && (
                 <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  Advanced settings have invalid constraints. Open Advanced to fix:
+                  Invalid advanced settings. Open the Advanced Settings card to fix:
                   {' ' + parsedConstraints.errors.join(' | ')}
                 </div>
               )}
@@ -1688,9 +1466,9 @@ export function Planner() {
                     A/B Plan Comparison
                   </div>
                   <div className="grid md:grid-cols-2 gap-3">
-                    <label className="text-xs text-foreground-muted">
+                    <label className="form-label normal-case tracking-normal text-xs">
                       Plan A
-                      <select
+                      <FormSelect
                         data-testid="compare-plan-a"
                         value={comparePlanAIndex ?? ''}
                         onChange={(e) =>
@@ -1698,18 +1476,18 @@ export function Planner() {
                             e.target.value === '' ? null : Number.parseInt(e.target.value, 10)
                           )
                         }
-                        className="input-broadcast mt-1"
+                        className="mt-1"
                       >
                         {paths.map((path, idx) => (
                           <option key={`compare-a-${path.id}-${idx}`} value={idx}>
                             Plan {path.id} ({path.total_score.toFixed(1)})
                           </option>
                         ))}
-                      </select>
+                      </FormSelect>
                     </label>
-                    <label className="text-xs text-foreground-muted">
+                    <label className="form-label normal-case tracking-normal text-xs">
                       Plan B
-                      <select
+                      <FormSelect
                         data-testid="compare-plan-b"
                         value={comparePlanBIndex ?? ''}
                         onChange={(e) =>
@@ -1717,14 +1495,14 @@ export function Planner() {
                             e.target.value === '' ? null : Number.parseInt(e.target.value, 10)
                           )
                         }
-                        className="input-broadcast mt-1"
+                        className="mt-1"
                       >
                         {paths.map((path, idx) => (
                           <option key={`compare-b-${path.id}-${idx}`} value={idx}>
                             Plan {path.id} ({path.total_score.toFixed(1)})
                           </option>
                         ))}
-                      </select>
+                      </FormSelect>
                     </label>
                   </div>
                   {planComparison && (
@@ -1781,6 +1559,219 @@ export function Planner() {
                 </div>
               )}
             </BroadcastCard>
+
+            <div className="animate-fade-in-up">
+              <button
+                type="button"
+                data-testid="planner-advanced-toggle"
+                onClick={() => setShowAdvancedSettings((prev) => !prev)}
+                className="w-full flex items-center justify-between p-4 bg-surface-elevated rounded-lg hover:bg-surface-hover transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <h3 className="font-display text-sm font-bold tracking-wider uppercase text-foreground">
+                    Advanced Settings
+                  </h3>
+                  <span className="text-xs text-foreground-muted font-mono">
+                    chips + constraints
+                  </span>
+                </div>
+                <span
+                  className={`text-foreground-muted transition-transform ${showAdvancedSettings ? 'rotate-180' : ''}`}
+                >
+                  {'\u25BC'}
+                </span>
+              </button>
+              {showAdvancedSettings && (
+                <div className="mt-2">
+                  <BroadcastCard accentColor="purple" animate={false}>
+                    <div className="space-y-3">
+                      <FormSectionCard
+                        heading="Chip Weeks"
+                        description="Pick exact chip weeks. Auto chip-planning is disabled."
+                      >
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {(Object.keys(CHIP_LABELS) as (keyof ChipPlan)[]).map((chip) => (
+                            <FormField key={chip} label={CHIP_LABELS[chip]}>
+                              <FormSelect
+                                value={chipPlan[chip] ?? ''}
+                                onChange={(e) => setChipWeek(chip, e.target.value)}
+                              >
+                                <option value="">Not set</option>
+                                {optimizeData.planning_horizon.map((gw) => (
+                                  <option key={`${chip}-${gw}`} value={gw}>
+                                    GW{gw}
+                                  </option>
+                                ))}
+                              </FormSelect>
+                            </FormField>
+                          ))}
+                        </div>
+                      </FormSectionCard>
+
+                      <FormSectionCard heading="Constraints">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          <FormField label="Lock Players">
+                            <FormInput
+                              data-testid="constraints-lock-search"
+                              value={lockSearch}
+                              onChange={(e) => setLockSearch(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && lockSearchResults.length > 0) {
+                                  e.preventDefault()
+                                  addLockPlayer(lockSearchResults[0].id)
+                                }
+                              }}
+                              placeholder="Search by name..."
+                            />
+                            {lockSearch.trim().length > 0 && lockSearchResults.length > 0 && (
+                              <SearchResultsList>
+                                {lockSearchResults.map((player) => (
+                                  <SearchResultButton
+                                    key={`lock-option-${player.id}`}
+                                    data-testid={`constraints-lock-option-${player.id}`}
+                                    onClick={() => addLockPlayer(player.id)}
+                                  >
+                                    <span className="text-foreground">{player.web_name}</span>
+                                    <span className="text-foreground-muted">
+                                      {teamsMap.get(player.team) ?? '?'}
+                                    </span>
+                                  </SearchResultButton>
+                                ))}
+                              </SearchResultsList>
+                            )}
+                            <SelectionPillList
+                              emptyText="No locked players"
+                              hasItems={lockIds.length > 0}
+                            >
+                              {lockIds.map((id) => {
+                                const player = playersById.get(id)
+                                return (
+                                  <SelectionPill
+                                    key={`lock-selected-${id}`}
+                                    tone="lock"
+                                    onClick={() => removeLockPlayer(id)}
+                                    title="Remove lock"
+                                  >
+                                    <span>{player?.web_name ?? `#${id}`}</span>
+                                    <span className="text-fpl-green/80">×</span>
+                                  </SelectionPill>
+                                )
+                              })}
+                            </SelectionPillList>
+                          </FormField>
+
+                          <FormField label="Avoid Players">
+                            <FormInput
+                              data-testid="constraints-avoid-search"
+                              value={avoidSearch}
+                              onChange={(e) => setAvoidSearch(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && avoidSearchResults.length > 0) {
+                                  e.preventDefault()
+                                  addAvoidPlayer(avoidSearchResults[0].id)
+                                }
+                              }}
+                              placeholder="Search by name..."
+                            />
+                            {avoidSearch.trim().length > 0 && avoidSearchResults.length > 0 && (
+                              <SearchResultsList>
+                                {avoidSearchResults.map((player) => (
+                                  <SearchResultButton
+                                    key={`avoid-option-${player.id}`}
+                                    data-testid={`constraints-avoid-option-${player.id}`}
+                                    onClick={() => addAvoidPlayer(player.id)}
+                                  >
+                                    <span className="text-foreground">{player.web_name}</span>
+                                    <span className="text-foreground-muted">
+                                      {teamsMap.get(player.team) ?? '?'}
+                                    </span>
+                                  </SearchResultButton>
+                                ))}
+                              </SearchResultsList>
+                            )}
+                            <SelectionPillList
+                              emptyText="No avoided players"
+                              hasItems={avoidIds.length > 0}
+                            >
+                              {avoidIds.map((id) => {
+                                const player = playersById.get(id)
+                                return (
+                                  <SelectionPill
+                                    key={`avoid-selected-${id}`}
+                                    tone="avoid"
+                                    onClick={() => removeAvoidPlayer(id)}
+                                    title="Remove avoid"
+                                  >
+                                    <span>{player?.web_name ?? `#${id}`}</span>
+                                    <span className="text-destructive/80">×</span>
+                                  </SelectionPill>
+                                )
+                              })}
+                            </SelectionPillList>
+                          </FormField>
+
+                          <FormField label="Avoid Teams">
+                            <FormInput
+                              data-testid="constraints-avoid-team-search"
+                              value={avoidTeamSearch}
+                              onChange={(e) => setAvoidTeamSearch(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && avoidTeamSearchResults.length > 0) {
+                                  e.preventDefault()
+                                  addAvoidTeam(avoidTeamSearchResults[0].id)
+                                }
+                              }}
+                              placeholder="Search by team name..."
+                            />
+                            {avoidTeamSearch.trim().length > 0 &&
+                              avoidTeamSearchResults.length > 0 && (
+                                <SearchResultsList>
+                                  {avoidTeamSearchResults.map((team) => (
+                                    <SearchResultButton
+                                      key={`avoid-team-option-${team.id}`}
+                                      data-testid={`constraints-avoid-team-option-${team.id}`}
+                                      onClick={() => addAvoidTeam(team.id)}
+                                    >
+                                      <span className="text-foreground">{team.name}</span>
+                                      <span className="text-foreground-muted">
+                                        {team.short_name}
+                                      </span>
+                                    </SearchResultButton>
+                                  ))}
+                                </SearchResultsList>
+                              )}
+                            <SelectionPillList
+                              emptyText="No avoided teams"
+                              hasItems={avoidTeamIds.length > 0}
+                            >
+                              {avoidTeamIds.map((id) => {
+                                const team = teamsById.get(id)
+                                return (
+                                  <SelectionPill
+                                    key={`avoid-team-selected-${id}`}
+                                    tone="team"
+                                    onClick={() => removeAvoidTeam(id)}
+                                    title="Remove avoid team"
+                                  >
+                                    <span>{team?.short_name ?? `#${id}`}</span>
+                                    <span className="text-highlight/80">×</span>
+                                  </SelectionPill>
+                                )
+                              })}
+                            </SelectionPillList>
+                          </FormField>
+                        </div>
+                        {parsedConstraints.hasErrors && (
+                          <div className="mt-2 form-error-text">
+                            {parsedConstraints.errors.join(' | ')}
+                          </div>
+                        )}
+                      </FormSectionCard>
+                    </div>
+                  </BroadcastCard>
+                </div>
+              )}
+            </div>
 
             {/* Gameweek Selector */}
             <BroadcastCard title="Select Gameweek" animationDelay={200}>

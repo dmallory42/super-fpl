@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ManagerSeasonAnalysisResponse } from '../../api/client'
+import { FormSelect } from '../ui/form'
 
 type BenchmarkMode = 'overall' | 'top_10k' | 'league_median'
 
@@ -25,7 +26,9 @@ function formatSigned(value: number | null, precision = 1): string {
   return `${prefix}${value.toFixed(precision)}`
 }
 
-function toSeriesMap(series?: Array<{ gameweek: number; points: number | null }>): Map<number, number | null> {
+function toSeriesMap(
+  series?: Array<{ gameweek: number; points: number | null }>
+): Map<number, number | null> {
   const map = new Map<number, number | null>()
   if (!series) return map
   for (const row of series) {
@@ -125,7 +128,13 @@ function CumulativeChart({ rows }: { rows: RowData[] }) {
         className="stroke-border"
       />
 
-      <path d={luckPath} fill="none" className="stroke-fpl-green" strokeWidth="2" strokeLinecap="round" />
+      <path
+        d={luckPath}
+        fill="none"
+        className="stroke-fpl-green"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
       <path
         d={benchmarkPath}
         fill="none"
@@ -194,19 +203,19 @@ export function ExpectedActualLuckPanel({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="season-benchmark-select" className="text-xs text-foreground-muted uppercase">
+          <label htmlFor="season-benchmark-select" className="form-label">
             Benchmark
           </label>
-          <select
+          <FormSelect
             id="season-benchmark-select"
-            className="input-broadcast h-10 min-w-[210px]"
+            className="h-10 min-w-[210px]"
             value={benchmarkMode}
             onChange={(event) => setBenchmarkMode(event.target.value as BenchmarkMode)}
           >
             <option value="overall">Overall</option>
             {hasTop10k && <option value="top_10k">Top 10K</option>}
             {hasLeagueMedian && <option value="league_median">League Median</option>}
-          </select>
+          </FormSelect>
         </div>
       </div>
 

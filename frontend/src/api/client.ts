@@ -771,6 +771,7 @@ export interface FixedTransfer {
 export interface PlannerConstraints {
   lock_ids?: number[]
   avoid_ids?: number[]
+  avoid_teams?: number[]
   max_hits?: number | null
   chip_windows?: Partial<Record<keyof ChipPlan, number[]>>
 }

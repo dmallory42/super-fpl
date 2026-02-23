@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import type { PlayerMultiWeekPrediction, XMinsOverrides, FixtureOpponent } from '../../api/client'
 import { PositionBadge } from '../common/PositionBadge'
+import { FormInput } from '../ui/form'
 import { GradientText } from '../ui/GradientText'
 import { scalePoints } from '../../lib/predictions'
 
@@ -422,12 +423,11 @@ export function PlayerDetailPanel({
                 {budget.toFixed(1)}m
               </span>
             </div>
-            <input
+            <FormInput
               type="text"
               value={replacementSearch}
               onChange={(e) => onReplacementSearchChange(e.target.value)}
               placeholder="Search players..."
-              className="input-broadcast"
               autoFocus
             />
             <div className="max-h-[400px] overflow-y-auto space-y-1">

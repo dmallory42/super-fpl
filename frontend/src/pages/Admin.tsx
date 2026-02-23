@@ -9,6 +9,7 @@ import {
   clearXMins,
 } from '../api/client'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
+import { FormInput, FormSelect, SearchResultButton, SearchResultsList } from '../components/ui/form'
 import { GradientText } from '../components/ui/GradientText'
 import type { Player } from '../types/player'
 import { getPositionName } from '../types/player'
@@ -157,8 +158,8 @@ export function Admin() {
       >
         {/* Team selector */}
         <div className="mb-4">
-          <select
-            className="input-broadcast w-full sm:w-64"
+          <FormSelect
+            className="w-full sm:w-64"
             value={selectedTeamId ?? ''}
             onChange={(e) => setSelectedTeamId(e.target.value ? Number(e.target.value) : null)}
           >
@@ -168,7 +169,7 @@ export function Admin() {
                 {t.name}
               </option>
             ))}
-          </select>
+          </FormSelect>
         </div>
 
         {/* Player table for selected team */}
@@ -201,8 +202,8 @@ export function Admin() {
                         {POSITION_LABELS[player.element_type]}
                       </td>
                       <td className="py-2">
-                        <select
-                          className="input-broadcast text-sm py-1 px-2 w-24"
+                        <FormSelect
+                          className="h-9 w-24 px-2 py-1 text-sm"
                           value={currentOrder ?? ''}
                           onChange={(e) => {
                             const val = e.target.value ? Number(e.target.value) : null
@@ -215,7 +216,7 @@ export function Admin() {
                           <option value="3">3rd</option>
                           <option value="4">4th</option>
                           <option value="5">5th</option>
-                        </select>
+                        </FormSelect>
                       </td>
                     </tr>
                   )
@@ -242,9 +243,9 @@ export function Admin() {
       >
         {/* Search to add new override */}
         <div className="mb-4">
-          <input
+          <FormInput
             type="text"
-            className="input-broadcast w-full sm:w-64"
+            className="w-full sm:w-64"
             placeholder="Search player to add override..."
             value={xminsSearch}
             onChange={(e) => {
@@ -255,11 +256,11 @@ export function Admin() {
 
           {/* Search results dropdown */}
           {xminsSearchResults.length > 0 && !addingPlayerId && (
-            <div className="mt-1 border border-border rounded-lg bg-surface overflow-hidden">
+            <SearchResultsList className="mt-1 overflow-hidden">
               {xminsSearchResults.map((p) => (
-                <button
+                <SearchResultButton
                   key={p.id}
-                  className="w-full text-left px-3 py-2 hover:bg-surface-hover transition-colors text-sm flex items-center gap-2"
+                  className="gap-2 transition-colors"
                   onClick={() => {
                     setAddingPlayerId(p.id)
                     setXminsSearch(p.web_name)
@@ -275,17 +276,17 @@ export function Admin() {
                   <span className="font-mono text-xs text-foreground-muted">
                     {teamMap.get(p.team)} &middot; {getPositionName(p.element_type)}
                   </span>
-                </button>
+                </SearchResultButton>
               ))}
-            </div>
+            </SearchResultsList>
           )}
 
           {/* Add form */}
           {addingPlayerId && (
             <div className="mt-2 flex items-center gap-2">
-              <input
+              <FormInput
                 type="number"
-                className="input-broadcast w-20 text-sm py-1 px-2"
+                className="h-9 w-20 px-2 py-1 text-sm"
                 min={0}
                 max={95}
                 value={addingValue}
@@ -355,9 +356,9 @@ export function Admin() {
                       </td>
                       <td className="py-2 font-mono text-xs text-foreground-muted">{avgMins}</td>
                       <td className="py-2">
-                        <input
+                        <FormInput
                           type="number"
-                          className="input-broadcast w-20 text-sm py-1 px-2"
+                          className="h-9 w-20 px-2 py-1 text-sm"
                           min={0}
                           max={95}
                           defaultValue={player.xmins_override ?? undefined}

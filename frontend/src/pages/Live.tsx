@@ -9,6 +9,7 @@ import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { LiveIndicator } from '../components/ui/LiveIndicator'
 import { EmptyState, CalendarIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonPitch } from '../components/ui/SkeletonLoader'
+import { FormInput } from '../components/ui/form'
 import { LiveFormationPitch } from '../components/live/LiveFormationPitch'
 import { ComparisonBars, type PlayerImpact } from '../components/live/ComparisonBars'
 import { FixtureScores } from '../components/live/FixtureScores'
@@ -501,7 +502,7 @@ export function Live() {
       {!managerId && (
         <div className="animate-fade-in-up animation-delay-100">
           <div className="flex gap-2 max-w-md">
-            <input
+            <FormInput
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -511,7 +512,7 @@ export function Live() {
                 setManagerInputError(null)
               }}
               placeholder="Enter your FPL Manager ID"
-              className="input-broadcast flex-1"
+              className="flex-1"
               aria-label="Manager ID"
               onKeyDown={(e) => e.key === 'Enter' && handleLoadManager()}
             />
