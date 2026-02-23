@@ -6,7 +6,6 @@ import type {
   ChipPlan,
   PlayerMultiWeekPrediction,
   FixedTransfer,
-  PathGameweek,
   PlannerConstraints,
   PlannerObjectiveMode,
   XMinsOverrides,
@@ -51,11 +50,6 @@ const OBJECTIVE_LABELS: Record<PlannerObjectiveMode, string> = {
   floor: 'Floor',
   ceiling: 'Ceiling',
 }
-const OBJECTIVE_CONTEXT: Record<PlannerObjectiveMode, string> = {
-  expected: 'Balances upside and downside around median projection.',
-  floor: 'Prioritizes safer minutes and lower downside outcomes.',
-  ceiling: 'Prioritizes upside and high-variance outcomes.',
-}
 const DEFAULT_SOLVER_DEPTH = 'deep'
 
 function formatFixtures(fixtures: FixtureOpponent[]): string {
@@ -82,17 +76,6 @@ interface ConstraintInputState {
   lockIds: number[]
   avoidIds: number[]
   avoidTeams: number[]
-}
-
-interface GameweekRationaleRow {
-  gw: number
-  actionLabel: string
-  expectedGain: number | null
-  hitCost: number
-  riskTradeoff: string
-  objectiveMode: PlannerObjectiveMode
-  objectiveContext: string
-  chipLabel: string | null
 }
 
 function getInitialManagerId(): { id: number | null; input: string } {
@@ -309,7 +292,6 @@ export function Planner() {
   // Merge squad + solve data for display
   const optimizeData = squadData
   const paths = solveData?.paths ?? []
-  const chipResolvedPlan = solveData?.resolved_chip_plan ?? solveData?.chip_plan ?? {}
 
   // Get predictions for multiple gameweeks
   const { data: predictionsRange } = usePredictionsRange(undefined, undefined, !!managerId)
@@ -410,30 +392,6 @@ export function Planner() {
     return paths[selectedPathIndex] ?? null
   }, [selectedPathIndex, paths])
 
-  const chipTimelineByGw = useMemo(() => {
-    const timeline: Record<number, string> = {}
-    const gws = predictionsRange?.gameweeks ?? []
-
-    for (const gw of gws) {
-      const pathChip = selectedPath?.transfers_by_gw?.[gw]?.chip_played as
-        | keyof ChipPlan
-        | undefined
-      if (pathChip && CHIP_SHORT_LABELS[pathChip]) {
-        timeline[gw] = CHIP_SHORT_LABELS[pathChip]
-        continue
-      }
-
-      const plannedChip = (Object.entries(chipResolvedPlan).find(
-        ([, chipGw]) => chipGw === gw
-      )?.[0] ?? null) as keyof ChipPlan | null
-      if (plannedChip && CHIP_SHORT_LABELS[plannedChip]) {
-        timeline[gw] = CHIP_SHORT_LABELS[plannedChip]
-      }
-    }
-
-    return timeline
-  }, [predictionsRange?.gameweeks, selectedPath, chipResolvedPlan])
-
   // GW-aware effective squad: apply transfers up to and including selectedGameweek
   const effectiveSquad = useMemo(() => {
     if (!optimizeData?.current_squad?.player_ids) return []
@@ -514,83 +472,6 @@ export function Planner() {
     ? Math.max(0, firstGwTransfers - (ftByGameweek[firstGw] ?? effectiveFt))
     : 0
   const hitsCost = hitsCount * HIT_COST
-
-  const rationaleByGw = useMemo((): GameweekRationaleRow[] => {
-    if (!predictionsRange?.gameweeks) return []
-
-    const rationalePath = selectedPath ?? paths[0] ?? null
-    const activeObjectiveMode = rationalePath ? solveObjectiveMode : objectiveMode
-
-    const fromPath = (gw: number, pathGw: PathGameweek): GameweekRationaleRow => {
-      const expectedGain = pathGw.moves.reduce((sum, move) => sum + (move.gain ?? 0), 0)
-      const transferCount = pathGw.moves.length
-      const chipKey = (pathGw.chip_played ?? null) as keyof ChipPlan | null
-      const chipLabel = chipKey ? CHIP_LABELS[chipKey] : null
-
-      let riskTradeoff = 'Single move keeps variance contained.'
-      if (pathGw.action === 'bank') {
-        riskTradeoff = `Roll preserves flexibility with ${pathGw.ft_after} FT available next GW.`
-      } else if (pathGw.hit_cost > 0) {
-        riskTradeoff = 'Hit cost accepted for projected upside; downside rises if returns miss.'
-      } else if (chipLabel) {
-        riskTradeoff = `${chipLabel} raises range of outcomes; upside is prioritized.`
-      } else if (transferCount > 1) {
-        riskTradeoff = 'Multiple transfers increase variance and execution risk.'
-      }
-
-      return {
-        gw,
-        actionLabel:
-          pathGw.action === 'bank'
-            ? 'Bank / roll FT'
-            : `${transferCount} transfer${transferCount === 1 ? '' : 's'}`,
-        expectedGain,
-        hitCost: pathGw.hit_cost,
-        riskTradeoff,
-        objectiveMode: activeObjectiveMode,
-        objectiveContext: OBJECTIVE_CONTEXT[activeObjectiveMode],
-        chipLabel,
-      }
-    }
-
-    return predictionsRange.gameweeks.map((gw) => {
-      const pathGw = rationalePath?.transfers_by_gw?.[gw]
-      if (pathGw) {
-        return fromPath(gw, pathGw)
-      }
-
-      const gwTransferCount = userTransfers.filter((transfer) => transfer.gameweek === gw).length
-      const manualHitCost = gw === firstGw ? hitsCost : 0
-      const actionLabel =
-        gwTransferCount > 0
-          ? `${gwTransferCount} manual transfer${gwTransferCount === 1 ? '' : 's'}`
-          : 'Bank / roll FT'
-
-      return {
-        gw,
-        actionLabel,
-        expectedGain: gwTransferCount > 0 ? null : 0,
-        hitCost: manualHitCost,
-        riskTradeoff:
-          gwTransferCount > 0
-            ? 'Manual action queued; run solver to quantify gain and downside.'
-            : 'No move queued; flexibility is preserved for later weeks.',
-        objectiveMode: activeObjectiveMode,
-        objectiveContext: OBJECTIVE_CONTEXT[activeObjectiveMode],
-        chipLabel: chipTimelineByGw[gw] ? `Chip: ${chipTimelineByGw[gw]}` : null,
-      }
-    })
-  }, [
-    predictionsRange?.gameweeks,
-    selectedPath,
-    paths,
-    solveObjectiveMode,
-    objectiveMode,
-    userTransfers,
-    firstGw,
-    hitsCost,
-    chipTimelineByGw,
-  ])
 
   // Get the selected player's data
   const selectedPlayerData = useMemo(() => {
@@ -1601,141 +1482,84 @@ export function Planner() {
               )}
             </div>
 
-            {/* Gameweek Selector */}
-            <BroadcastCard title="Select Gameweek" animationDelay={200}>
-              <div className="mb-3 p-2.5 rounded-lg bg-surface-elevated/60 border border-border/50">
-                <div className="text-[10px] font-display uppercase tracking-wider text-foreground-muted mb-1.5">
-                  Chip Timeline
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {predictionsRange?.gameweeks.map((gw) => (
-                    <div
-                      key={`chip-timeline-${gw}`}
-                      className={`px-2 py-1 rounded border text-center min-w-[62px] ${
-                        chipTimelineByGw[gw]
-                          ? 'bg-fpl-green/10 border-fpl-green/30'
-                          : 'bg-surface border-border/40'
-                      }`}
-                    >
-                      <div className="text-[10px] text-foreground-muted">GW{gw}</div>
-                      <div className="text-[11px] font-display tracking-wider text-foreground">
-                        {chipTimelineByGw[gw] ?? '-'}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-2 flex-wrap">
-                {predictionsRange?.gameweeks.map((gw, idx) => {
-                  const pathGw = selectedPath?.transfers_by_gw[gw]
-                  const pts = pathGw ? pathGw.gw_score : (squadPredictions?.byGw[gw] ?? 0)
-                  const isFirst = idx === 0
-                  const isSelected = gw === selectedGameweek
-                  const pathAction = pathGw?.action
-                  const gwUserTransfers = userTransfers.filter((t) => t.gameweek === gw)
-                  return (
-                    <button
-                      key={gw}
-                      onClick={() => setSelectedGameweek(gw)}
-                      className={`
-                        px-4 py-3 rounded-lg animate-fade-in-up opacity-0 transition-all
-                        ${
-                          isSelected
-                            ? 'bg-fpl-green/20 border-2 border-fpl-green ring-2 ring-fpl-green/30'
-                            : isFirst && hitsCost > 0 && !selectedPath
-                              ? 'bg-destructive/20 border border-destructive/30 hover:bg-destructive/30'
-                              : pathAction === 'transfer'
-                                ? 'bg-fpl-purple/10 border border-fpl-purple/20 hover:bg-fpl-purple/20'
-                                : gwUserTransfers.length > 0
-                                  ? 'bg-fpl-green/10 border border-fpl-green/20 hover:bg-fpl-green/20'
-                                  : 'bg-surface-elevated hover:bg-surface-hover border border-transparent'
-                        }
-                      `}
-                      style={{ animationDelay: `${250 + idx * 50}ms` }}
-                    >
-                      <div
-                        className={`text-xs font-display uppercase ${isSelected ? 'text-fpl-green' : 'text-foreground-muted'}`}
-                      >
-                        GW{gw}
-                        {!selectedPath && isFirst && hitsCost > 0 && ` (-${hitsCost})`}
-                        {pathGw?.hit_cost ? ` (-${pathGw.hit_cost})` : ''}
-                      </div>
-                      <div
-                        className={`text-xl font-mono font-bold ${isSelected ? 'text-fpl-green' : 'text-foreground'}`}
-                      >
-                        {pts.toFixed(1)}
-                      </div>
-                      {pathAction && (
-                        <div className="text-[10px] text-fpl-purple mt-0.5">
-                          {pathGw?.chip_played
-                            ? CHIP_LABELS[pathGw.chip_played as keyof ChipPlan]
-                            : pathAction === 'bank'
-                              ? 'Roll'
-                              : `${pathGw.moves.length} move${pathGw.moves.length > 1 ? 's' : ''}`}
-                        </div>
-                      )}
-                      {!selectedPath && gwUserTransfers.length > 0 && (
-                        <div className="text-[10px] text-fpl-green mt-0.5">
-                          {gwUserTransfers.length} transfer
-                          {gwUserTransfers.length > 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
-                <span className="text-xs text-foreground-muted">
-                  Total ({predictionsRange?.gameweeks.length ?? 6} GWs)
-                  {selectedPath && ' \u2014 Plan ' + selectedPath.id}
-                </span>
-                <span className="font-mono font-bold text-fpl-green text-lg">
-                  {selectedPath
-                    ? `${selectedPath.total_score.toFixed(1)} pts`
-                    : `${squadPredictions?.total.toFixed(1) ?? '...'} pts`}
-                </span>
-              </div>
-
-              <div className="mt-3 pt-3 border-t border-border/50">
-                <div className="text-[10px] font-display uppercase tracking-wider text-foreground-muted mb-2">
-                  Per-GW Rationale
-                </div>
-                <div className="space-y-2">
-                  {rationaleByGw.map((row) => (
-                    <div
-                      key={`rationale-${row.gw}`}
-                      data-testid={`rationale-gw-${row.gw}`}
-                      className="rounded-lg border border-border/50 bg-surface-elevated/60 p-2.5"
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-display text-foreground-muted uppercase tracking-wider">
-                          GW{row.gw} - {row.actionLabel}
-                        </span>
-                        {row.chipLabel && <span className="text-fpl-green">{row.chipLabel}</span>}
-                      </div>
-                      <div className="mt-1 text-xs text-foreground">
-                        Expected gain:{' '}
-                        {row.expectedGain === null
-                          ? 'pending'
-                          : `${row.expectedGain >= 0 ? '+' : ''}${row.expectedGain.toFixed(1)}`}{' '}
-                        | Hit cost: -{row.hitCost.toFixed(1)} | Objective:{' '}
-                        {OBJECTIVE_LABELS[row.objectiveMode]}
-                      </div>
-                      <div className="mt-1 text-xs text-foreground-muted">{row.riskTradeoff}</div>
-                      <div className="text-[11px] text-foreground-dim">{row.objectiveContext}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </BroadcastCard>
-
             {/* Squad Formation */}
             <BroadcastCard
               title={`Your Squad \u2014 GW${selectedGameweek ?? '?'} Predictions`}
               accentColor="green"
               animationDelay={300}
             >
+              <div className="mb-4 space-y-3">
+                <div className="flex gap-2 flex-wrap">
+                  {predictionsRange?.gameweeks.map((gw, idx) => {
+                    const pathGw = selectedPath?.transfers_by_gw[gw]
+                    const pts = pathGw ? pathGw.gw_score : (squadPredictions?.byGw[gw] ?? 0)
+                    const isFirst = idx === 0
+                    const isSelected = gw === selectedGameweek
+                    const pathAction = pathGw?.action
+                    const gwUserTransfers = userTransfers.filter((t) => t.gameweek === gw)
+                    return (
+                      <button
+                        key={gw}
+                        onClick={() => setSelectedGameweek(gw)}
+                        className={`
+                          px-4 py-3 rounded-lg animate-fade-in-up opacity-0 transition-all
+                          ${
+                            isSelected
+                              ? 'bg-fpl-green/20 border-2 border-fpl-green ring-2 ring-fpl-green/30'
+                              : isFirst && hitsCost > 0 && !selectedPath
+                                ? 'bg-destructive/20 border border-destructive/30 hover:bg-destructive/30'
+                                : pathAction === 'transfer'
+                                  ? 'bg-fpl-purple/10 border border-fpl-purple/20 hover:bg-fpl-purple/20'
+                                  : gwUserTransfers.length > 0
+                                    ? 'bg-fpl-green/10 border border-fpl-green/20 hover:bg-fpl-green/20'
+                                    : 'bg-surface-elevated hover:bg-surface-hover border border-transparent'
+                          }
+                        `}
+                        style={{ animationDelay: `${250 + idx * 50}ms` }}
+                      >
+                        <div
+                          className={`text-xs font-display uppercase ${isSelected ? 'text-fpl-green' : 'text-foreground-muted'}`}
+                        >
+                          GW{gw}
+                          {!selectedPath && isFirst && hitsCost > 0 && ` (-${hitsCost})`}
+                          {pathGw?.hit_cost ? ` (-${pathGw.hit_cost})` : ''}
+                        </div>
+                        <div
+                          className={`text-xl font-mono font-bold ${isSelected ? 'text-fpl-green' : 'text-foreground'}`}
+                        >
+                          {pts.toFixed(1)}
+                        </div>
+                        {pathAction && (
+                          <div className="text-[10px] text-fpl-purple mt-0.5">
+                            {pathGw?.chip_played
+                              ? CHIP_LABELS[pathGw.chip_played as keyof ChipPlan]
+                              : pathAction === 'bank'
+                                ? 'Roll'
+                                : `${pathGw.moves.length} move${pathGw.moves.length > 1 ? 's' : ''}`}
+                          </div>
+                        )}
+                        {!selectedPath && gwUserTransfers.length > 0 && (
+                          <div className="text-[10px] text-fpl-green mt-0.5">
+                            {gwUserTransfers.length} transfer
+                            {gwUserTransfers.length > 1 ? 's' : ''}
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="pt-3 border-t border-border/50 flex items-center justify-between">
+                  <span className="text-xs text-foreground-muted">
+                    Total ({predictionsRange?.gameweeks.length ?? 6} GWs)
+                    {selectedPath && ' \u2014 Plan ' + selectedPath.id}
+                  </span>
+                  <span className="font-mono font-bold text-fpl-green text-lg">
+                    {selectedPath
+                      ? `${selectedPath.total_score.toFixed(1)} pts`
+                      : `${squadPredictions?.total.toFixed(1) ?? '...'} pts`}
+                  </span>
+                </div>
+              </div>
               <p className="text-xs text-foreground-muted mb-4">
                 Click a player to adjust minutes or make a transfer.
                 {selectedGameweek !== null && ` Showing squad as of GW${selectedGameweek}.`}
