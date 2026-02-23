@@ -18,7 +18,7 @@ export function usePlannerOptimize(
   xMinsOverrides: XMinsOverrides = {},
   fixedTransfers: FixedTransfer[] = [],
   ftValue: number = 1.5,
-  depth: SolverDepth = 'standard',
+  depth: SolverDepth = 'deep',
   skipSolve: boolean = false,
   chipMode: ChipMode = 'locked',
   objectiveMode: PlannerObjectiveMode = 'expected',

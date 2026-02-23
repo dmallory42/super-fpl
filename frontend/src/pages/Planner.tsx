@@ -9,7 +9,6 @@ import type {
   PathGameweek,
   PlannerConstraints,
   PlannerObjectiveMode,
-  SolverDepth,
   XMinsOverrides,
   FixtureOpponent,
 } from '../api/client'
@@ -57,6 +56,7 @@ const OBJECTIVE_CONTEXT: Record<PlannerObjectiveMode, string> = {
   floor: 'Prioritizes safer minutes and lower downside outcomes.',
   ceiling: 'Prioritizes upside and high-variance outcomes.',
 }
+const DEFAULT_SOLVER_DEPTH = 'deep'
 
 function formatFixtures(fixtures: FixtureOpponent[]): string {
   return fixtures.map((f) => (f.is_home ? f.opponent : f.opponent.toLowerCase())).join(', ')
@@ -167,7 +167,6 @@ export function Planner() {
   const [comparePlanAIndex, setComparePlanAIndex] = useState<number | null>(null)
   const [comparePlanBIndex, setComparePlanBIndex] = useState<number | null>(null)
   const [ftValue, setFtValue] = useState(1.5)
-  const [solverDepth, setSolverDepth] = useState<SolverDepth>('standard')
   const [objectiveMode, setObjectiveMode] = useState<PlannerObjectiveMode>('expected')
   const initialConstraintInputs = getInitialConstraintInputs()
   const [lockIds, setLockIds] = useState<number[]>(initialConstraintInputs.lockIds)
@@ -185,7 +184,6 @@ export function Planner() {
   const [solveTransfers, setSolveTransfers] = useState<FixedTransfer[]>([])
   const [solveChipPlan, setSolveChipPlan] = useState<ChipPlan>({})
   const [solveFtValue, setSolveFtValue] = useState(1.5)
-  const [solveDepth, setSolveDepth] = useState<SolverDepth>('standard')
   const [solveObjectiveMode, setSolveObjectiveMode] = useState<PlannerObjectiveMode>('expected')
   const [solveConstraints, setSolveConstraints] = useState<PlannerConstraints>({})
   const [showSolveLoader, setShowSolveLoader] = useState(false)
@@ -271,7 +269,7 @@ export function Planner() {
     debouncedXMins,
     userTransfers,
     ftValue,
-    solverDepth,
+    DEFAULT_SOLVER_DEPTH,
     true, // skipSolve
     'locked',
     objectiveMode,
@@ -291,7 +289,7 @@ export function Planner() {
     debouncedXMins,
     solveTransfers,
     solveFtValue,
-    solveDepth,
+    DEFAULT_SOLVER_DEPTH,
     false, // run solver
     'locked',
     solveObjectiveMode,
@@ -305,7 +303,6 @@ export function Planner() {
     (JSON.stringify(userTransfers) !== JSON.stringify(solveTransfers) ||
       JSON.stringify(chipPlan) !== JSON.stringify(solveChipPlan) ||
       ftValue !== solveFtValue ||
-      solverDepth !== solveDepth ||
       objectiveMode !== solveObjectiveMode ||
       JSON.stringify(parsedConstraints.constraints) !== JSON.stringify(solveConstraints))
 
@@ -760,7 +757,6 @@ export function Planner() {
       setSolveTransfers([])
       setSolveChipPlan({})
       setSolveFtValue(1.5)
-      setSolveDepth('standard')
       setSolveObjectiveMode('expected')
       setSolveConstraints({})
       setFreeTransfers(null)
@@ -868,7 +864,6 @@ export function Planner() {
     setSolveTransfers([])
     setSolveChipPlan({})
     setSolveFtValue(1.5)
-    setSolveDepth('standard')
     setSolveObjectiveMode('expected')
     setSolveConstraints({})
     setChipPlan({})
@@ -890,7 +885,6 @@ export function Planner() {
     setSolveTransfers([...userTransfers])
     setSolveChipPlan({ ...chipPlan })
     setSolveFtValue(ftValue)
-    setSolveDepth(solverDepth)
     setSolveObjectiveMode(objectiveMode)
     setSolveConstraints(parsedConstraints.constraints)
     setSolveRequested(true)
@@ -1174,9 +1168,8 @@ export function Planner() {
                   </h4>
                   <p className="text-sm text-foreground-muted">
                     <span className="text-foreground font-medium">FT Value</span> controls hit
-                    aversion — higher values make the solver prefer rolling transfers.{' '}
-                    <span className="text-foreground font-medium">Depth</span> controls search
-                    thoroughness.
+                    aversion — higher values make the solver prefer rolling transfers. Solver depth
+                    is fixed to <span className="text-foreground font-medium">Deep</span>.
                   </p>
                 </div>
               </div>
@@ -1339,21 +1332,6 @@ export function Planner() {
                     <span className="font-mono text-xs text-foreground w-7 text-right">
                       {ftValue.toFixed(1)}
                     </span>
-                  </div>
-                  <div className="flex gap-1">
-                    {(['quick', 'standard', 'deep'] as const).map((d) => (
-                      <button
-                        key={d}
-                        onClick={() => setSolverDepth(d)}
-                        className={`px-2 py-0.5 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
-                          solverDepth === d
-                            ? 'bg-fpl-purple/20 text-fpl-purple border border-fpl-purple/30'
-                            : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
-                        }`}
-                      >
-                        {d}
-                      </button>
-                    ))}
                   </div>
                 </div>
               </div>
