@@ -280,6 +280,7 @@ test.describe('Planner Page', () => {
     })
     await expect(page.locator('text=SafeMid')).toBeVisible()
 
+    await page.getByTestId('planner-advanced-toggle').click()
     await page.click('button:has-text("Ceiling")')
     await page.click('button:has-text("Re-solve")')
     await expect(page.getByText('Objective: Ceiling', { exact: true })).toBeVisible({
@@ -402,6 +403,7 @@ test.describe('Planner Page', () => {
     await page.fill('input[placeholder="Enter FPL ID"]', '8028')
     await page.click('button:has-text("Load")')
 
+    await page.getByTestId('planner-advanced-toggle').click()
     await page.click('button:has-text("Ceiling")')
     await page.click('button:has-text("Find Plans")')
 
@@ -417,9 +419,7 @@ test.describe('Planner Page', () => {
     await expect(gw28Rationale).toContainText('Hit cost: -0.0')
   })
 
-  test('compares two plans with gw deltas, transfer/chip differences, and cumulative delta', async ({
-    page,
-  }) => {
+  test('shows multiple plans and allows selecting a specific plan', async ({ page }) => {
     await page.route('**/api/planner/optimize**', async (route) => {
       const url = new URL(route.request().url())
       const skipSolve = url.searchParams.get('skip_solve') === '1'
@@ -557,16 +557,16 @@ test.describe('Planner Page', () => {
     await page.click('button:has-text("Load")')
     await page.click('button:has-text("Find Plans")')
 
-    await expect(page.getByTestId('plan-comparison-panel')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByTestId('comparison-row-gw-27')).toContainText('Delta +3.0')
-    await expect(page.getByTestId('comparison-row-gw-28')).toContainText('Delta -1.0')
-    await expect(page.getByTestId('comparison-row-gw-27')).toContainText(
-      'Transfers: A Saka -> SafeMid | B Foden -> AltMid'
-    )
-    await expect(page.getByTestId('comparison-row-gw-28')).toContainText('Chips: A - | B BB')
-    await expect(page.getByTestId('comparison-cumulative-delta')).toContainText(
-      'Final cumulative delta: +2.0'
-    )
+    await expect(page.getByText('Plan 1')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Plan 2')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('button', { name: 'Save Plan' })).toHaveCount(0)
+    await page.getByText('Plan 2').first().click()
+    await expect(page.getByRole('button', { name: 'Save Plan' })).toBeVisible()
+    const transfersCard = page
+      .locator('div.broadcast-card')
+      .filter({ has: page.getByRole('heading', { name: 'Your Transfers' }) })
+    await expect(transfersCard).toContainText('Foden')
+    await expect(transfersCard).toContainText('#17')
   })
 
   test('sends constraints and shows infeasible-constraint message', async ({ page }) => {
