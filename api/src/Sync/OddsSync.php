@@ -82,6 +82,7 @@ class OddsSync
                 'home_cs_prob' => $odds['home_cs_prob'] ?? $this->estimateCleanSheetProb($odds, true),
                 'away_cs_prob' => $odds['away_cs_prob'] ?? $this->estimateCleanSheetProb($odds, false),
                 'expected_total_goals' => $odds['expected_total_goals'] ?? 2.5,
+                'line_count' => (int) ($odds['line_count'] ?? 0),
                 'updated_at' => date('Y-m-d H:i:s'),
             ], ['fixture_id']);
 
@@ -120,16 +121,25 @@ class OddsSync
 
             $matchedFixtures++;
 
-            foreach ($event['players'] as $playerName => $prob) {
+            foreach ($event['players'] as $playerName => $market) {
                 $player = $this->matchPlayerByName($playerName);
                 if ($player === null) {
                     continue;
+                }
+
+                if (is_array($market)) {
+                    $prob = (float) ($market['probability'] ?? 0);
+                    $lineCount = (int) ($market['line_count'] ?? 0);
+                } else {
+                    $prob = (float) $market;
+                    $lineCount = 0;
                 }
 
                 $this->db->upsert('player_goalscorer_odds', [
                     'player_id' => $player['id'],
                     'fixture_id' => $fixture['id'],
                     'anytime_scorer_prob' => $prob,
+                    'line_count' => $lineCount,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ], ['player_id', 'fixture_id']);
 
@@ -169,16 +179,25 @@ class OddsSync
 
             $matchedFixtures++;
 
-            foreach ($event['players'] as $playerName => $prob) {
+            foreach ($event['players'] as $playerName => $market) {
                 $player = $this->matchPlayerByName($playerName);
                 if ($player === null) {
                     continue;
+                }
+
+                if (is_array($market)) {
+                    $prob = (float) ($market['probability'] ?? 0);
+                    $lineCount = (int) ($market['line_count'] ?? 0);
+                } else {
+                    $prob = (float) $market;
+                    $lineCount = 0;
                 }
 
                 $this->db->upsert('player_assist_odds', [
                     'player_id' => $player['id'],
                     'fixture_id' => $fixture['id'],
                     'anytime_assist_prob' => $prob,
+                    'line_count' => $lineCount,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ], ['player_id', 'fixture_id']);
 

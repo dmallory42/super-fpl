@@ -680,6 +680,7 @@ function handlePredictionsRange(Database $db, array $config): void
             pp.predicted_if_fit,
             pp.expected_mins,
             pp.expected_mins_if_fit,
+            pp.if_fit_breakdown_json,
             pp.confidence,
             p.web_name,
             p.club_id as team,
@@ -711,6 +712,7 @@ function handlePredictionsRange(Database $db, array $config): void
                 'expected_mins_if_fit' => (int) round((float) ($pred['expected_mins_if_fit'] ?? 90)),
                 'predictions' => [],
                 'if_fit_predictions' => [],
+                'if_fit_breakdowns' => [],
                 'total_predicted' => 0,
             ];
         }
@@ -718,6 +720,16 @@ function handlePredictionsRange(Database $db, array $config): void
         $playerMap[$playerId]['expected_mins'][$gw] = (int) round((float) ($pred['expected_mins'] ?? 90));
         $playerMap[$playerId]['predictions'][$gw] = round((float) $pred['predicted_points'], 1);
         $playerMap[$playerId]['if_fit_predictions'][$gw] = round((float) ($pred['predicted_if_fit'] ?? 0), 2);
+        $ifFitBreakdown = json_decode((string) ($pred['if_fit_breakdown_json'] ?? '{}'), true);
+        if (is_array($ifFitBreakdown)) {
+            $normalizedBreakdown = [];
+            foreach ($ifFitBreakdown as $key => $value) {
+                if (is_string($key) && is_numeric($value)) {
+                    $normalizedBreakdown[$key] = round((float) $value, 2);
+                }
+            }
+            $playerMap[$playerId]['if_fit_breakdowns'][$gw] = $normalizedBreakdown;
+        }
         $playerMap[$playerId]['total_predicted'] += (float) $pred['predicted_points'];
     }
 

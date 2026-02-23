@@ -176,6 +176,51 @@ class HistoricalBaselinesTest extends TestCase
         $this->assertEqualsWithDelta(0.5, $effective1800, 0.001);
     }
 
+    public function testIgnoresHistoricalBaselineUnder450Minutes(): void
+    {
+        $this->db->getPdo()->exec("
+            INSERT INTO players (id, code, web_name, understat_id)
+            VALUES (1, 400, 'TinySample', 888)
+        ");
+
+        // 449 minutes should be ignored as a historical baseline.
+        $this->db->getPdo()->exec("
+            INSERT INTO understat_season_history (understat_id, season, minutes, npxg, xa)
+            VALUES (888, 2023, 449, 2.0, 0.8)
+        ");
+
+        $baselines = new HistoricalBaselines($this->db);
+
+        $this->assertSame(0.0, $baselines->getXgPer90(400));
+        $this->assertSame(0.0, $baselines->getXaPer90(400));
+        $this->assertSame(0.0, $baselines->getHistoricalConfidence(400));
+    }
+
+    public function testHistoricalConfidenceScalesWithMinutesAndAffectsBlend(): void
+    {
+        $this->db->getPdo()->exec("
+            INSERT INTO players (id, code, web_name, understat_id)
+            VALUES (1, 500, 'LowConfidence', 999)
+        ");
+
+        // Exactly 450 minutes -> confidence 0.25
+        $this->db->getPdo()->exec("
+            INSERT INTO understat_season_history (understat_id, season, minutes, npxg, xa)
+            VALUES (999, 2023, 450, 2.25, 0.9)
+        ");
+
+        $baselines = new HistoricalBaselines($this->db);
+
+        $this->assertEqualsWithDelta(0.25, $baselines->getHistoricalConfidence(500), 0.001);
+
+        $highConfidenceBlend = $baselines->getEffectiveRate(0.5, 0.3, 900, 1.0);
+        $lowConfidenceBlend = $baselines->getEffectiveRate(0.5, 0.3, 900, 0.25);
+
+        // Lower baseline confidence should nudge result slightly toward current rate.
+        $this->assertGreaterThan($highConfidenceBlend, $lowConfidenceBlend);
+        $this->assertLessThan(0.5, $lowConfidenceBlend);
+    }
+
     public function testMissingPlayerReturnsZero(): void
     {
         $baselines = new HistoricalBaselines($this->db);

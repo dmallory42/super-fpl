@@ -76,6 +76,8 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
                 predicted_if_fit REAL,
                 expected_mins REAL,
                 expected_mins_if_fit REAL,
+                breakdown_json TEXT DEFAULT '{}',
+                if_fit_breakdown_json TEXT DEFAULT '{}',
                 confidence REAL,
                 model_version TEXT,
                 computed_at TIMESTAMP,

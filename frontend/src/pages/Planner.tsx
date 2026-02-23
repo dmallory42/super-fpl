@@ -900,7 +900,19 @@ export function Planner() {
     if (typeof override === 'object' && override !== null && override[gw] != null) {
       const ifFitPts = pred?.if_fit_predictions?.[gw] ?? pred?.predictions[gw] ?? 0
       const ifFitMins = pred?.expected_mins_if_fit ?? 90
-      return scalePoints(ifFitPts, ifFitMins, override[gw])
+      const ifFitBreakdown = pred?.if_fit_breakdowns?.[gw]
+      const fixtureCount = Math.max(
+        1,
+        predictionsRange?.fixtures?.[pred?.team ?? 0]?.[gw]?.length ?? 1
+      )
+      return scalePoints(
+        ifFitPts,
+        ifFitMins,
+        override[gw],
+        ifFitBreakdown,
+        fixtureCount,
+        pred?.position
+      )
     }
 
     return pred?.predictions[gw] ?? 0

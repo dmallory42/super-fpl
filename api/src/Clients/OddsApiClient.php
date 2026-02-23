@@ -56,7 +56,7 @@ class OddsApiClient
      *     event_id: string,
      *     home_team: string,
      *     away_team: string,
-     *     players: array<string, float>
+     *     players: array<string, array{probability: float, line_count: int}>
      * }>
      */
     public function getGoalscorerOdds(): array
@@ -114,7 +114,7 @@ class OddsApiClient
      *     event_id: string,
      *     home_team: string,
      *     away_team: string,
-     *     players: array<string, float>
+     *     players: array<string, array{probability: float, line_count: int}>
      * }>
      */
     public function getAssistOdds(): array
@@ -166,11 +166,11 @@ class OddsApiClient
     /**
      * Extract anytime assist probabilities from event data.
      *
-     * @return array<string, float> Player name => probability
+     * @return array<string, array{probability: float, line_count: int}> Player name => market data
      */
     private function extractPlayerAssistOdds(array $event): array
     {
-        $players = [];
+        $totals = [];
 
         foreach ($event['bookmakers'] ?? [] as $bookmaker) {
             foreach ($bookmaker['markets'] ?? [] as $market) {
@@ -179,20 +179,35 @@ class OddsApiClient
                 }
 
                 foreach ($market['outcomes'] ?? [] as $outcome) {
+                    if (!$this->isPositiveAssistOutcome($outcome)) {
+                        continue;
+                    }
+
                     $playerName = $outcome['description'] ?? $outcome['name'] ?? '';
                     $price = (float) ($outcome['price'] ?? 0);
 
                     if ($playerName && $price > 1) {
                         $prob = (1 / $price) / 1.10;
-
-                        if (isset($players[$playerName])) {
-                            $players[$playerName] = ($players[$playerName] + $prob) / 2;
-                        } else {
-                            $players[$playerName] = round($prob, 4);
+                        if (!isset($totals[$playerName])) {
+                            $totals[$playerName] = ['sum' => 0.0, 'count' => 0];
                         }
+                        $totals[$playerName]['sum'] += $prob;
+                        $totals[$playerName]['count']++;
                     }
                 }
             }
+        }
+
+        $players = [];
+        foreach ($totals as $playerName => $agg) {
+            $count = (int) $agg['count'];
+            if ($count <= 0) {
+                continue;
+            }
+            $players[$playerName] = [
+                'probability' => round((float) $agg['sum'] / $count, 4),
+                'line_count' => $count,
+            ];
         }
 
         return $players;
@@ -202,11 +217,11 @@ class OddsApiClient
      * Extract anytime goalscorer probabilities from event data.
      * Handles both bulk and event-specific API response formats.
      *
-     * @return array<string, float> Player name => probability
+     * @return array<string, array{probability: float, line_count: int}> Player name => market data
      */
     private function extractPlayerGoalscorerOdds(array $event): array
     {
-        $players = [];
+        $totals = [];
 
         foreach ($event['bookmakers'] ?? [] as $bookmaker) {
             foreach ($bookmaker['markets'] ?? [] as $market) {
@@ -215,6 +230,10 @@ class OddsApiClient
                 }
 
                 foreach ($market['outcomes'] ?? [] as $outcome) {
+                    if (!$this->isPositiveGoalscorerOutcome($outcome)) {
+                        continue;
+                    }
+
                     // Player name is in 'description' for event-specific endpoint
                     // or 'name' for bulk endpoint
                     $playerName = $outcome['description'] ?? $outcome['name'] ?? '';
@@ -223,19 +242,81 @@ class OddsApiClient
                     if ($playerName && $price > 1) {
                         // Convert odds to probability, remove ~10% overround
                         $prob = (1 / $price) / 1.10;
-
-                        // Average if we already have odds for this player
-                        if (isset($players[$playerName])) {
-                            $players[$playerName] = ($players[$playerName] + $prob) / 2;
-                        } else {
-                            $players[$playerName] = round($prob, 4);
+                        if (!isset($totals[$playerName])) {
+                            $totals[$playerName] = ['sum' => 0.0, 'count' => 0];
                         }
+                        $totals[$playerName]['sum'] += $prob;
+                        $totals[$playerName]['count']++;
                     }
                 }
             }
         }
 
+        $players = [];
+        foreach ($totals as $playerName => $agg) {
+            $count = (int) $agg['count'];
+            if ($count <= 0) {
+                continue;
+            }
+            $players[$playerName] = [
+                'probability' => round((float) $agg['sum'] / $count, 4),
+                'line_count' => $count,
+            ];
+        }
+
         return $players;
+    }
+
+    /**
+     * Ensure we only ingest positive "to contribute" sides for assist markets.
+     *
+     * @param array<string, mixed> $outcome
+     */
+    private function isPositiveAssistOutcome(array $outcome): bool
+    {
+        $name = strtolower(trim((string) ($outcome['name'] ?? '')));
+        $description = strtolower(trim((string) ($outcome['description'] ?? '')));
+        $point = isset($outcome['point']) ? (float) $outcome['point'] : null;
+
+        if ($description === '' || str_contains($description, 'no assist')) {
+            return false;
+        }
+
+        // Most books use Over/Under 0.5 for anytime assist.
+        if ($name === 'over') {
+            if ($point !== null && abs($point - 0.5) > 0.01) {
+                return false;
+            }
+            return true;
+        }
+
+        // Some books expose yes/no style outcome naming.
+        if ($name === 'yes') {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Ensure we only ingest positive "anytime scorer" sides.
+     *
+     * @param array<string, mixed> $outcome
+     */
+    private function isPositiveGoalscorerOutcome(array $outcome): bool
+    {
+        $name = strtolower(trim((string) ($outcome['name'] ?? '')));
+        $description = strtolower(trim((string) ($outcome['description'] ?? '')));
+
+        if ($description === '' || str_contains($description, 'no scorer') || str_contains($description, 'own goal')) {
+            return false;
+        }
+
+        if ($name === 'under' || $name === 'no') {
+            return false;
+        }
+
+        return $name === 'yes' || $name === '' || $name === 'over';
     }
 
     /**
@@ -301,6 +382,11 @@ class OddsApiClient
             // Get average odds across bookmakers
             $h2hOdds = $this->extractMarketOdds($event, 'h2h');
             $totalsOdds = $this->extractMarketOdds($event, 'totals');
+            $h2hLineCount = count($h2hOdds);
+            $totalsLineCount = count($totalsOdds);
+            $fixture['line_count'] = ($h2hLineCount > 0 && $totalsLineCount > 0)
+                ? min($h2hLineCount, $totalsLineCount)
+                : max($h2hLineCount, $totalsLineCount);
 
             if (!empty($h2hOdds)) {
                 $avgOdds = $this->averageOdds($h2hOdds);

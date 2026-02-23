@@ -94,6 +94,18 @@ class PredictionService
                         'cards' => 0.0,
                         'penalties' => 0.0,
                     ],
+                    'if_fit_breakdown' => [
+                        'appearance' => 0.0,
+                        'goals' => 0.0,
+                        'assists' => 0.0,
+                        'clean_sheet' => 0.0,
+                        'bonus' => 0.0,
+                        'goals_conceded' => 0.0,
+                        'saves' => 0.0,
+                        'defensive_contribution' => 0.0,
+                        'cards' => 0.0,
+                        'penalties' => 0.0,
+                    ],
                 ];
                 $fixtureInfo = null;
             } else {
@@ -103,6 +115,7 @@ class PredictionService
                 $perGameMinsIfFit = 0.0;
                 $totalConfidence = 0.0;
                 $combinedBreakdown = [];
+                $combinedIfFitBreakdown = [];
                 $fixtureInfoList = [];
 
                 foreach ($playerFixtures as $fixture) {
@@ -130,6 +143,9 @@ class PredictionService
                     foreach ($fixturePrediction['breakdown'] as $bkey => $value) {
                         $combinedBreakdown[$bkey] = ($combinedBreakdown[$bkey] ?? 0) + $value;
                     }
+                    foreach (($fixturePrediction['if_fit_breakdown'] ?? []) as $bkey => $value) {
+                        $combinedIfFitBreakdown[$bkey] = ($combinedIfFitBreakdown[$bkey] ?? 0) + $value;
+                    }
 
                     $fixtureInfoList[] = [
                         'opponent' => $fixture['home_club_id'] === $clubId
@@ -149,6 +165,7 @@ class PredictionService
                     'expected_mins_if_fit' => round($perGameMinsIfFit, 1),
                     'confidence' => round($totalConfidence / count($playerFixtures), 2),
                     'breakdown' => $combinedBreakdown,
+                    'if_fit_breakdown' => $combinedIfFitBreakdown,
                 ];
 
                 // For single fixture, return object; for DGW return array
@@ -164,8 +181,12 @@ class PredictionService
                 'form' => $player['form'],
                 'total_points' => $player['total_points'],
                 'predicted_points' => $prediction['predicted_points'],
+                'predicted_if_fit' => $prediction['predicted_if_fit'] ?? 0.0,
+                'expected_mins' => $prediction['expected_mins'] ?? 0.0,
+                'expected_mins_if_fit' => $prediction['expected_mins_if_fit'] ?? 0.0,
                 'confidence' => $prediction['confidence'],
                 'breakdown' => $prediction['breakdown'],
+                'if_fit_breakdown' => $prediction['if_fit_breakdown'] ?? [],
                 'fixture' => $fixtureInfo,
                 'fixture_count' => count($playerFixtures),
                 'availability' => $this->deriveAvailability($player),
@@ -288,6 +309,11 @@ class PredictionService
                 p.form,
                 p.total_points,
                 pp.predicted_points,
+                pp.predicted_if_fit,
+                pp.expected_mins,
+                pp.expected_mins_if_fit,
+                pp.breakdown_json,
+                pp.if_fit_breakdown_json,
                 pp.confidence,
                 p.chance_of_playing,
                 p.news
@@ -304,7 +330,10 @@ class PredictionService
         // Add availability to each result
         foreach ($results as &$row) {
             $row['availability'] = $this->deriveAvailability($row);
+            $row['breakdown'] = $this->decodeBreakdownJson($row['breakdown_json'] ?? '{}');
+            $row['if_fit_breakdown'] = $this->decodeBreakdownJson($row['if_fit_breakdown_json'] ?? '{}');
             unset($row['chance_of_playing'], $row['news']);
+            unset($row['breakdown_json'], $row['if_fit_breakdown_json']);
         }
 
         return $results;
@@ -324,10 +353,32 @@ class PredictionService
             'predicted_if_fit' => $prediction['predicted_if_fit'] ?? null,
             'expected_mins' => $prediction['expected_mins'] ?? null,
             'expected_mins_if_fit' => $prediction['expected_mins_if_fit'] ?? null,
+            'breakdown_json' => json_encode($prediction['breakdown'] ?? []) ?: '{}',
+            'if_fit_breakdown_json' => json_encode($prediction['if_fit_breakdown'] ?? []) ?: '{}',
             'confidence' => $prediction['confidence'],
             'model_version' => 'v2.0',
             'computed_at' => date('Y-m-d H:i:s'),
         ], ['player_id', 'gameweek']);
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    private function decodeBreakdownJson(string $json): array
+    {
+        $decoded = json_decode($json, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($decoded as $key => $value) {
+            if (is_string($key) && is_numeric($value)) {
+                $result[$key] = (float) $value;
+            }
+        }
+
+        return $result;
     }
 
     /**

@@ -53,8 +53,9 @@ class AssistProbability
             // Calculate season xA/90 regressed to career baseline
             $seasonXaPer90 = $this->getRegressedXaPer90($xa, $minutes, $playerCode);
 
-            // Blend: 90% bookmaker-derived, 10% season xA (regressed)
-            $expectedAssists = ($oddsXA * 0.9) + ($seasonXaPer90 * 0.1);
+            // Blend odds vs season baseline by market depth.
+            $oddsWeight = $this->marketOddsWeight($assistOdds);
+            $expectedAssists = ($oddsXA * $oddsWeight) + ($seasonXaPer90 * (1 - $oddsWeight));
 
             return round(min(1.5, $expectedAssists), 4);
         }
@@ -100,7 +101,13 @@ class AssistProbability
         if ($this->baselines !== null && $playerCode > 0) {
             $historicalRate = $this->baselines->getXaPer90($playerCode);
             if ($historicalRate > 0) {
-                return $this->baselines->getEffectiveRate($currentRate, $historicalRate, $minutes);
+                $historicalConfidence = $this->baselines->getHistoricalConfidence($playerCode);
+                return $this->baselines->getEffectiveRate(
+                    $currentRate,
+                    $historicalRate,
+                    $minutes,
+                    $historicalConfidence
+                );
             }
         }
 
@@ -157,10 +164,32 @@ class AssistProbability
 
         $rawMultiplier = $teamXG / $leagueAvgTeamXG;
 
+        $shrink = $this->fixtureOddsShrink($fixtureOdds);
         // Shrink toward 1.0 — team-level xG boost doesn't distribute
-        // equally across all players (top attackers capture more)
-        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.35;
+        // equally across all players (top attackers capture more).
+        // Use smaller shrink when fixture market is thin.
+        $multiplier = 1.0 + ($rawMultiplier - 1.0) * $shrink;
 
         return min(2.0, $baseXA * $multiplier);
+    }
+
+    /**
+     * Dynamic odds weight from available market lines.
+     */
+    private function marketOddsWeight(array $odds): float
+    {
+        $lines = max(0, (int) ($odds['line_count'] ?? 0));
+        // 1 line => 0.53, 2 => 0.61, ... 6+ => 0.90
+        return min(0.90, 0.45 + (0.08 * min(6, $lines)));
+    }
+
+    /**
+     * Fixture adjustment shrink factor from fixture market depth.
+     */
+    private function fixtureOddsShrink(array $fixtureOdds): float
+    {
+        $lines = max(0, (int) ($fixtureOdds['line_count'] ?? 0));
+        // 1 line => 0.16, 2 => 0.20, ... 6+ => 0.35
+        return min(0.35, 0.12 + (0.04 * min(6, $lines)));
     }
 }

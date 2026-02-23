@@ -46,16 +46,20 @@ class CleanSheetProbability
                 : ($fixtureOdds['away_cs_prob'] ?? null);
 
             if ($csProb !== null) {
-                // Blend 80% odds / 20% xGC-based — no separate home boost
+                // Blend odds vs xGC baseline by market depth.
                 $xgcBasedProb = $this->calculateFromXGC($player);
-                $blendedProb = ((float) $csProb * 0.8) + ($xgcBasedProb * 0.2);
+                $oddsWeight = $this->oddsWeight($fixtureOdds);
+                $blendedProb = ((float) $csProb * $oddsWeight) + ($xgcBasedProb * (1 - $oddsWeight));
                 return round(min(0.6, max(0.05, $blendedProb)), 4);
             }
 
             // Method 2: Derive from match odds (no CS odds available)
             $oppXG = $this->deriveOpponentGoals($fixtureOdds, $isHome);
             $derivedCsProb = exp(-$oppXG);
-            return round(min(0.6, max(0.05, $derivedCsProb)), 4);
+            $xgcBasedProb = $this->calculateFromXGC($player);
+            $oddsWeight = $this->oddsWeight($fixtureOdds);
+            $blendedProb = ($derivedCsProb * $oddsWeight) + ($xgcBasedProb * (1 - $oddsWeight));
+            return round(min(0.6, max(0.05, $blendedProb)), 4);
         }
 
         // Method 2b: Team strength fallback (no odds, but fixture known)
@@ -121,5 +125,19 @@ class CleanSheetProbability
 
         $gamesPlayed = max(1, floor($minutes / 60));
         return $cleanSheets / $gamesPlayed;
+    }
+
+    /**
+     * Dynamic odds confidence from available fixture market lines.
+     */
+    private function oddsWeight(array $fixtureOdds): float
+    {
+        $lines = max(0, (int) ($fixtureOdds['line_count'] ?? 0));
+        if ($lines === 0) {
+            // Backward-compatible fallback for legacy rows without line_count.
+            return 0.80;
+        }
+        // 1 line => 0.53, 2 => 0.61, ... 6+ => 0.90
+        return min(0.90, 0.45 + (0.08 * min(6, $lines)));
     }
 }

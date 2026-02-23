@@ -86,6 +86,13 @@ class Database
             // prediction_snapshots metadata for reliable pre-deadline detection
             'ALTER TABLE prediction_snapshots ADD COLUMN snapshot_source TEXT DEFAULT "legacy"',
             'ALTER TABLE prediction_snapshots ADD COLUMN is_pre_deadline INTEGER DEFAULT 0',
+            // player_predictions - cached component breakdowns for override scaling
+            'ALTER TABLE player_predictions ADD COLUMN breakdown_json TEXT DEFAULT "{}"',
+            'ALTER TABLE player_predictions ADD COLUMN if_fit_breakdown_json TEXT DEFAULT "{}"',
+            // odds market depth metadata
+            'ALTER TABLE fixture_odds ADD COLUMN line_count INTEGER DEFAULT 0',
+            'ALTER TABLE player_goalscorer_odds ADD COLUMN line_count INTEGER DEFAULT 0',
+            'ALTER TABLE player_assist_odds ADD COLUMN line_count INTEGER DEFAULT 0',
         ];
 
         foreach ($migrations as $sql) {
@@ -105,6 +112,7 @@ class Database
                 player_id INTEGER,
                 fixture_id INTEGER,
                 anytime_assist_prob REAL,
+                line_count INTEGER DEFAULT 0,
                 updated_at TIMESTAMP,
                 PRIMARY KEY (player_id, fixture_id)
             )

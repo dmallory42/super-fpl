@@ -8,7 +8,7 @@ namespace SuperFPL\Api\Prediction;
  * Calculates goal-scoring probability for a player.
  *
  * Priority system (odds-first):
- * 1. Scorer odds → inverse Poisson, blended 90% odds / 10% season xG (regressed)
+ * 1. Scorer odds → inverse Poisson, blended with season xG by market depth
  * 2. Season xG/90 regressed toward career baseline, fixture-adjusted from match odds
  * 3. Historical goals/90 (actual goals per 90, no position weight suppression)
  */
@@ -57,8 +57,9 @@ class GoalProbability
             // Calculate season npxG/90 regressed to career baseline
             $seasonXgPer90 = $this->getRegressedXgPer90($openPlayXG, $minutes, $playerCode);
 
-            // Blend: 90% bookmaker-derived, 10% season xG (regressed)
-            $expectedGoals = ($oddsXG * 0.9) + ($seasonXgPer90 * 0.1);
+            // Blend odds vs season baseline by market depth.
+            $oddsWeight = $this->marketOddsWeight($goalscorerOdds);
+            $expectedGoals = ($oddsXG * $oddsWeight) + ($seasonXgPer90 * (1 - $oddsWeight));
 
             return [
                 'expected_goals' => round($expectedGoals, 4),
@@ -112,7 +113,13 @@ class GoalProbability
         if ($this->baselines !== null && $playerCode > 0) {
             $historicalRate = $this->baselines->getXgPer90($playerCode);
             if ($historicalRate > 0) {
-                return $this->baselines->getEffectiveRate($currentRate, $historicalRate, $minutes);
+                $historicalConfidence = $this->baselines->getHistoricalConfidence($playerCode);
+                return $this->baselines->getEffectiveRate(
+                    $currentRate,
+                    $historicalRate,
+                    $minutes,
+                    $historicalConfidence
+                );
             }
         }
 
@@ -172,10 +179,32 @@ class GoalProbability
 
         $rawMultiplier = $teamXG / $leagueAvgTeamXG;
 
+        $shrink = $this->fixtureOddsShrink($fixtureOdds);
         // Shrink toward 1.0 — team-level xG boost doesn't distribute
-        // equally across all players (top attackers capture more)
-        $multiplier = 1.0 + ($rawMultiplier - 1.0) * 0.35;
+        // equally across all players (top attackers capture more).
+        // Use smaller shrink when fixture market is thin.
+        $multiplier = 1.0 + ($rawMultiplier - 1.0) * $shrink;
 
         return min(2.0, $baseXG * $multiplier);
+    }
+
+    /**
+     * Dynamic odds weight from available market lines.
+     */
+    private function marketOddsWeight(array $odds): float
+    {
+        $lines = max(0, (int) ($odds['line_count'] ?? 0));
+        // 1 line => 0.53, 2 => 0.61, ... 6+ => 0.90
+        return min(0.90, 0.45 + (0.08 * min(6, $lines)));
+    }
+
+    /**
+     * Fixture adjustment shrink factor from fixture market depth.
+     */
+    private function fixtureOddsShrink(array $fixtureOdds): float
+    {
+        $lines = max(0, (int) ($fixtureOdds['line_count'] ?? 0));
+        // 1 line => 0.16, 2 => 0.20, ... 6+ => 0.35
+        return min(0.35, 0.12 + (0.04 * min(6, $lines)));
     }
 }

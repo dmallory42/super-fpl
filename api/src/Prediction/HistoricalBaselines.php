@@ -15,7 +15,12 @@ use SuperFPL\Api\Database;
  */
 class HistoricalBaselines
 {
-    /** @var array<int, array{xg_per_90: float, xa_per_90: float, total_minutes: int}> */
+    private const MIN_BASELINE_MINUTES = 450;
+    private const FULL_CONFIDENCE_MINUTES = 1800;
+    private const MIN_CONFIDENCE_WEIGHT = 0.85;
+    private const MAX_CONFIDENCE_WEIGHT = 1.0;
+
+    /** @var array<int, array{xg_per_90: float, xa_per_90: float, total_minutes: int, confidence: float}> */
     private array $cache = [];
 
     public function __construct(Database $db)
@@ -41,6 +46,14 @@ class HistoricalBaselines
     }
 
     /**
+     * Confidence in the historical baseline (0..1), derived from historical minutes.
+     */
+    public function getHistoricalConfidence(int $playerCode): float
+    {
+        return $this->cache[$playerCode]['confidence'] ?? 0.0;
+    }
+
+    /**
      * Regression weight: how much to trust current-season data vs career baseline.
      * Linear ramp from 0 to 1 over 1800 minutes (~20 full matches).
      */
@@ -52,10 +65,22 @@ class HistoricalBaselines
     /**
      * Blend current-season rate with career baseline.
      */
-    public function getEffectiveRate(float $currentRate, float $historicalRate, int $currentMinutes): float
+    public function getEffectiveRate(
+        float $currentRate,
+        float $historicalRate,
+        int $currentMinutes,
+        float $historicalConfidence = 1.0
+    ): float
     {
         $w = $this->getRegressionWeight($currentMinutes);
-        return ($currentRate * $w) + ($historicalRate * (1 - $w));
+        $historicalWeight = 1 - $w;
+        $clampedConfidence = min(1.0, max(0.0, $historicalConfidence));
+        $confidenceWeight = self::MIN_CONFIDENCE_WEIGHT
+            + ((self::MAX_CONFIDENCE_WEIGHT - self::MIN_CONFIDENCE_WEIGHT) * $clampedConfidence);
+        $historicalWeight *= $confidenceWeight;
+        $currentWeight = 1 - $historicalWeight;
+
+        return ($currentRate * $currentWeight) + ($historicalRate * $historicalWeight);
     }
 
     /**
@@ -84,10 +109,14 @@ class HistoricalBaselines
 
         foreach ($byPlayer as $code => $data) {
             $mins = $data['total_minutes'];
+            if ($mins < self::MIN_BASELINE_MINUTES) {
+                continue;
+            }
             $this->cache[$code] = [
                 'xg_per_90' => $mins > 0 ? ($data['total_npxg'] / $mins) * 90 : 0.0,
                 'xa_per_90' => $mins > 0 ? ($data['total_xa'] / $mins) * 90 : 0.0,
                 'total_minutes' => $mins,
+                'confidence' => min(1.0, $mins / self::FULL_CONFIDENCE_MINUTES),
             ];
         }
     }
@@ -122,10 +151,14 @@ class HistoricalBaselines
 
         foreach ($byPlayer as $code => $data) {
             $mins = $data['total_minutes'];
+            if ($mins < self::MIN_BASELINE_MINUTES) {
+                continue;
+            }
             $this->cache[$code] = [
                 'xg_per_90' => $mins > 0 ? ($data['total_xg'] / $mins) * 90 : 0.0,
                 'xa_per_90' => $mins > 0 ? ($data['total_xa'] / $mins) * 90 : 0.0,
                 'total_minutes' => $mins,
+                'confidence' => min(1.0, $mins / self::FULL_CONFIDENCE_MINUTES),
             ];
         }
     }

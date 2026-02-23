@@ -25,6 +25,9 @@ class TransferOptimizerService
     private const OBJECTIVE_EXPECTED = 'expected';
     private const OBJECTIVE_FLOOR = 'floor';
     private const OBJECTIVE_CEILING = 'ceiling';
+    private const POSITION_GKP = 1;
+    private const POSITION_DEF = 2;
+    private const POSITION_MID = 3;
     private const CONSTRAINT_CHIP_KEYS = [
         self::CHIP_WILDCARD,
         self::CHIP_BENCH_BOOST,
@@ -64,7 +67,7 @@ class TransferOptimizerService
         string $objectiveMode = self::OBJECTIVE_EXPECTED,
         array $constraints = [],
     ): array {
-        $context = $this->buildPlanningContext($managerId, $freeTransfers);
+        $context = $this->buildPlanningContext($managerId, $freeTransfers, $xMinsOverrides);
         $planFromGw = $context['plan_from_gw'];
         $upcomingGws = $context['upcoming_gws'];
         $currentSquad = $context['current_squad'];
@@ -247,7 +250,7 @@ class TransferOptimizerService
         ];
     }
 
-    private function buildPlanningContext(int $managerId, int $freeTransfers): array
+    private function buildPlanningContext(int $managerId, int $freeTransfers, array $xMinsOverrides = []): array
     {
         $currentGw = $this->gameweekService->getCurrentGameweek();
         $planFromGw = $this->gameweekService->getNextActionableGameweek();
@@ -290,17 +293,38 @@ class TransferOptimizerService
             $gwPredictions = $this->predictionService->getPredictions($gw);
             foreach ($gwPredictions['predictions'] ?? $gwPredictions as $pred) {
                 $playerId = (int) $pred['player_id'];
+                $predictedPoints = (float) ($pred['predicted_points'] ?? 0);
+                $effectiveMins = (float) ($pred['expected_mins'] ?? 90);
+                $overrideMins = $this->resolveXMinsOverride($xMinsOverrides, $playerId, $gw);
+                if ($overrideMins !== null) {
+                    $ifFitPoints = (float) ($pred['predicted_if_fit'] ?? $predictedPoints);
+                    $ifFitMins = (float) ($pred['expected_mins_if_fit'] ?? $effectiveMins);
+                    $fixtureCount = max(1, (int) ($fixtureCounts[$gw][(int) ($pred['team'] ?? 0)] ?? 1));
+                    $ifFitBreakdown = is_array($pred['if_fit_breakdown'] ?? null)
+                        ? $pred['if_fit_breakdown']
+                        : [];
+                    $predictedPoints = $this->scalePredictionForXMinsOverride(
+                        $ifFitPoints,
+                        $ifFitMins,
+                        $overrideMins,
+                        $ifFitBreakdown,
+                        $fixtureCount,
+                        (int) ($pred['position'] ?? 0)
+                    );
+                    $effectiveMins = $overrideMins;
+                }
+
                 if (!isset($predictions[$playerId])) {
                     $predictions[$playerId] = [];
                 }
                 if (!isset($solverPredictions[$playerId])) {
                     $solverPredictions[$playerId] = [];
                 }
-                $predictions[$playerId][$gw] = (float) ($pred['predicted_points'] ?? 0);
+                $predictions[$playerId][$gw] = $predictedPoints;
                 $solverPredictions[$playerId][$gw] = [
-                    'predicted_points' => (float) ($pred['predicted_points'] ?? 0),
+                    'predicted_points' => $predictedPoints,
                     'confidence' => (float) ($pred['confidence'] ?? 1),
-                    'expected_mins' => (float) ($pred['expected_mins'] ?? 90),
+                    'expected_mins' => $effectiveMins,
                 ];
             }
         }
@@ -329,6 +353,87 @@ class TransferOptimizerService
             'solver_predictions' => $solverPredictions,
             'dgw_teams' => $dgwTeams,
         ];
+    }
+
+    private function resolveXMinsOverride(array $xMinsOverrides, int $playerId, int $gameweek): ?float
+    {
+        if (!isset($xMinsOverrides[$playerId])) {
+            return null;
+        }
+
+        $raw = $xMinsOverrides[$playerId];
+        if (is_array($raw)) {
+            if (!isset($raw[$gameweek]) || !is_numeric($raw[$gameweek])) {
+                return null;
+            }
+            return max(0.0, min(95.0, (float) $raw[$gameweek]));
+        }
+
+        if (!is_numeric($raw)) {
+            return null;
+        }
+
+        return max(0.0, min(95.0, (float) $raw));
+    }
+
+    /**
+     * Scale if-fit prediction to custom xMins while capping bounded components.
+     *
+     * @param array<string, mixed> $ifFitBreakdown
+     */
+    private function scalePredictionForXMinsOverride(
+        float $ifFitPoints,
+        float $ifFitMins,
+        float $overrideMins,
+        array $ifFitBreakdown,
+        int $fixtureCount,
+        int $position
+    ): float {
+        if ($ifFitMins <= 0) {
+            return 0.0;
+        }
+
+        $ratio = $overrideMins / $ifFitMins;
+        if ($ratio < 0) {
+            return 0.0;
+        }
+
+        $components = [];
+        foreach ($ifFitBreakdown as $key => $value) {
+            if (is_string($key) && is_numeric($value)) {
+                $components[$key] = (float) $value;
+            }
+        }
+
+        if (empty($components)) {
+            return round($ifFitPoints * $ratio, 4);
+        }
+
+        $appearanceCap = 2.0 * max(1, $fixtureCount);
+        $bonusCap = 3.0 * max(1, $fixtureCount);
+        $cleanSheetCapPerFixture = match ($position) {
+            self::POSITION_GKP, self::POSITION_DEF => 4.0,
+            self::POSITION_MID => 1.0,
+            default => 0.0,
+        };
+        $cleanSheetCap = $cleanSheetCapPerFixture * max(1, $fixtureCount);
+        $defContributionCap = $position >= self::POSITION_DEF ? 2.0 * max(1, $fixtureCount) : 0.0;
+        $scaledTotal = 0.0;
+        foreach ($components as $key => $value) {
+            $scaled = $value * $ratio;
+            if ($key === 'appearance' && $scaled > 0) {
+                $scaled = min($appearanceCap, $scaled);
+            } elseif ($key === 'bonus' && $scaled > 0) {
+                $scaled = min($bonusCap, $scaled);
+            } elseif ($key === 'clean_sheet' && $scaled > 0 && $cleanSheetCapPerFixture > 0) {
+                $scaled = min($cleanSheetCap, $scaled);
+            } elseif ($key === 'defensive_contribution' && $scaled > 0 && $defContributionCap > 0) {
+                $scaled = min($defContributionCap, $scaled);
+            }
+            $scaledTotal += $scaled;
+        }
+
+        return round($scaledTotal, 4);
     }
 
     private function normalizeObjectiveMode(string $objectiveMode): string

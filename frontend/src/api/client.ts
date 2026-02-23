@@ -175,23 +175,27 @@ export interface PlayerPrediction {
   total_points: number
   predicted_points: number
   confidence: number
-  breakdown?: {
-    appearance: number
-    goals: number
-    assists: number
-    clean_sheet: number
-    bonus: number
-    goals_conceded: number
-    saves: number
-    defensive_contribution: number
-    cards: number
-  }
+  breakdown?: PredictionBreakdown
+  if_fit_breakdown?: PredictionBreakdown
   fixture?: {
     opponent: number
     is_home: boolean
     difficulty: number
   }
   availability?: 'available' | 'unavailable' | 'injured' | 'doubtful' | 'suspended'
+}
+
+export interface PredictionBreakdown {
+  appearance: number
+  goals: number
+  assists: number
+  clean_sheet: number
+  bonus: number
+  goals_conceded: number
+  saves: number
+  defensive_contribution: number
+  cards: number
+  penalties?: number
 }
 
 export interface PredictionsResponse {
@@ -220,6 +224,7 @@ export interface PlayerMultiWeekPrediction {
   expected_mins_if_fit: number // expected minutes when fully available (single value)
   predictions: Record<number, number> // gameweek -> predicted points
   if_fit_predictions: Record<number, number> // gameweek -> if-fit points (availability=1.0)
+  if_fit_breakdowns?: Record<number, PredictionBreakdown> // gameweek -> if-fit breakdown components
   total_predicted: number
 }
 

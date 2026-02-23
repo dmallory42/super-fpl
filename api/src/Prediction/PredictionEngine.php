@@ -228,6 +228,19 @@ class PredictionEngine
             + $ifFitBonus + $ifFitGC + $ifFitSaves + $ifFitDC + $ifFitCards
             + $penaltyPoints;
 
+        $ifFitBreakdown = [
+            'appearance' => round($ifFitAppearance, 2),
+            'goals' => round($ifFitGoals, 2),
+            'assists' => round($ifFitAssists, 2),
+            'clean_sheet' => round($ifFitCS, 2),
+            'bonus' => round($ifFitBonus, 2),
+            'goals_conceded' => round($ifFitGC, 2),
+            'saves' => round($ifFitSaves, 2),
+            'defensive_contribution' => round($ifFitDC, 2),
+            'cards' => round($ifFitCards, 2),
+            'penalties' => round($penaltyPoints, 2),
+        ];
+
         // No post-hoc calibration — collect snapshots vs actuals to identify
         // systematic bias empirically before adding any correction.
 
@@ -240,6 +253,7 @@ class PredictionEngine
             'expected_mins' => round($minutes['expected_mins'], 1),
             'expected_mins_if_fit' => round($minutesFit['expected_mins'], 1),
             'breakdown' => $breakdown,
+            'if_fit_breakdown' => $ifFitBreakdown,
             'confidence' => $confidence,
         ];
     }

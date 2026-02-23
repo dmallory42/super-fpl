@@ -137,6 +137,8 @@ CREATE TABLE player_predictions (
     predicted_if_fit REAL,
     expected_mins REAL,
     expected_mins_if_fit REAL,
+    breakdown_json TEXT DEFAULT '{}',
+    if_fit_breakdown_json TEXT DEFAULT '{}',
     confidence REAL,
     model_version TEXT,
     computed_at TIMESTAMP,
@@ -176,6 +178,7 @@ CREATE TABLE fixture_odds (
     home_cs_prob REAL,
     away_cs_prob REAL,
     expected_total_goals REAL,
+    line_count INTEGER DEFAULT 0,
     updated_at TIMESTAMP,
     PRIMARY KEY (fixture_id)
 );
@@ -184,6 +187,7 @@ CREATE TABLE player_goalscorer_odds (
     player_id INTEGER REFERENCES players(id),
     fixture_id INTEGER REFERENCES fixtures(id),
     anytime_scorer_prob REAL,
+    line_count INTEGER DEFAULT 0,
     updated_at TIMESTAMP,
     PRIMARY KEY (player_id, fixture_id)
 );
@@ -192,6 +196,7 @@ CREATE TABLE player_assist_odds (
     player_id INTEGER,
     fixture_id INTEGER,
     anytime_assist_prob REAL,
+    line_count INTEGER DEFAULT 0,
     updated_at TIMESTAMP,
     PRIMARY KEY (player_id, fixture_id)
 );

@@ -136,7 +136,16 @@ export function PlayerExplorer({
         if (gwOverride && gwOverride[gw] != null) {
           const ifFitPts = player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
           const ifFitMins = player.expected_mins_if_fit ?? 90
-          perGw[gw] = scalePoints(ifFitPts, ifFitMins, gwOverride[gw])
+          const ifFitBreakdown = player.if_fit_breakdowns?.[gw]
+          const fixtureCount = Math.max(1, fixtures?.[player.team]?.[gw]?.length ?? 1)
+          perGw[gw] = scalePoints(
+            ifFitPts,
+            ifFitMins,
+            gwOverride[gw],
+            ifFitBreakdown,
+            fixtureCount,
+            player.position
+          )
         } else {
           perGw[gw] = player.predictions[gw] ?? 0
         }

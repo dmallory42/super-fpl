@@ -163,7 +163,16 @@ export function PlayerDetailPanel({
       const ifFitPts =
         playerPrediction?.if_fit_predictions?.[gw] ?? playerPrediction?.predictions[gw]
       if (ifFitPts == null) return null
-      return scalePoints(ifFitPts, expectedMinsIfFit, override)
+      const ifFitBreakdown = playerPrediction?.if_fit_breakdowns?.[gw]
+      const fixtureCount = Math.max(1, fixtures?.[gw]?.length ?? 1)
+      return scalePoints(
+        ifFitPts,
+        expectedMinsIfFit,
+        override,
+        ifFitBreakdown,
+        fixtureCount,
+        player.element_type
+      )
     }
     return playerPrediction?.predictions[gw] ?? null
   }
