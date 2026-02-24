@@ -738,5 +738,15 @@ class PathSolverTest extends TestCase
         $best = $paths[0];
         $this->assertContains(201, $best['transfers_by_gw'][30]['squad_ids']);
         $this->assertContains(201, $best['transfers_by_gw'][31]['squad_ids']);
+
+        $wildcardMoves = $best['transfers_by_gw'][30]['moves'] ?? [];
+        $this->assertNotEmpty($wildcardMoves, 'Wildcard should emit concrete out/in moves');
+
+        $wcSquadIds = $best['transfers_by_gw'][30]['squad_ids'];
+        $expectedMoveCount = count(array_diff($squadIds, $wcSquadIds));
+        $this->assertSame($expectedMoveCount, count($wildcardMoves), 'Wildcard move count should match squad diff size');
+
+        $wildcardInIds = array_column($wildcardMoves, 'in_id');
+        $this->assertContains(201, $wildcardInIds, 'Wildcard moves should include the premium transfer-in');
     }
 }

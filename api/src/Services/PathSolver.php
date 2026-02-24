@@ -801,11 +801,22 @@ class PathSolver
                 $newState['bank'] = round($chipBank, 1);
             }
 
+            $moves = [];
+            if ($chip === self::CHIP_WILDCARD) {
+                $moves = $this->buildWildcardMoves(
+                    $state['squad_ids'],
+                    $chipSquadIds,
+                    $playerMap,
+                    $predictions,
+                    $gw
+                );
+            }
+
             $newState['transfers_by_gw'][$gw] = [
                 'action' => 'transfer',
                 'ft_available' => $state['ft'],
                 'ft_after' => $state['ft'],
-                'moves' => [],
+                'moves' => $moves,
                 'hit_cost' => 0,
                 'gw_score' => round($gwScore, 1),
                 // For FH, expose the temporary squad in this GW row even though state reverts next GW.
@@ -818,6 +829,70 @@ class PathSolver
         }
 
         return $children;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildWildcardMoves(
+        array $currentSquadIds,
+        array $wildcardSquadIds,
+        array $playerMap,
+        array $predictions,
+        int $gw
+    ): array {
+        $outIds = array_values(array_diff($currentSquadIds, $wildcardSquadIds));
+        $inIds = array_values(array_diff($wildcardSquadIds, $currentSquadIds));
+
+        if (empty($outIds) || empty($inIds)) {
+            return [];
+        }
+
+        $outByPosition = [];
+        foreach ($outIds as $outId) {
+            $position = (int) ($playerMap[$outId]['position'] ?? 0);
+            $outByPosition[$position][] = $outId;
+        }
+
+        $inByPosition = [];
+        foreach ($inIds as $inId) {
+            $position = (int) ($playerMap[$inId]['position'] ?? 0);
+            $inByPosition[$position][] = $inId;
+        }
+
+        $moves = [];
+        foreach ([1, 2, 3, 4] as $position) {
+            $positionOutIds = $outByPosition[$position] ?? [];
+            $positionInIds = $inByPosition[$position] ?? [];
+            $pairCount = min(count($positionOutIds), count($positionInIds));
+
+            for ($i = 0; $i < $pairCount; $i++) {
+                $outId = $positionOutIds[$i];
+                $inId = $positionInIds[$i];
+                $outPlayer = $playerMap[$outId] ?? [];
+                $inPlayer = $playerMap[$inId] ?? [];
+                $outPrice = (int) ($outPlayer['now_cost'] ?? 0) / 10;
+                $inPrice = (int) ($inPlayer['now_cost'] ?? 0) / 10;
+
+                $moves[] = [
+                    'out_id' => $outId,
+                    'out_name' => $outPlayer['web_name'] ?? '',
+                    'out_team' => (int) ($outPlayer['club_id'] ?? 0),
+                    'out_price' => round($outPrice, 1),
+                    'in_id' => $inId,
+                    'in_name' => $inPlayer['web_name'] ?? '',
+                    'in_team' => (int) ($inPlayer['club_id'] ?? 0),
+                    'in_price' => round($inPrice, 1),
+                    'gain' => round(
+                        $this->getExpectedPoints($predictions, $inId, $gw) - $this->getExpectedPoints($predictions, $outId, $gw),
+                        1
+                    ),
+                    'is_free' => true,
+                ];
+            }
+        }
+
+        return $moves;
     }
 
     /**
