@@ -8,6 +8,21 @@ $uri = getenv('REQ_URI') ?: '/api/health';
 $_SERVER['REQUEST_METHOD'] = $method;
 $_SERVER['REQUEST_URI'] = $uri;
 
+$origin = getenv('REQ_ORIGIN');
+if (is_string($origin) && $origin !== '') {
+    $_SERVER['HTTP_ORIGIN'] = $origin;
+}
+
+$authorization = getenv('REQ_AUTHORIZATION');
+if (is_string($authorization) && $authorization !== '') {
+    $_SERVER['HTTP_AUTHORIZATION'] = $authorization;
+}
+
+$adminToken = getenv('REQ_X_ADMIN_TOKEN');
+if (is_string($adminToken) && $adminToken !== '') {
+    $_SERVER['HTTP_X_ADMIN_TOKEN'] = $adminToken;
+}
+
 $_GET = [];
 $query = parse_url($uri, PHP_URL_QUERY);
 if (is_string($query) && $query !== '') {
@@ -26,10 +41,12 @@ register_shutdown_function(static function (): void {
     if ($status === false || $status === 0) {
         $status = 200;
     }
+    $headers = headers_list();
 
     echo json_encode([
         'status' => $status,
         'body' => (string) $body,
+        'headers' => $headers,
     ], JSON_UNESCAPED_SLASHES);
 });
 

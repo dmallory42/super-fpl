@@ -89,10 +89,71 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame('Not found', $response['json']['error'] ?? null);
     }
 
+    public function testCorsPreflightAllowsWhitelistedOrigin(): void
+    {
+        $response = $this->callApi(
+            '/api/health',
+            'OPTIONS',
+            [
+                'REQ_ORIGIN' => 'https://superfpl.com',
+                'SUPERFPL_CORS_ALLOWED_ORIGINS' => 'https://superfpl.com,https://www.superfpl.com',
+            ]
+        );
+
+        self::assertSame(204, $response['status']);
+        self::assertSame('', trim($response['body']));
+    }
+
+    public function testCorsPreflightRejectsDisallowedOrigin(): void
+    {
+        $response = $this->callApi(
+            '/api/health',
+            'OPTIONS',
+            [
+                'REQ_ORIGIN' => 'https://evil.example',
+                'SUPERFPL_CORS_ALLOWED_ORIGINS' => 'https://superfpl.com',
+            ]
+        );
+
+        self::assertSame(403, $response['status']);
+        self::assertSame('Origin not allowed', $response['json']['error'] ?? null);
+    }
+
+    public function testAdminRoutesRequireTokenWhenConfigured(): void
+    {
+        $response = $this->callApi(
+            '/api/sync/players',
+            'GET',
+            ['SUPERFPL_ADMIN_TOKEN' => 'abc123']
+        );
+
+        self::assertSame(401, $response['status']);
+        self::assertSame('Unauthorized', $response['json']['error'] ?? null);
+    }
+
+    public function testProductionUnhandledErrorsAreSanitized(): void
+    {
+        $response = $this->callApi(
+            '/api/health',
+            'GET',
+            [
+                'SUPERFPL_APP_ENV' => 'production',
+                'SUPERFPL_DEBUG' => '0',
+                'SUPERFPL_DB_PATH' => '/proc/superfpl.db',
+            ]
+        );
+
+        self::assertSame(500, $response['status']);
+        self::assertSame('Internal server error', $response['json']['error'] ?? null);
+        self::assertArrayHasKey('request_id', $response['json']);
+        self::assertArrayNotHasKey('trace', $response['json']);
+    }
+
     /**
-     * @return array{status: int, body: string, json: array<string, mixed>}
+     * @param array<string, string> $envOverrides
+     * @return array{status: int, body: string, json: array<string, mixed>, headers: array<int, string>}
      */
-    private function callApi(string $uri, string $method = 'GET'): array
+    private function callApi(string $uri, string $method = 'GET', array $envOverrides = []): array
     {
         $env = array_merge($_ENV, [
             'PATH' => getenv('PATH') ?: '',
@@ -102,7 +163,7 @@ class ApiRouteSmokeTest extends TestCase
             'SUPERFPL_CACHE_PATH' => $this->cachePath,
             'SUPERFPL_RATE_LIMIT_DIR' => $this->rateLimitDir,
             'SUPERFPL_ERROR_LOG' => $this->errorLogPath,
-        ]);
+        ], $envOverrides);
 
         $command = PHP_BINARY . ' api/tests/Routes/route_harness.php';
         $descriptors = [
@@ -128,14 +189,20 @@ class ApiRouteSmokeTest extends TestCase
 
         $status = (int) ($decoded['status'] ?? 0);
         $body = (string) ($decoded['body'] ?? '');
+        $headers = $decoded['headers'] ?? [];
+        self::assertIsArray($headers, "Response headers are not an array for {$method} {$uri}");
 
-        $json = json_decode($body, true);
-        self::assertIsArray($json, "Response body is not JSON for {$method} {$uri}: {$body}");
+        $json = [];
+        if (trim($body) !== '') {
+            $json = json_decode($body, true);
+            self::assertIsArray($json, "Response body is not JSON for {$method} {$uri}: {$body}");
+        }
 
         return [
             'status' => $status,
             'body' => $body,
             'json' => $json,
+            'headers' => $headers,
         ];
     }
 
@@ -167,4 +234,3 @@ class ApiRouteSmokeTest extends TestCase
         @rmdir($path);
     }
 }
-

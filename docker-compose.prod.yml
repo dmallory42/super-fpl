@@ -1,0 +1,138 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv/frontend:ro
+      - ./api/public:/srv/api/public:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      php:
+        condition: service_started
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  php:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.php
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    working_dir: /var/www/html/api
+    environment:
+      ODDS_API_KEY: ${ODDS_API_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SUPERFPL_DB_PATH: ${SUPERFPL_DB_PATH:-/var/www/html/api/data/superfpl.db}
+      SUPERFPL_CACHE_PATH: ${SUPERFPL_CACHE_PATH:-/var/www/html/api/cache}
+      SUPERFPL_RATE_LIMIT_DIR: ${SUPERFPL_RATE_LIMIT_DIR:-/var/www/html/api/cache/rate-limit}
+      SUPERFPL_ERROR_LOG: ${SUPERFPL_ERROR_LOG:-/var/www/html/api/cache/logs/api-error.log}
+      SUPERFPL_APP_ENV: ${SUPERFPL_APP_ENV:-production}
+      SUPERFPL_DEBUG: ${SUPERFPL_DEBUG:-0}
+      SUPERFPL_CORS_ALLOWED_ORIGINS: ${SUPERFPL_CORS_ALLOWED_ORIGINS:-https://superfpl.com,https://www.superfpl.com}
+      SUPERFPL_ADMIN_TOKEN: ${SUPERFPL_ADMIN_TOKEN:-}
+    volumes:
+      - ./packages:/var/www/html/packages
+      - ./api:/var/www/html/api
+      - superfpl-db:/var/www/html/api/data
+      - superfpl-cache:/var/www/html/api/cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit((int)!file_exists('/var/www/html/api/public/index.php'));"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  cron:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.php
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    working_dir: /var/www/html/api
+    command: ["crond", "-f", "-l", "2"]
+    environment:
+      ODDS_API_KEY: ${ODDS_API_KEY}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SUPERFPL_DB_PATH: ${SUPERFPL_DB_PATH:-/var/www/html/api/data/superfpl.db}
+      SUPERFPL_CACHE_PATH: ${SUPERFPL_CACHE_PATH:-/var/www/html/api/cache}
+      SUPERFPL_RATE_LIMIT_DIR: ${SUPERFPL_RATE_LIMIT_DIR:-/var/www/html/api/cache/rate-limit}
+      SUPERFPL_ERROR_LOG: ${SUPERFPL_ERROR_LOG:-/var/www/html/api/cache/logs/api-error.log}
+      SUPERFPL_APP_ENV: ${SUPERFPL_APP_ENV:-production}
+      SUPERFPL_DEBUG: ${SUPERFPL_DEBUG:-0}
+      SUPERFPL_CORS_ALLOWED_ORIGINS: ${SUPERFPL_CORS_ALLOWED_ORIGINS:-https://superfpl.com,https://www.superfpl.com}
+      SUPERFPL_ADMIN_TOKEN: ${SUPERFPL_ADMIN_TOKEN:-}
+    volumes:
+      - ./packages:/var/www/html/packages
+      - ./api:/var/www/html/api
+      - superfpl-db:/var/www/html/api/data
+      - superfpl-cache:/var/www/html/api/cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command:
+      [
+        "sh",
+        "-lc",
+        "if [ -n \"$REDIS_PASSWORD\" ]; then exec redis-server --appendonly no --save '' --requirepass \"$REDIS_PASSWORD\"; else exec redis-server --appendonly no --save ''; fi",
+      ]
+    networks:
+      - internal
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "if [ -n \"$REDIS_PASSWORD\" ]; then redis-cli -a \"$REDIS_PASSWORD\" ping | grep -q PONG; else redis-cli ping | grep -q PONG; fi",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  superfpl-db:
+  superfpl-cache:
+  caddy-data:
+  caddy-config:
+
+networks:
+  internal:
+    driver: bridge

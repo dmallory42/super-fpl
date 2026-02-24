@@ -14,7 +14,13 @@ Fantasy Premier League analytics app with:
 ## Prerequisites
 
 - Docker + Docker Compose
-- Node.js 22+ and npm
+- Node.js 22.12.0+ and npm
+
+If you use `fnm`, make sure shell integration is enabled so `node` actually switches per repo:
+
+```bash
+eval "$(fnm env --use-on-cd --shell zsh)"
+```
 
 ## Quick Start
 
@@ -30,6 +36,12 @@ This will:
 App URLs:
 - Frontend: `http://localhost:5173`
 - API (via nginx): `http://localhost:8080/api`
+
+Optional local env (for odds sync):
+
+```bash
+export ODDS_API_KEY=your_key_here
+```
 
 ## Common Commands
 
@@ -88,6 +100,22 @@ Important: after changing `deploy/crontab`, rebuild/restart cron:
 ```bash
 docker compose build cron
 docker compose up -d cron
+```
+
+## Production Security Env Vars
+
+Set these in `.env.production`:
+
+- `SUPERFPL_APP_ENV=production`
+- `SUPERFPL_DEBUG=0`
+- `SUPERFPL_CORS_ALLOWED_ORIGINS=https://superfpl.com,https://www.superfpl.com`
+- `SUPERFPL_ADMIN_TOKEN=<long-random-token>` (recommended)
+- `REDIS_PASSWORD=<strong-password>` (recommended)
+
+If `SUPERFPL_ADMIN_TOKEN` is set and you use the in-app Admin page, set it in browser local storage:
+
+```js
+localStorage.setItem('superfpl_admin_token', 'your_token_here')
 ```
 
 ## Caching
