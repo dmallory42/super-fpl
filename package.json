@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Fantasy Premier League Analytics Suite",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "workspaces": [
     "frontend"
   ],
@@ -19,7 +22,7 @@
     "preview": "cd frontend && npm run preview",
     "test": "npm run test:api && npm run test:frontend",
     "test:api": "cd api && ./vendor/bin/phpunit tests",
-    "test:frontend": "node -e \"const major=Number(process.versions.node.split('.')[0]); if (major < 22) { console.error('Frontend tests require Node 22+. Run: fnm use 22'); process.exit(1); }\" && cd frontend && npm run test -- --run",
+    "test:frontend": "node scripts/check-node-version.js && cd frontend && npm run test -- --run",
     "test:api:routes": "cd api && ./vendor/bin/phpunit tests/Routes",
     "test:e2e": "cd frontend && npm run test:e2e",
     "sync": "docker-compose exec -T php php cron/sync-all.php --phase=pre-deadline",
