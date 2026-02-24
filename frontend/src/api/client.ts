@@ -40,6 +40,34 @@ async function fetchApi<T>(endpoint: string): Promise<T> {
   return parsed as T
 }
 
+function getAdminTokenHeader(): Record<string, string> {
+  if (typeof window === 'undefined') {
+    return {}
+  }
+  const token = window.localStorage.getItem('superfpl_admin_token')?.trim() ?? ''
+  return token ? { 'X-Admin-Token': token } : {}
+}
+
+async function fetchApiMutation(endpoint: string, init: RequestInit): Promise<void> {
+  const response = await fetch(`${API_BASE}${endpoint}`, init)
+  if (response.ok) {
+    return
+  }
+
+  const raw = await response.text()
+  let message = raw.slice(0, 200).trim()
+  try {
+    const parsed = JSON.parse(raw) as { error?: unknown }
+    if (parsed && typeof parsed.error === 'string' && parsed.error.trim() !== '') {
+      message = parsed.error
+    }
+  } catch {
+    // Keep plain text fallback.
+  }
+
+  throw new Error(`API error: ${response.status} ${response.statusText}${message ? ` - ${message}` : ''}`)
+}
+
 export interface SyncStatusResponse {
   last_sync: number
 }
@@ -241,10 +269,17 @@ export interface PredictionsRangeResponse {
   generated_at: string
 }
 
-export async function fetchPredictionsRange(startGw?: number, endGw?: number): Promise<PredictionsRangeResponse> {
+export async function fetchPredictionsRange(
+  startGw?: number,
+  endGw?: number,
+  xMinsOverrides: XMinsOverrides = {}
+): Promise<PredictionsRangeResponse> {
   const params = new URLSearchParams()
   if (startGw) params.set('start', String(startGw))
   if (endGw) params.set('end', String(endGw))
+  if (Object.keys(xMinsOverrides).length > 0) {
+    params.set('xmins', JSON.stringify(xMinsOverrides))
+  }
   const query = params.toString()
   return fetchApi<PredictionsRangeResponse>(`/predictions/range${query ? `?${query}` : ''}`)
 }
@@ -839,28 +874,34 @@ export async function fetchPenaltyTakers(): Promise<PenaltyTakersResponse> {
 }
 
 export async function setPenaltyOrder(playerId: number, order: number): Promise<void> {
-  await fetch(`${API_BASE}/players/${playerId}/penalty-order`, {
+  await fetchApiMutation(`/players/${playerId}/penalty-order`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAdminTokenHeader() },
     body: JSON.stringify({ penalty_order: order }),
   })
 }
 
 export async function clearPenaltyOrder(playerId: number): Promise<void> {
-  await fetch(`${API_BASE}/players/${playerId}/penalty-order`, { method: 'DELETE' })
+  await fetchApiMutation(`/players/${playerId}/penalty-order`, {
+    method: 'DELETE',
+    headers: { ...getAdminTokenHeader() },
+  })
 }
 
 // xMins overrides
 export async function setXMins(playerId: number, mins: number): Promise<void> {
-  await fetch(`${API_BASE}/players/${playerId}/xmins`, {
+  await fetchApiMutation(`/players/${playerId}/xmins`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAdminTokenHeader() },
     body: JSON.stringify({ expected_mins: mins }),
   })
 }
 
 export async function clearXMins(playerId: number): Promise<void> {
-  await fetch(`${API_BASE}/players/${playerId}/xmins`, { method: 'DELETE' })
+  await fetchApiMutation(`/players/${playerId}/xmins`, {
+    method: 'DELETE',
+    headers: { ...getAdminTokenHeader() },
+  })
 }
 
 export async function fetchPlannerOptimize(
@@ -871,6 +912,7 @@ export async function fetchPlannerOptimize(
   fixedTransfers: FixedTransfer[] = [],
   ftValue: number = 1.5,
   depth: SolverDepth = 'deep',
+  horizon: number = 6,
   skipSolve: boolean = false,
   chipMode: ChipMode = 'locked',
   objectiveMode: PlannerObjectiveMode = 'expected',
@@ -881,6 +923,7 @@ export async function fetchPlannerOptimize(
 ): Promise<PlannerOptimizeResponse> {
   const params = new URLSearchParams()
   params.set('manager', String(managerId))
+  params.set('horizon', String(horizon))
   // Only send ft when user explicitly overrides; null = auto-detect from API
   if (freeTransfers !== null) {
     params.set('ft', String(freeTransfers))
@@ -937,10 +980,12 @@ export async function fetchPlannerChipSuggest(
   freeTransfers: number | null = null,
   chipPlan: ChipPlan = {},
   chipAllow: string[] = [],
-  chipForbid: Record<string, number[]> = {}
+  chipForbid: Record<string, number[]> = {},
+  horizon: number = 6
 ): Promise<PlannerChipSuggestResponse> {
   const params = new URLSearchParams()
   params.set('manager', String(managerId))
+  params.set('horizon', String(horizon))
   if (freeTransfers !== null) {
     params.set('ft', String(freeTransfers))
   }

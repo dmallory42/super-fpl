@@ -47,6 +47,7 @@ class PlayerMetricsServiceTest extends TestCase
                 goals_scored INTEGER,
                 assists INTEGER,
                 clean_sheets INTEGER,
+                saves INTEGER DEFAULT 0,
                 expected_goals REAL,
                 expected_assists REAL,
                 ict_index REAL,

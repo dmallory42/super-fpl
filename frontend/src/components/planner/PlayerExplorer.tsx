@@ -1,9 +1,8 @@
-import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect, memo } from 'react'
 import type { PlayerMultiWeekPrediction, XMinsOverrides, FixtureOpponent } from '../../api/client'
 import { BroadcastCard } from '../ui/BroadcastCard'
 import { PositionBadge } from '../common/PositionBadge'
 import { FormInput } from '../ui/form'
-import { scalePoints } from '../../lib/predictions'
 
 interface PlayerExplorerProps {
   players: PlayerMultiWeekPrediction[]
@@ -99,6 +98,111 @@ function getHeatClass(pts: number): string {
   return 'text-foreground-dim'
 }
 
+interface ExplorerRowProps {
+  playerId: number
+  position: number
+  webName: string
+  teamShort: string
+  nowCost: number
+  effectiveOwnership: number | null
+  baseXMins: number
+  committedXMins: number | undefined
+  hasOverride: boolean
+  totalPoints: number
+  gwValues: Array<{ gw: number; pts: number }>
+  totalPredicted: number
+  onXMinsChange?: (playerId: number, xMins: number, gameweek?: number) => void
+  onPlayerClick?: (playerId: number) => void
+}
+
+const ExplorerRow = memo(
+  function ExplorerRow({
+    playerId,
+    position,
+    webName,
+    teamShort,
+    nowCost,
+    effectiveOwnership,
+    baseXMins,
+    committedXMins,
+    hasOverride,
+    totalPoints,
+    gwValues,
+    totalPredicted,
+    onXMinsChange,
+    onPlayerClick,
+  }: ExplorerRowProps) {
+    return (
+      <tr
+        data-player-id={playerId}
+        className="border-b border-border/20 hover:bg-surface-hover/50 transition-colors"
+      >
+        <td className="px-3 py-1.5 sticky left-0 bg-surface z-10">
+          <PositionBadge elementType={position} />
+        </td>
+        <td
+          className={`px-3 py-1.5 font-body font-medium text-foreground sticky left-12 bg-surface z-10 ${onPlayerClick ? 'cursor-pointer hover:text-fpl-green transition-colors' : ''}`}
+          onClick={onPlayerClick ? () => onPlayerClick(playerId) : undefined}
+        >
+          {webName}
+        </td>
+        <td className="px-2 py-1.5 font-body text-foreground-muted">{teamShort}</td>
+        <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
+          £{(nowCost / 10).toFixed(1)}m
+        </td>
+        <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
+          {effectiveOwnership != null ? `${effectiveOwnership.toFixed(0)}%` : '-'}
+        </td>
+        <td className="px-1 py-0.5 text-center">
+          <XMinsInput
+            playerId={playerId}
+            baseXMins={baseXMins}
+            committedValue={committedXMins}
+            onChange={onXMinsChange}
+          />
+        </td>
+        <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">{totalPoints}</td>
+        {gwValues.map(({ gw, pts }) => (
+          <td
+            key={gw}
+            className={`px-2 py-1.5 text-right font-mono text-xs rounded-sm ${getHeatClass(pts)} ${hasOverride ? 'italic' : ''}`}
+          >
+            {pts.toFixed(1)}
+          </td>
+        ))}
+        <td
+          className={`px-3 py-1.5 text-right font-mono font-bold text-fpl-green ${hasOverride ? 'italic' : ''}`}
+        >
+          {totalPredicted.toFixed(1)}
+        </td>
+      </tr>
+    )
+  },
+  (prev, next) => {
+    if (prev.playerId !== next.playerId) return false
+    if (prev.position !== next.position) return false
+    if (prev.webName !== next.webName) return false
+    if (prev.teamShort !== next.teamShort) return false
+    if (prev.nowCost !== next.nowCost) return false
+    if (prev.effectiveOwnership !== next.effectiveOwnership) return false
+    if (prev.baseXMins !== next.baseXMins) return false
+    if (prev.committedXMins !== next.committedXMins) return false
+    if (prev.hasOverride !== next.hasOverride) return false
+    if (prev.totalPoints !== next.totalPoints) return false
+    if (prev.totalPredicted !== next.totalPredicted) return false
+    if (prev.onXMinsChange !== next.onXMinsChange) return false
+    if (prev.onPlayerClick !== next.onPlayerClick) return false
+
+    if (prev.gwValues.length !== next.gwValues.length) return false
+    for (let i = 0; i < prev.gwValues.length; i++) {
+      if (prev.gwValues[i].gw !== next.gwValues[i].gw) return false
+      if (prev.gwValues[i].pts !== next.gwValues[i].pts) return false
+    }
+
+    return true
+  }
+)
+
 export function PlayerExplorer({
   players,
   gameweeks,
@@ -115,15 +219,13 @@ export function PlayerExplorer({
   const [positionFilter, setPositionFilter] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [visibleCount, setVisibleCount] = useState(50)
+  const tableBodyRef = useRef<HTMLTableSectionElement | null>(null)
+  const previousRowTopsRef = useRef<Map<number, number>>(new Map())
 
-  // Pre-compute effective points per player (raw predictions by default, scaled with user overrides)
+  // Pre-compute effective points from API-recalculated predictions.
   const effectivePoints = useMemo(() => {
     const map = new Map<number, { perGw: Record<number, number>; total: number }>()
     for (const player of players) {
-      const rawOverride = xMinsOverrides?.[player.player_id]
-      const gwOverride =
-        typeof rawOverride === 'object' && rawOverride !== null ? rawOverride : null
-
       const perGw: Record<number, number> = {}
       let total = 0
       for (const gw of gameweeks) {
@@ -132,29 +234,13 @@ export function PlayerExplorer({
           perGw[gw] = 0
           continue
         }
-
-        if (gwOverride && gwOverride[gw] != null) {
-          const ifFitPts = player.if_fit_predictions?.[gw] ?? player.predictions[gw] ?? 0
-          const ifFitMins = player.expected_mins_if_fit ?? 90
-          const ifFitBreakdown = player.if_fit_breakdowns?.[gw]
-          const fixtureCount = Math.max(1, fixtures?.[player.team]?.[gw]?.length ?? 1)
-          perGw[gw] = scalePoints(
-            ifFitPts,
-            ifFitMins,
-            gwOverride[gw],
-            ifFitBreakdown,
-            fixtureCount,
-            player.position
-          )
-        } else {
-          perGw[gw] = player.predictions[gw] ?? 0
-        }
+        perGw[gw] = player.predictions[gw] ?? 0
         total += perGw[gw]
       }
       map.set(player.player_id, { perGw, total: Math.round(total * 10) / 10 })
     }
     return map
-  }, [players, gameweeks, fixtures, xMinsOverrides])
+  }, [players, gameweeks, fixtures])
 
   const filteredAndSorted = useMemo(() => {
     let filtered = players
@@ -236,6 +322,61 @@ export function PlayerExplorer({
   const hasXMinsOverrides = xMinsOverrides && Object.keys(xMinsOverrides).length > 0
 
   const visiblePlayers = filteredAndSorted.slice(0, visibleCount)
+  const visibleOrderSignature = useMemo(
+    () => visiblePlayers.map((player) => player.player_id).join(','),
+    [visiblePlayers]
+  )
+
+  useLayoutEffect(() => {
+    const tbody = tableBodyRef.current
+    if (!tbody || typeof window === 'undefined') return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const rows = Array.from(tbody.querySelectorAll<HTMLTableRowElement>('tr[data-player-id]'))
+    if (!rows.length) return
+
+    const nextTops = new Map<number, number>()
+    rows.forEach((row) => {
+      const playerId = Number(row.dataset.playerId)
+      if (!Number.isFinite(playerId)) return
+      nextTops.set(playerId, row.getBoundingClientRect().top)
+    })
+
+    // Skip animation on first paint.
+    if (previousRowTopsRef.current.size === 0) {
+      previousRowTopsRef.current = nextTops
+      return
+    }
+
+    rows.forEach((row) => {
+      const playerId = Number(row.dataset.playerId)
+      if (!Number.isFinite(playerId)) return
+      const previousTop = previousRowTopsRef.current.get(playerId)
+      const nextTop = nextTops.get(playerId)
+      if (previousTop === undefined || nextTop === undefined) return
+
+      const deltaY = previousTop - nextTop
+      if (Math.abs(deltaY) < 1) return
+
+      row.style.transition = 'none'
+      row.style.transform = `translateY(${deltaY}px)`
+      row.style.willChange = 'transform'
+
+      requestAnimationFrame(() => {
+        row.style.transition = 'transform 220ms cubic-bezier(0.2, 0, 0, 1)'
+        row.style.transform = 'translateY(0)'
+      })
+
+      const cleanup = () => {
+        row.style.transition = ''
+        row.style.willChange = ''
+        row.removeEventListener('transitionend', cleanup)
+      }
+      row.addEventListener('transitionend', cleanup)
+    })
+
+    previousRowTopsRef.current = nextTops
+  }, [visibleOrderSignature])
 
   return (
     <BroadcastCard accentColor="purple" animationDelay={500}>
@@ -337,9 +478,8 @@ export function PlayerExplorer({
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody ref={tableBodyRef}>
             {visiblePlayers.map((player) => {
-              const eo = effectiveOwnership?.[String(player.player_id)]
               const baseXMins =
                 player.expected_mins?.[gameweeks[0]] ?? player.expected_mins_if_fit ?? 90
               const rawOverride = xMinsOverrides?.[player.player_id]
@@ -348,59 +488,29 @@ export function PlayerExplorer({
                 typeof rawOverride === 'object' && rawOverride !== null ? rawOverride : null
               const firstGwValue = gwOverride ? gwOverride[gameweeks[0]] : undefined
               const hasOverride = gwOverride != null
-
+              const gwValues = gameweeks.map((gw) => ({
+                gw,
+                pts: effectivePoints.get(player.player_id)?.perGw[gw] ?? 0,
+              }))
+              const totalPredicted = effectivePoints.get(player.player_id)?.total ?? 0
               return (
-                <tr
+                <ExplorerRow
                   key={player.player_id}
-                  className="border-b border-border/20 hover:bg-surface-hover/50 transition-colors"
-                >
-                  <td className="px-3 py-1.5 sticky left-0 bg-surface z-10">
-                    <PositionBadge elementType={player.position} />
-                  </td>
-                  <td
-                    className={`px-3 py-1.5 font-body font-medium text-foreground sticky left-12 bg-surface z-10 ${onPlayerClick ? 'cursor-pointer hover:text-fpl-green transition-colors' : ''}`}
-                    onClick={onPlayerClick ? () => onPlayerClick(player.player_id) : undefined}
-                  >
-                    {player.web_name}
-                  </td>
-                  <td className="px-2 py-1.5 font-body text-foreground-muted">
-                    {teamsMap.get(player.team) ?? ''}
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
-                    £{(player.now_cost / 10).toFixed(1)}m
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
-                    {eo != null ? `${eo.toFixed(0)}%` : '-'}
-                  </td>
-                  <td className="px-1 py-0.5 text-center">
-                    <XMinsInput
-                      playerId={player.player_id}
-                      baseXMins={baseXMins}
-                      committedValue={firstGwValue}
-                      onChange={onXMinsChange}
-                    />
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
-                    {player.total_points}
-                  </td>
-                  {gameweeks.map((gw) => {
-                    const pts = effectivePoints.get(player.player_id)?.perGw[gw] ?? 0
-                    const isScaled = hasOverride
-                    return (
-                      <td
-                        key={gw}
-                        className={`px-2 py-1.5 text-right font-mono text-xs rounded-sm ${getHeatClass(pts)} ${isScaled ? 'italic' : ''}`}
-                      >
-                        {pts.toFixed(1)}
-                      </td>
-                    )
-                  })}
-                  <td
-                    className={`px-3 py-1.5 text-right font-mono font-bold text-fpl-green ${hasOverride ? 'italic' : ''}`}
-                  >
-                    {(effectivePoints.get(player.player_id)?.total ?? 0).toFixed(1)}
-                  </td>
-                </tr>
+                  playerId={player.player_id}
+                  position={player.position}
+                  webName={player.web_name}
+                  teamShort={teamsMap.get(player.team) ?? ''}
+                  nowCost={player.now_cost}
+                  effectiveOwnership={effectiveOwnership?.[String(player.player_id)] ?? null}
+                  baseXMins={baseXMins}
+                  committedXMins={firstGwValue}
+                  hasOverride={hasOverride}
+                  totalPoints={player.total_points}
+                  gwValues={gwValues}
+                  totalPredicted={totalPredicted}
+                  onXMinsChange={onXMinsChange}
+                  onPlayerClick={onPlayerClick}
+                />
               )
             })}
           </tbody>

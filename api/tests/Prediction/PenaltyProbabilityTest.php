@@ -146,4 +146,67 @@ class PenaltyProbabilityTest extends TestCase
         $result = $this->prob->calculate($player, $teamTakers);
         $this->assertEquals(0.0, $result);
     }
+
+    public function testPenaltyMissesAreShrunkByPrior(): void
+    {
+        $teamTakers = [
+            ['player_id' => 100, 'expected_mins' => 90.0],
+        ];
+
+        $clean = [
+            'id' => 100,
+            'penalty_order' => 1,
+            'position' => 3,
+            'goals_scored' => 6,
+            'npg' => 4, // inferred pens scored = 2
+            'penalties_missed' => 0,
+        ];
+
+        $missy = [
+            'id' => 100,
+            'penalty_order' => 1,
+            'position' => 3,
+            'goals_scored' => 6,
+            'npg' => 4, // inferred pens scored = 2
+            'penalties_missed' => 2, // 2/4 this season, but should be shrunk
+        ];
+
+        $cleanResult = $this->prob->calculate($clean, $teamTakers);
+        $missyResult = $this->prob->calculate($missy, $teamTakers);
+
+        $this->assertGreaterThan($missyResult, $cleanResult);
+        // Prior should prevent extreme collapse from a small-sample miss run.
+        $this->assertGreaterThan(0.3, $missyResult);
+    }
+
+    public function testExplicitPenaltiesTakenOverridesInference(): void
+    {
+        $teamTakers = [
+            ['player_id' => 100, 'expected_mins' => 90.0],
+        ];
+
+        $inferredOnly = [
+            'id' => 100,
+            'penalty_order' => 1,
+            'position' => 3,
+            'goals_scored' => 8,
+            'npg' => 6, // inferred 2 scored pens
+            'penalties_missed' => 0,
+        ];
+
+        $explicitTaken = [
+            'id' => 100,
+            'penalty_order' => 1,
+            'position' => 3,
+            'goals_scored' => 8,
+            'npg' => 6,
+            'penalties_taken' => 10,
+            'penalties_missed' => 1, // explicit 9/10
+        ];
+
+        $inferredResult = $this->prob->calculate($inferredOnly, $teamTakers);
+        $explicitResult = $this->prob->calculate($explicitTaken, $teamTakers);
+
+        $this->assertGreaterThan($inferredResult, $explicitResult);
+    }
 }

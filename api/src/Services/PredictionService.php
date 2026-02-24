@@ -896,7 +896,7 @@ class PredictionService
                 'bonus' => '1-3pts based on BPS ranking',
                 'saves' => 'GK only: 1pt per 3 saves',
                 'goals_conceded' => 'GK/DEF only: -1pt per 2 goals conceded',
-                'cards' => 'Yellow: -1pt, Red: -3pts, Own goal: -2pts, Pen miss: -2pts',
+                'cards' => 'Yellow: -1pt, Red: -3pts (disciplinary component only)',
                 'defensive_contribution' => 'DEF: 2pts for 10+ DC, MID/FWD: 2pts for 12+ DC',
             ],
             'probability_models' => [
@@ -936,8 +936,8 @@ class PredictionService
                     'blend' => '60% BPS-based, 40% historical',
                 ],
                 'cards' => [
-                    'description' => 'Per-90 rates for yellow cards, red cards, own goals, penalty misses',
-                    'factors' => ['yellow_cards/90', 'red_cards/90', 'own_goals/90', 'penalties_missed/90'],
+                    'description' => 'Per-90 rates for yellow/red cards only',
+                    'factors' => ['yellow_cards/90', 'red_cards/90'],
                 ],
                 'defensive_contribution' => [
                     'description' => 'Poisson CDF probability of reaching DC threshold',

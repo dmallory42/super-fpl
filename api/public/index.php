@@ -17,6 +17,7 @@ use SuperFPL\Api\Services\ComparisonService;
 use SuperFPL\Api\Services\LiveService;
 use SuperFPL\Api\Services\SampleService;
 use SuperFPL\Api\Services\TransferService;
+use SuperFPL\Api\Prediction\PredictionScaler;
 use SuperFPL\Api\Sync\PlayerSync;
 use SuperFPL\Api\Sync\FixtureSync;
 use SuperFPL\Api\Sync\ManagerSync;
@@ -27,6 +28,10 @@ use SuperFPL\Api\Clients\UnderstatClient;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\Cache\FileCache;
 use Predis\Client as RedisClient;
+
+// Load config early so error/CORS behavior can be environment-aware.
+$config = require __DIR__ . '/../config/config.php';
+$appDebug = (bool) ($config['app']['debug'] ?? false);
 
 // Ensure PHP notices/warnings never corrupt JSON API responses.
 ini_set('display_errors', '0');
@@ -44,35 +49,16 @@ set_error_handler(static function (int $severity, string $message, string $file 
 });
 
 set_exception_handler(static function (Throwable $e): void {
-    $requestId = logUnhandledThrowable($e);
-
-    if (!headers_sent()) {
-        http_response_code(500);
-        header('Content-Type: application/json');
-    }
-
-    echo json_encode([
-        'error' => $e->getMessage(),
-        'trace' => $e->getTraceAsString(),
-        'request_id' => $requestId,
-    ]);
+    global $appDebug;
+    renderUnhandledExceptionResponse($e, $appDebug);
 });
 
-// CORS headers
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Cache-Control: no-cache, no-store, must-revalidate');
-header('Access-Control-Allow-Headers: Content-Type');
-header('Content-Type: application/json');
+configureErrorLogDestination($config);
+applyBaseHeaders($config);
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(204);
-    exit;
+    handleCorsPreflight($config);
 }
-
-// Load config
-$config = require __DIR__ . '/../config/config.php';
-configureErrorLogDestination($config);
 
 // Initialize database
 $db = new Database($config['database']['path']);
@@ -109,23 +95,23 @@ try {
         $uri === '/gameweek/current' => handleCurrentGameweek($db),
         $uri === '/teams' => handleTeams($db, $config),
         $uri === '/sync/status' => handleSyncStatus($config),
-        $uri === '/sync/players' => handleSyncPlayers($db, $fplClient),
-        $uri === '/sync/fixtures' => handleSyncFixtures($db, $fplClient),
-        $uri === '/sync/odds' => handleSyncOdds($db, $config),
-        $uri === '/sync/understat' => handleSyncUnderstat($db, $config),
-        $uri === '/sync/season-history' => handleSyncSeasonHistory($db, $fplClient),
-        preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetXMins($db, (int) $m[1]),
-        preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'DELETE' => handleClearXMins($db, (int) $m[1]),
-        preg_match('#^/players/(\d+)/penalty-order$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetPenaltyOrder($db, (int) $m[1]),
-        preg_match('#^/players/(\d+)/penalty-order$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'DELETE' => handleClearPenaltyOrder($db, (int) $m[1]),
-        preg_match('#^/teams/(\d+)/penalty-takers$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => handleSetTeamPenaltyTakers($db, (int) $m[1]),
+        $uri === '/sync/players' => withAdminToken($config, static fn() => handleSyncPlayers($db, $fplClient)),
+        $uri === '/sync/fixtures' => withAdminToken($config, static fn() => handleSyncFixtures($db, $fplClient)),
+        $uri === '/sync/odds' => withAdminToken($config, static fn() => handleSyncOdds($db, $config)),
+        $uri === '/sync/understat' => withAdminToken($config, static fn() => handleSyncUnderstat($db, $config)),
+        $uri === '/sync/season-history' => withAdminToken($config, static fn() => handleSyncSeasonHistory($db, $fplClient)),
+        preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => withAdminToken($config, static fn() => handleSetXMins($db, (int) $m[1])),
+        preg_match('#^/players/(\d+)/xmins$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'DELETE' => withAdminToken($config, static fn() => handleClearXMins($db, (int) $m[1])),
+        preg_match('#^/players/(\d+)/penalty-order$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => withAdminToken($config, static fn() => handleSetPenaltyOrder($db, (int) $m[1])),
+        preg_match('#^/players/(\d+)/penalty-order$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'DELETE' => withAdminToken($config, static fn() => handleClearPenaltyOrder($db, (int) $m[1])),
+        preg_match('#^/teams/(\d+)/penalty-takers$#', $uri, $m) === 1 && $_SERVER['REQUEST_METHOD'] === 'PUT' => withAdminToken($config, static fn() => handleSetTeamPenaltyTakers($db, (int) $m[1])),
         $uri === '/penalty-takers' && $_SERVER['REQUEST_METHOD'] === 'GET' => handleGetPenaltyTakers($db),
         preg_match('#^/players/(\d+)$#', $uri, $m) === 1 => handlePlayer($db, (int) $m[1]),
         preg_match('#^/managers/(\d+)$#', $uri, $m) === 1 => handleManager($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/managers/(\d+)/picks/(\d+)$#', $uri, $m) === 1 => handleManagerPicks($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
         preg_match('#^/managers/(\d+)/history$#', $uri, $m) === 1 => handleManagerHistory($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/managers/(\d+)/season-analysis$#', $uri, $m) === 1 => handleManagerSeasonAnalysis($db, $fplClient, $config, (int) $m[1]),
-        $uri === '/sync/managers' => handleSyncManagers($db, $fplClient),
+        $uri === '/sync/managers' => withAdminToken($config, static fn() => handleSyncManagers($db, $fplClient)),
         preg_match('#^/predictions/(\d+)/accuracy$#', $uri, $m) === 1 => handlePredictionAccuracy($db, (int) $m[1], $config),
         preg_match('#^/predictions/(\d+)$#', $uri, $m) === 1 => handlePredictions($db, (int) $m[1], $config),
         preg_match('#^/predictions/(\d+)/player/(\d+)$#', $uri, $m) === 1 => handlePlayerPrediction($db, (int) $m[1], (int) $m[2]),
@@ -142,7 +128,7 @@ try {
         preg_match('#^/live/(\d+)/manager/(\d+)/enhanced$#', $uri, $m) === 1 => handleLiveManagerEnhanced($db, $fplClient, $config, (int) $m[1], (int) $m[2]),
         preg_match('#^/live/(\d+)/bonus$#', $uri, $m) === 1 => handleLiveBonus($db, $fplClient, $config, (int) $m[1]),
         preg_match('#^/live/(\d+)/samples$#', $uri, $m) === 1 => handleLiveSamples($db, $fplClient, $config, (int) $m[1]),
-        preg_match('#^/admin/sample/(\d+)$#', $uri, $m) === 1 => handleAdminSample($db, $fplClient, $config, (int) $m[1]),
+        preg_match('#^/admin/sample/(\d+)$#', $uri, $m) === 1 => withAdminToken($config, static fn() => handleAdminSample($db, $fplClient, $config, (int) $m[1])),
         $uri === '/fixtures/status' => handleFixturesStatus($db, $fplClient, $config),
         preg_match('#^/ownership/(\d+)$#', $uri, $m) === 1 => handleOwnership($db, $fplClient, $config, (int) $m[1]),
         $uri === '/transfers/suggest' => handleTransferSuggest($db, $fplClient),
@@ -153,13 +139,7 @@ try {
         default => handleNotFound(),
     };
 } catch (Throwable $e) {
-    $requestId = logUnhandledThrowable($e);
-    http_response_code(500);
-    echo json_encode([
-        'error' => $e->getMessage(),
-        'trace' => $e->getTraceAsString(),
-        'request_id' => $requestId,
-    ]);
+    renderUnhandledExceptionResponse($e, $appDebug);
 }
 
 function configureErrorLogDestination(array $config): void
@@ -181,12 +161,14 @@ function configureErrorLogDestination(array $config): void
     }
 }
 
-function logUnhandledThrowable(Throwable $e): string
+function logUnhandledThrowable(Throwable $e, ?string $requestId = null): string
 {
-    try {
-        $requestId = bin2hex(random_bytes(8));
-    } catch (Throwable) {
-        $requestId = uniqid('req_', true);
+    if ($requestId === null || $requestId === '') {
+        try {
+            $requestId = bin2hex(random_bytes(8));
+        } catch (Throwable) {
+            $requestId = uniqid('req_', true);
+        }
     }
 
     $payload = [
@@ -215,6 +197,172 @@ function logUnhandledThrowable(Throwable $e): string
     return $requestId;
 }
 
+function getOrCreateRequestId(): string
+{
+    static $requestId = null;
+    if (is_string($requestId) && $requestId !== '') {
+        return $requestId;
+    }
+
+    try {
+        $requestId = bin2hex(random_bytes(8));
+    } catch (Throwable) {
+        $requestId = uniqid('req_', true);
+    }
+
+    return $requestId;
+}
+
+function appendVaryHeader(string $token): void
+{
+    $existing = headers_list();
+    foreach ($existing as $header) {
+        if (!str_starts_with(strtolower($header), 'vary:')) {
+            continue;
+        }
+
+        $current = trim(substr($header, strlen('vary:')));
+        $tokens = array_map('trim', explode(',', $current));
+        foreach ($tokens as $existingToken) {
+            if (strcasecmp($existingToken, $token) === 0) {
+                return;
+            }
+        }
+    }
+
+    header("Vary: {$token}", false);
+}
+
+function getAllowedCorsOrigins(array $config): array
+{
+    $allowed = $config['security']['cors_allowed_origins'] ?? [];
+    if (!is_array($allowed)) {
+        return [];
+    }
+
+    return array_values(array_filter(array_map(
+        static fn($origin): string => is_string($origin) ? trim($origin) : '',
+        $allowed
+    )));
+}
+
+function isCorsOriginAllowed(array $allowedOrigins, string $origin): bool
+{
+    if ($origin === '') {
+        return true;
+    }
+
+    if (in_array('*', $allowedOrigins, true)) {
+        return true;
+    }
+
+    return in_array($origin, $allowedOrigins, true);
+}
+
+function applyCorsHeaders(array $config): void
+{
+    $allowedOrigins = getAllowedCorsOrigins($config);
+    $origin = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+
+    if ($origin !== '' && isCorsOriginAllowed($allowedOrigins, $origin)) {
+        if (in_array('*', $allowedOrigins, true)) {
+            header('Access-Control-Allow-Origin: *');
+        } else {
+            header("Access-Control-Allow-Origin: {$origin}");
+            appendVaryHeader('Origin');
+        }
+    }
+
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Admin-Token');
+    header('Access-Control-Max-Age: 600');
+}
+
+function applyBaseHeaders(array $config): void
+{
+    applyCorsHeaders($config);
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Content-Type: application/json; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header('Permissions-Policy: geolocation=(), camera=(), microphone=()');
+    header('X-Request-ID: ' . getOrCreateRequestId());
+}
+
+function handleCorsPreflight(array $config): void
+{
+    $allowedOrigins = getAllowedCorsOrigins($config);
+    $origin = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+    if ($origin !== '' && !isCorsOriginAllowed($allowedOrigins, $origin)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Origin not allowed']);
+        exit;
+    }
+
+    http_response_code(204);
+    exit;
+}
+
+function renderUnhandledExceptionResponse(Throwable $e, bool $debug): void
+{
+    $requestId = logUnhandledThrowable($e, getOrCreateRequestId());
+
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        header('X-Request-ID: ' . $requestId);
+    }
+
+    $payload = [
+        'error' => $debug ? $e->getMessage() : 'Internal server error',
+        'request_id' => $requestId,
+    ];
+    if ($debug) {
+        $payload['type'] = get_class($e);
+        $payload['trace'] = $e->getTraceAsString();
+    }
+
+    echo json_encode($payload);
+}
+
+function getExpectedAdminToken(array $config): string
+{
+    $security = $config['security'] ?? [];
+    $token = $security['admin_token'] ?? '';
+    return is_string($token) ? trim($token) : '';
+}
+
+function getProvidedAdminToken(): string
+{
+    $headerToken = trim((string) ($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? ''));
+    if ($headerToken !== '') {
+        return $headerToken;
+    }
+
+    $authorization = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+    if ($authorization !== '' && preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches) === 1) {
+        return trim((string) $matches[1]);
+    }
+
+    return '';
+}
+
+function withAdminToken(array $config, callable $handler): void
+{
+    $expectedToken = getExpectedAdminToken($config);
+    if ($expectedToken !== '') {
+        $providedToken = getProvidedAdminToken();
+        if ($providedToken === '' || !hash_equals($expectedToken, $providedToken)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'Unauthorized']);
+            return;
+        }
+    }
+
+    $handler();
+}
+
 function handleHealth(): void
 {
     echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
@@ -231,23 +379,32 @@ function createResponseCacheClient(): ?RedisClient
 {
     $host = getenv('REDIS_HOST') ?: 'redis';
     $port = (int) (getenv('REDIS_PORT') ?: 6379);
+    $password = trim((string) (getenv('REDIS_PASSWORD') ?: ''));
     $redisUrl = getenv('REDIS_URL') ?: '';
     if ($redisUrl !== '') {
         $parts = parse_url($redisUrl);
         if (is_array($parts)) {
             $host = (string) ($parts['host'] ?? $host);
             $port = (int) ($parts['port'] ?? $port);
+            $urlPassword = isset($parts['pass']) ? trim((string) $parts['pass']) : '';
+            if ($urlPassword !== '') {
+                $password = $urlPassword;
+            }
         }
     }
 
     $hosts = array_values(array_unique([$host, '127.0.0.1', 'host.docker.internal']));
     foreach ($hosts as $candidateHost) {
         try {
-            $client = new RedisClient([
+            $parameters = [
                 'scheme' => 'tcp',
                 'host' => $candidateHost,
                 'port' => $port,
-            ], [
+            ];
+            if ($password !== '') {
+                $parameters['password'] = $password;
+            }
+            $client = new RedisClient($parameters, [
                 'timeout' => 0.5,
                 'read_write_timeout' => 0.5,
             ]);
@@ -325,6 +482,80 @@ function withResponseCache(array $config, string $namespace, int $ttlSeconds, ca
 
     header("X-Response-Cache: {$cacheStatus}");
     echo $body;
+}
+
+/**
+ * Parse xMins overrides from query string.
+ *
+ * Accepted forms:
+ * - {"123": 80}
+ * - {"123": {"27": 80, "28": 78}}
+ *
+ * @return array<int, float|array<int, float>>
+ */
+function parseXMinsOverridesFromQuery(): array
+{
+    if (!isset($_GET['xmins'])) {
+        return [];
+    }
+
+    $decoded = json_decode((string) $_GET['xmins'], true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    $overrides = [];
+    foreach ($decoded as $playerId => $value) {
+        $normalizedPlayerId = (int) $playerId;
+        if ($normalizedPlayerId <= 0) {
+            continue;
+        }
+
+        if (is_array($value)) {
+            $perGw = [];
+            foreach ($value as $gw => $mins) {
+                if (!is_numeric($mins)) {
+                    continue;
+                }
+                $normalizedGw = (int) $gw;
+                $perGw[$normalizedGw] = max(0.0, min(95.0, (float) $mins));
+            }
+            if (!empty($perGw)) {
+                $overrides[$normalizedPlayerId] = $perGw;
+            }
+            continue;
+        }
+
+        if (is_numeric($value)) {
+            $overrides[$normalizedPlayerId] = max(0.0, min(95.0, (float) $value));
+        }
+    }
+
+    return $overrides;
+}
+
+/**
+ * @param array<int, float|array<int, float>> $xMinsOverrides
+ */
+function resolveXMinsOverrideForGameweek(array $xMinsOverrides, int $playerId, int $gameweek): ?float
+{
+    if (!isset($xMinsOverrides[$playerId])) {
+        return null;
+    }
+
+    $raw = $xMinsOverrides[$playerId];
+    if (is_array($raw)) {
+        if (!isset($raw[$gameweek]) || !is_numeric($raw[$gameweek])) {
+            return null;
+        }
+        return max(0.0, min(95.0, (float) $raw[$gameweek]));
+    }
+
+    if (!is_numeric($raw)) {
+        return null;
+    }
+
+    return max(0.0, min(95.0, (float) $raw));
 }
 
 function handlePlayers(Database $db, array $config): void
@@ -659,109 +890,135 @@ function handlePredictionsRange(Database $db, array $config): void
     withResponseCache($config, 'predictions-range', 120, function () use ($db): void {
         $gwService = new \SuperFPL\Api\Services\GameweekService($db);
         $actionableGw = $gwService->getNextActionableGameweek();
+        $xMinsOverrides = parseXMinsOverridesFromQuery();
 
-    // Get gameweek range from query params (default: next 6 gameweeks from actionable)
-    $startGw = isset($_GET['start']) ? (int) $_GET['start'] : $actionableGw;
-    $endGw = isset($_GET['end']) ? (int) $_GET['end'] : min($startGw + 5, 38);
+        // Get gameweek range from query params (default: next 6 gameweeks from actionable)
+        $startGw = isset($_GET['start']) ? (int) $_GET['start'] : $actionableGw;
+        $endGw = isset($_GET['end']) ? (int) $_GET['end'] : min($startGw + 5, 38);
 
-    // Validate range
-    $startGw = max($actionableGw, min(38, $startGw));
-    $endGw = max($startGw, min(38, $endGw));
+        // Validate range
+        $startGw = max($actionableGw, min(38, $startGw));
+        $endGw = max($startGw, min(38, $endGw));
+        $gameweeks = range($startGw, $endGw);
+        $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
 
-    $gameweeks = range($startGw, $endGw);
+        // Build fixtures map and counts: club_id -> gameweek -> [{opponent, is_home}]
+        $fixtureRows = $db->fetchAll(
+            "SELECT f.gameweek, f.home_club_id, f.away_club_id,
+                    h.short_name as home_short, a.short_name as away_short
+             FROM fixtures f
+             JOIN clubs h ON f.home_club_id = h.id
+             JOIN clubs a ON f.away_club_id = a.id
+             WHERE f.gameweek IN ($placeholders)",
+            $gameweeks
+        );
 
-    // Fetch all predictions for the range in a single query
-    $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
-    $predictions = $db->fetchAll(
-        "SELECT
-            pp.player_id,
-            pp.gameweek,
-            pp.predicted_points,
-            pp.predicted_if_fit,
-            pp.expected_mins,
-            pp.expected_mins_if_fit,
-            pp.if_fit_breakdown_json,
-            pp.confidence,
-            p.web_name,
-            p.club_id as team,
-            p.position,
-            p.now_cost,
-            p.form,
-            p.total_points
-        FROM player_predictions pp
-        JOIN players p ON pp.player_id = p.id
-        WHERE pp.gameweek IN ($placeholders)
-        ORDER BY pp.player_id, pp.gameweek",
-        $gameweeks
-    );
+        $fixturesMap = [];
+        $fixtureCounts = [];
+        foreach ($fixtureRows as $row) {
+            $gw = (int) $row['gameweek'];
+            $homeId = (int) $row['home_club_id'];
+            $awayId = (int) $row['away_club_id'];
 
-    // Group by player with predictions keyed by gameweek
-    $playerMap = [];
-    foreach ($predictions as $pred) {
-        $playerId = $pred['player_id'];
-        if (!isset($playerMap[$playerId])) {
-            $playerMap[$playerId] = [
-                'player_id' => (int) $pred['player_id'],
-                'web_name' => $pred['web_name'],
-                'team' => (int) $pred['team'],
-                'position' => (int) $pred['position'],
-                'now_cost' => (int) $pred['now_cost'],
-                'form' => (float) $pred['form'],
-                'total_points' => (int) $pred['total_points'],
-                'expected_mins' => [],
-                'expected_mins_if_fit' => (int) round((float) ($pred['expected_mins_if_fit'] ?? 90)),
-                'predictions' => [],
-                'if_fit_predictions' => [],
-                'if_fit_breakdowns' => [],
-                'total_predicted' => 0,
-            ];
+            $fixturesMap[$homeId][$gw][] = ['opponent' => $row['away_short'], 'is_home' => true];
+            $fixturesMap[$awayId][$gw][] = ['opponent' => $row['home_short'], 'is_home' => false];
+
+            $fixtureCounts[$gw][$homeId] = ($fixtureCounts[$gw][$homeId] ?? 0) + 1;
+            $fixtureCounts[$gw][$awayId] = ($fixtureCounts[$gw][$awayId] ?? 0) + 1;
         }
-        $gw = (int) $pred['gameweek'];
-        $playerMap[$playerId]['expected_mins'][$gw] = (int) round((float) ($pred['expected_mins'] ?? 90));
-        $playerMap[$playerId]['predictions'][$gw] = round((float) $pred['predicted_points'], 1);
-        $playerMap[$playerId]['if_fit_predictions'][$gw] = round((float) ($pred['predicted_if_fit'] ?? 0), 2);
-        $ifFitBreakdown = json_decode((string) ($pred['if_fit_breakdown_json'] ?? '{}'), true);
-        if (is_array($ifFitBreakdown)) {
+
+        // Fetch all predictions for the range in a single query
+        $predictions = $db->fetchAll(
+            "SELECT
+                pp.player_id,
+                pp.gameweek,
+                pp.predicted_points,
+                pp.predicted_if_fit,
+                pp.expected_mins,
+                pp.expected_mins_if_fit,
+                pp.if_fit_breakdown_json,
+                pp.confidence,
+                p.web_name,
+                p.club_id as team,
+                p.position,
+                p.now_cost,
+                p.form,
+                p.total_points
+            FROM player_predictions pp
+            JOIN players p ON pp.player_id = p.id
+            WHERE pp.gameweek IN ($placeholders)
+            ORDER BY pp.player_id, pp.gameweek",
+            $gameweeks
+        );
+
+        // Group by player with predictions keyed by gameweek
+        $playerMap = [];
+        foreach ($predictions as $pred) {
+            $playerId = (int) $pred['player_id'];
+            $teamId = (int) $pred['team'];
+            $position = (int) $pred['position'];
+            $gw = (int) $pred['gameweek'];
+
+            if (!isset($playerMap[$playerId])) {
+                $playerMap[$playerId] = [
+                    'player_id' => $playerId,
+                    'web_name' => $pred['web_name'],
+                    'team' => $teamId,
+                    'position' => $position,
+                    'now_cost' => (int) $pred['now_cost'],
+                    'form' => (float) $pred['form'],
+                    'total_points' => (int) $pred['total_points'],
+                    'expected_mins' => [],
+                    'expected_mins_if_fit' => (int) round((float) ($pred['expected_mins_if_fit'] ?? 90)),
+                    'predictions' => [],
+                    'if_fit_predictions' => [],
+                    'if_fit_breakdowns' => [],
+                    'total_predicted' => 0,
+                ];
+            }
+
+            $ifFitBreakdown = json_decode((string) ($pred['if_fit_breakdown_json'] ?? '{}'), true);
+            if (!is_array($ifFitBreakdown)) {
+                $ifFitBreakdown = [];
+            }
             $normalizedBreakdown = [];
             foreach ($ifFitBreakdown as $key => $value) {
                 if (is_string($key) && is_numeric($value)) {
                     $normalizedBreakdown[$key] = round((float) $value, 2);
                 }
             }
+
+            $predictedPoints = (float) $pred['predicted_points'];
+            $overrideMins = resolveXMinsOverrideForGameweek($xMinsOverrides, $playerId, $gw);
+            if ($overrideMins !== null) {
+                $ifFitPoints = (float) ($pred['predicted_if_fit'] ?? $predictedPoints);
+                $ifFitMins = (float) ($pred['expected_mins_if_fit'] ?? $pred['expected_mins'] ?? 90);
+                $fixtureCount = max(1, (int) ($fixtureCounts[$gw][$teamId] ?? 1));
+                $predictedPoints = PredictionScaler::scaleFromIfFitBreakdown(
+                    $ifFitPoints,
+                    $ifFitMins,
+                    $overrideMins,
+                    $ifFitBreakdown,
+                    $fixtureCount,
+                    $position
+                );
+            }
+
+            $playerMap[$playerId]['expected_mins'][$gw] = (int) round((float) ($pred['expected_mins'] ?? 90));
+            $playerMap[$playerId]['predictions'][$gw] = round($predictedPoints, 1);
+            $playerMap[$playerId]['if_fit_predictions'][$gw] = round((float) ($pred['predicted_if_fit'] ?? 0), 2);
             $playerMap[$playerId]['if_fit_breakdowns'][$gw] = $normalizedBreakdown;
+            $playerMap[$playerId]['total_predicted'] += $predictedPoints;
         }
-        $playerMap[$playerId]['total_predicted'] += (float) $pred['predicted_points'];
-    }
 
-    // Round totals and convert to array
-    $players = array_values(array_map(function ($p) {
-        $p['total_predicted'] = round($p['total_predicted'], 1);
-        return $p;
-    }, $playerMap));
+        // Round totals and convert to array
+        $players = array_values(array_map(function ($player) {
+            $player['total_predicted'] = round($player['total_predicted'], 1);
+            return $player;
+        }, $playerMap));
 
-    // Sort by total predicted points descending
-    usort($players, fn($a, $b) => $b['total_predicted'] <=> $a['total_predicted']);
-
-    // Build fixtures map: club_id -> gameweek -> [{opponent, is_home}]
-    $fixtureRows = $db->fetchAll(
-        "SELECT f.gameweek, f.home_club_id, f.away_club_id,
-                h.short_name as home_short, a.short_name as away_short
-         FROM fixtures f
-         JOIN clubs h ON f.home_club_id = h.id
-         JOIN clubs a ON f.away_club_id = a.id
-         WHERE f.gameweek IN ($placeholders)",
-        $gameweeks
-    );
-
-    $fixturesMap = [];
-    foreach ($fixtureRows as $row) {
-        $gw = (int) $row['gameweek'];
-        $homeId = (int) $row['home_club_id'];
-        $awayId = (int) $row['away_club_id'];
-
-        $fixturesMap[$homeId][$gw][] = ['opponent' => $row['away_short'], 'is_home' => true];
-        $fixturesMap[$awayId][$gw][] = ['opponent' => $row['home_short'], 'is_home' => false];
-    }
+        // Sort by total predicted points descending
+        usort($players, fn($a, $b) => $b['total_predicted'] <=> $a['total_predicted']);
 
         echo json_encode([
             'gameweeks' => $gameweeks,
@@ -1315,22 +1572,7 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
         }
     }
 
-    // Parse xMins overrides (JSON-encoded player_id -> expected_mins or per-GW map)
-    $xMinsOverrides = [];
-    if (isset($_GET['xmins'])) {
-        $decoded = json_decode($_GET['xmins'], true);
-        if (is_array($decoded)) {
-            foreach ($decoded as $playerId => $value) {
-                if (is_array($value)) {
-                    // Per-GW: {"26": 0, "27": 0, "28": 75}
-                    $xMinsOverrides[(int) $playerId] = array_map('intval', $value);
-                } else {
-                    // Uniform: 75 (backwards compat)
-                    $xMinsOverrides[(int) $playerId] = (int) $value;
-                }
-            }
-        }
-    }
+    $xMinsOverrides = parseXMinsOverridesFromQuery();
 
     // Parse fixed transfers (JSON array of {gameweek, out, in})
     $fixedTransfers = [];
@@ -1350,6 +1592,9 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
     if (!in_array($depth, ['quick', 'standard', 'deep'])) {
         $depth = 'standard';
     }
+
+    $planningHorizon = isset($_GET['horizon']) ? (int) $_GET['horizon'] : 6;
+    $planningHorizon = max(1, min(12, $planningHorizon));
 
     $objectiveMode = $_GET['objective'] ?? 'expected';
     if (!in_array($objectiveMode, ['expected', 'floor', 'ceiling'], true)) {
@@ -1400,6 +1645,7 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
             $chipCompare,
             $objectiveMode,
             $constraints,
+            $planningHorizon,
         );
         echo json_encode($plan);
     } catch (\InvalidArgumentException $e) {
@@ -1419,6 +1665,8 @@ function handlePlannerChipSuggest(Database $db, FplClient $fplClient): void
 {
     $managerId = isset($_GET['manager']) ? (int) $_GET['manager'] : null;
     $freeTransfers = isset($_GET['ft']) ? (int) $_GET['ft'] : 0;
+    $planningHorizon = isset($_GET['horizon']) ? (int) $_GET['horizon'] : 6;
+    $planningHorizon = max(1, min(12, $planningHorizon));
     if ($managerId === null) {
         http_response_code(400);
         echo json_encode(['error' => 'Missing manager parameter']);
@@ -1468,7 +1716,8 @@ function handlePlannerChipSuggest(Database $db, FplClient $fplClient): void
             $freeTransfers,
             $chipPlan,
             $chipAllow,
-            $chipForbid
+            $chipForbid,
+            $planningHorizon
         );
         echo json_encode($result);
     } catch (\Throwable $e) {

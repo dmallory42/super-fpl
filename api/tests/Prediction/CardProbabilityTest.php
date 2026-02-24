@@ -22,8 +22,6 @@ class CardProbabilityTest extends TestCase
             'minutes' => 1800,
             'yellow_cards' => 6,
             'red_cards' => 0,
-            'own_goals' => 0,
-            'penalties_missed' => 0,
         ];
 
         $result = $this->prob->calculate($player);
@@ -39,8 +37,6 @@ class CardProbabilityTest extends TestCase
             'minutes' => 1800,
             'yellow_cards' => 0,
             'red_cards' => 1,
-            'own_goals' => 0,
-            'penalties_missed' => 0,
         ];
 
         $result = $this->prob->calculate($player);
@@ -56,19 +52,31 @@ class CardProbabilityTest extends TestCase
             'minutes' => 1800,
             'yellow_cards' => 4,
             'red_cards' => 1,
-            'own_goals' => 1,
-            'penalties_missed' => 1,
         ];
 
         $result = $this->prob->calculate($player);
 
         // yellow: (4/1800)*90 * -1 = -0.2
         // red: (1/1800)*90 * -3 = -0.15
-        // own goal: (1/1800)*90 * -2 = -0.1
-        // pen miss: (1/1800)*90 * -2 = -0.1
-        // total: -0.55
+        // total: -0.35
         $this->assertLessThan(0, $result);
-        $this->assertEqualsWithDelta(-0.55, $result, 0.01);
+        $this->assertEqualsWithDelta(-0.35, $result, 0.01);
+    }
+
+    public function testOwnGoalsAndPenMissesDoNotAffectCardComponent(): void
+    {
+        $player = [
+            'minutes' => 1800,
+            'yellow_cards' => 0,
+            'red_cards' => 0,
+            'own_goals' => 3,
+            'penalties_missed' => 2,
+        ];
+
+        $result = $this->prob->calculate($player);
+
+        // Own goals and pen misses are modeled outside disciplinary card risk.
+        $this->assertEquals(0.0, $result);
     }
 
     public function testZeroMinutesReturnsBaseline(): void
@@ -77,14 +85,12 @@ class CardProbabilityTest extends TestCase
             'minutes' => 0,
             'yellow_cards' => 0,
             'red_cards' => 0,
-            'own_goals' => 0,
-            'penalties_missed' => 0,
         ];
 
         $result = $this->prob->calculate($player);
 
         // Zero minutes → league-average baseline deduction
-        $this->assertEqualsWithDelta(-0.20, $result, 0.01);
+        $this->assertEqualsWithDelta(-0.16, $result, 0.01);
     }
 
     public function testLowMinutesRegressesToBaseline(): void
@@ -93,18 +99,16 @@ class CardProbabilityTest extends TestCase
             'minutes' => 45,
             'yellow_cards' => 1,
             'red_cards' => 0,
-            'own_goals' => 0,
-            'penalties_missed' => 0,
         ];
 
         $result = $this->prob->calculate($player);
 
         // Raw: (1/45)*90 = 2.0 yellows/90 → -2.0
         // Reliability: 45/270 = 0.167
-        // Regressed: (-2.0 * 0.167) + (-0.20 * 0.833) = -0.334 + -0.167 = -0.50
+        // Regressed: (-2.0 * 0.167) + (-0.16 * 0.833) = -0.334 + -0.133 = -0.47
         // Much less extreme than raw -2.0
         $this->assertGreaterThan(-0.55, $result);
-        $this->assertLessThan(-0.20, $result);
+        $this->assertLessThan(-0.16, $result);
     }
 
     public function testCleanRecord(): void
@@ -113,8 +117,6 @@ class CardProbabilityTest extends TestCase
             'minutes' => 1800,
             'yellow_cards' => 0,
             'red_cards' => 0,
-            'own_goals' => 0,
-            'penalties_missed' => 0,
         ];
 
         $result = $this->prob->calculate($player);

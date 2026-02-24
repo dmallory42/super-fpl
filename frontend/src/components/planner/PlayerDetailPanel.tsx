@@ -3,7 +3,6 @@ import type { PlayerMultiWeekPrediction, XMinsOverrides, FixtureOpponent } from 
 import { PositionBadge } from '../common/PositionBadge'
 import { FormInput } from '../ui/form'
 import { GradientText } from '../ui/GradientText'
-import { scalePoints } from '../../lib/predictions'
 
 type SidebarTab = 'projections' | 'transfer'
 
@@ -154,26 +153,14 @@ export function PlayerDetailPanel({
 
   const isGkp = player.element_type === 1
   const isDef = player.element_type === 2
+  const savesPer90 =
+    isGkp && player.minutes > 0 && Number.isFinite(player.saves)
+      ? (player.saves / player.minutes) * 90
+      : null
 
-  // Compute xPts per-GW: raw predictions by default, scaled only with user override
+  // Compute xPts per-GW from API-recalculated predictions.
   const scaledXPts = (gw: number): number | null => {
     if (!fixtures?.[gw]?.length) return 0
-    const override = getGwOverride(gw)
-    if (override != null) {
-      const ifFitPts =
-        playerPrediction?.if_fit_predictions?.[gw] ?? playerPrediction?.predictions[gw]
-      if (ifFitPts == null) return null
-      const ifFitBreakdown = playerPrediction?.if_fit_breakdowns?.[gw]
-      const fixtureCount = Math.max(1, fixtures?.[gw]?.length ?? 1)
-      return scalePoints(
-        ifFitPts,
-        expectedMinsIfFit,
-        override,
-        ifFitBreakdown,
-        fixtureCount,
-        player.element_type
-      )
-    }
     return playerPrediction?.predictions[gw] ?? null
   }
 
@@ -271,7 +258,10 @@ export function PlayerDetailPanel({
           {isGkp ? (
             <>
               <span>
-                SV <span className="text-foreground-muted">{player.saves}</span>
+                SV/90{' '}
+                <span className="text-foreground-muted">
+                  {savesPer90 !== null ? savesPer90.toFixed(1) : '-'}
+                </span>
               </span>
               <span>{'\u00B7'}</span>
               <span>

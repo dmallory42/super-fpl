@@ -32,8 +32,18 @@ class PenaltyProbability
      */
     private const TEAM_PEN_RATE = 0.15;
 
-    /** Average penalty conversion rate in the EPL (~78%). */
-    private const CONVERSION_RATE = 0.78;
+    /**
+     * Prior conversion rate for designated penalty takers.
+     * Slightly above league average because this model only runs for players
+     * with penalty_order (i.e. nominated takers).
+     */
+    private const PRIOR_CONVERSION_RATE = 0.80;
+
+    /**
+     * Prior sample size for Bayesian shrinkage.
+     * Prevents short-term miss streaks from overreacting.
+     */
+    private const PRIOR_ATTEMPTS = 20.0;
 
     /** FPL deduction for a missed penalty. */
     private const MISS_DEDUCTION = -2;
@@ -72,15 +82,49 @@ class PenaltyProbability
         }
 
         $goalPoints = self::GOAL_POINTS[$position] ?? 4;
+        $conversionRate = $this->estimateConversionRate($player);
 
         // Expected points per penalty attempt:
         // P(score) * goalPoints + P(miss) * (-2)
-        $expectedPerPen = (self::CONVERSION_RATE * $goalPoints)
-            + ((1 - self::CONVERSION_RATE) * self::MISS_DEDUCTION);
+        $expectedPerPen = ($conversionRate * $goalPoints)
+            + ((1 - $conversionRate) * self::MISS_DEDUCTION);
 
         // Expected penalty points per match:
         // teamPenRate * P(this player takes it) * expectedPerPen
         return round(self::TEAM_PEN_RATE * $takePct * $expectedPerPen, 4);
+    }
+
+    /**
+     * Estimate player penalty conversion with Bayesian shrinkage.
+     *
+     * Uses explicit penalties_taken when available, otherwise infers converted
+     * penalties as goals_scored - npg when Understat NPG is present.
+     */
+    private function estimateConversionRate(array $player): float
+    {
+        $penMissed = max(0, (int) ($player['penalties_missed'] ?? 0));
+        $penTaken = max(0, (int) ($player['penalties_taken'] ?? 0));
+
+        $attempts = 0;
+        $scored = 0;
+
+        if ($penTaken > 0) {
+            $attempts = $penTaken;
+            $scored = max(0, $penTaken - $penMissed);
+        } else {
+            $goals = max(0, (int) ($player['goals_scored'] ?? 0));
+            $npgRaw = $player['npg'] ?? null;
+            if ($npgRaw !== null && is_numeric($npgRaw)) {
+                $npg = max(0, (int) round((float) $npgRaw));
+                $scored = max(0, $goals - $npg);
+                $attempts = $scored + $penMissed;
+            }
+        }
+
+        $priorSuccess = self::PRIOR_ATTEMPTS * self::PRIOR_CONVERSION_RATE;
+        $posterior = ($priorSuccess + $scored) / (self::PRIOR_ATTEMPTS + $attempts);
+
+        return min(0.95, max(0.60, $posterior));
     }
 
     /**

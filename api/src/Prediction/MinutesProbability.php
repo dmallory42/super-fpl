@@ -77,7 +77,12 @@ class MinutesProbability
         // a generous multiplier on appearance rate. But very low appearance
         // rates (e.g. backup GK: 3/24) still produce low selection probability
         // rather than being treated as nailed starters.
-        if ($minsPerAppearance >= 75) {
+        $isNailedStarter = $minsPerAppearance >= 85 && $startRate >= 0.80 && $appearanceRate >= 0.85;
+        if ($isNailedStarter) {
+            // Allow near-certain availability for genuinely nailed 90-minute players.
+            // Keep below 1.0 to represent rare early substitutions/injury events.
+            $selectionProb = min(0.995, max(0.96, $appearanceRate * 1.02));
+        } elseif ($minsPerAppearance >= 75) {
             $selectionProb = min(0.98, $appearanceRate * 2.0);
         } elseif ($minsPerAppearance >= 60) {
             $selectionProb = min(0.95, $appearanceRate * 1.2);
@@ -127,11 +132,15 @@ class MinutesProbability
     private function calculate60MinsProbability(float $minsPerAppearance, float $startRate, float $probAny): float
     {
         // High mins per appearance = usually plays full games
+        if ($minsPerAppearance >= 88 && $startRate >= 0.80) {
+            // Truly nailed players usually clear 60 mins unless an outlier event occurs.
+            return 0.99 * $probAny;
+        }
         if ($minsPerAppearance >= 85) {
-            return 0.95 * $probAny;
+            return 0.97 * $probAny;
         }
         if ($minsPerAppearance >= 70) {
-            return 0.85 * $probAny;
+            return 0.87 * $probAny;
         }
 
         // For lower mins per appearance, use start rate to estimate

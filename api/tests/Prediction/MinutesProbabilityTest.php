@@ -80,6 +80,22 @@ class MinutesProbabilityTest extends TestCase
         $this->assertGreaterThan(70, $result['expected_mins']);
     }
 
+    public function testNailedNinetyMinuteStarterNearFullAvailability(): void
+    {
+        $player = [
+            'starts' => 27,
+            'minutes' => 2430,
+            'appearances' => 27,
+        ];
+
+        $result = $this->prob->calculate($player, 27);
+
+        // Nailed 90-min players should project very close to full availability.
+        $this->assertGreaterThan(0.99, $result['prob_any']);
+        $this->assertGreaterThan(0.97, $result['prob_60']);
+        $this->assertGreaterThan(88, $result['expected_mins']);
+    }
+
     public function testSuperSub(): void
     {
         // Super-sub: plays often but rarely starts, low minutes per appearance

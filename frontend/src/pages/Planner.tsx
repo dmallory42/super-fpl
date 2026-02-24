@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
 import { usePlannerOptimize } from '../hooks/usePlannerOptimize'
 import { usePredictionsRange } from '../hooks/usePredictionsRange'
@@ -30,7 +30,6 @@ import { useLiveSamples } from '../hooks/useLiveSamples'
 import { PlayerExplorer } from '../components/planner/PlayerExplorer'
 import { PlayerDetailPanel } from '../components/planner/PlayerDetailPanel'
 import { buildFormation } from '../lib/formation'
-import { scalePoints } from '../lib/predictions'
 
 const HIT_COST = 4
 const CHIP_LABELS: Record<keyof ChipPlan, string> = {
@@ -51,6 +50,8 @@ const OBJECTIVE_LABELS: Record<PlannerObjectiveMode, string> = {
   ceiling: 'Ceiling',
 }
 const DEFAULT_SOLVER_DEPTH = 'deep'
+const DEFAULT_PLANNING_HORIZON = 6
+const MAX_PLANNING_HORIZON = 12
 
 function formatFixtures(fixtures: FixtureOpponent[]): string {
   return fixtures.map((f) => (f.is_home ? f.opponent : f.opponent.toLowerCase())).join(', ')
@@ -78,6 +79,12 @@ interface ConstraintInputState {
   avoidTeams: number[]
 }
 
+type ChipType = keyof ChipPlan
+
+function isUnlimitedTransferChip(chip: ChipType | undefined): boolean {
+  return chip === 'wildcard' || chip === 'free_hit'
+}
+
 function getInitialManagerId(): { id: number | null; input: string } {
   const params = new URLSearchParams(window.location.search)
   const urlManager = params.get('manager')
@@ -95,6 +102,18 @@ function getInitialManagerId(): { id: number | null; input: string } {
     }
   }
   return { id: null, input: '' }
+}
+
+function getInitialPlanningHorizon(): number {
+  const params = new URLSearchParams(window.location.search)
+  const fromUrl = params.get('horizon')
+  const fromStorage = localStorage.getItem('fpl_planner_horizon')
+  const raw = fromUrl ?? fromStorage
+  const parsed = raw ? parseInt(raw, 10) : NaN
+  if (!isNaN(parsed)) {
+    return Math.max(1, Math.min(MAX_PLANNING_HORIZON, parsed))
+  }
+  return DEFAULT_PLANNING_HORIZON
 }
 
 function getInitialConstraintInputs(): ConstraintInputState {
@@ -149,6 +168,7 @@ export function Planner() {
   const [selectedPathIndex, setSelectedPathIndex] = useState<number | null>(null)
   const [ftValue, setFtValue] = useState(1.5)
   const [objectiveMode, setObjectiveMode] = useState<PlannerObjectiveMode>('expected')
+  const [planningHorizon, setPlanningHorizon] = useState<number>(getInitialPlanningHorizon)
   const initialConstraintInputs = getInitialConstraintInputs()
   const [lockIds, setLockIds] = useState<number[]>(initialConstraintInputs.lockIds)
   const [avoidIds, setAvoidIds] = useState<number[]>(initialConstraintInputs.avoidIds)
@@ -167,6 +187,7 @@ export function Planner() {
   const [solveFtValue, setSolveFtValue] = useState(1.5)
   const [solveObjectiveMode, setSolveObjectiveMode] = useState<PlannerObjectiveMode>('expected')
   const [solveConstraints, setSolveConstraints] = useState<PlannerConstraints>({})
+  const [solvePlanningHorizon, setSolvePlanningHorizon] = useState(getInitialPlanningHorizon)
   const [showSolveLoader, setShowSolveLoader] = useState(false)
 
   // Player detail sidebar state
@@ -251,6 +272,7 @@ export function Planner() {
     userTransfers,
     ftValue,
     DEFAULT_SOLVER_DEPTH,
+    planningHorizon,
     true, // skipSolve
     'locked',
     objectiveMode,
@@ -271,6 +293,7 @@ export function Planner() {
     solveTransfers,
     solveFtValue,
     DEFAULT_SOLVER_DEPTH,
+    solvePlanningHorizon,
     false, // run solver
     'locked',
     solveObjectiveMode,
@@ -285,6 +308,7 @@ export function Planner() {
       JSON.stringify(chipPlan) !== JSON.stringify(solveChipPlan) ||
       ftValue !== solveFtValue ||
       objectiveMode !== solveObjectiveMode ||
+      planningHorizon !== solvePlanningHorizon ||
       JSON.stringify(parsedConstraints.constraints) !== JSON.stringify(solveConstraints))
 
   const isSolveActive = showSolveLoader || isFetchingSolve
@@ -292,9 +316,19 @@ export function Planner() {
   // Merge squad + solve data for display
   const optimizeData = squadData
   const paths = solveData?.paths ?? []
+  const displayHorizonLength = optimizeData?.planning_horizon?.length ?? planningHorizon
 
   // Get predictions for multiple gameweeks
-  const { data: predictionsRange } = usePredictionsRange(undefined, undefined, !!managerId)
+  const predictionStartGw = optimizeData?.current_gameweek
+  const predictionEndGw = predictionStartGw
+    ? Math.min(38, predictionStartGw + planningHorizon - 1)
+    : undefined
+  const { data: predictionsRange } = usePredictionsRange(
+    predictionStartGw,
+    predictionEndGw,
+    !!managerId && !!predictionStartGw,
+    debouncedXMins
+  )
 
   // Get top 10k effective ownership for player explorer
   const { data: samplesData } = useLiveSamples(predictionsRange?.current_gameweek ?? null)
@@ -306,6 +340,16 @@ export function Planner() {
       const initialGw = predictionsRange.current_gameweek || predictionsRange.gameweeks?.[0]
       if (initialGw) {
         setSelectedGameweek(initialGw)
+      }
+    }
+    if (
+      predictionsRange &&
+      selectedGameweek !== null &&
+      !predictionsRange.gameweeks.includes(selectedGameweek)
+    ) {
+      const nextGw = predictionsRange.gameweeks[0]
+      if (nextGw) {
+        setSelectedGameweek(nextGw)
       }
     }
   }, [predictionsRange, selectedGameweek])
@@ -329,6 +373,25 @@ export function Planner() {
     }
     return byId
   }, [playersData?.teams])
+
+  const maxSelectableHorizon = useMemo(() => {
+    const startGw = optimizeData?.current_gameweek ?? predictionsRange?.current_gameweek
+    if (!startGw) {
+      return MAX_PLANNING_HORIZON
+    }
+    return Math.max(1, Math.min(MAX_PLANNING_HORIZON, 39 - startGw))
+  }, [optimizeData?.current_gameweek, predictionsRange?.current_gameweek])
+
+  const horizonOptions = useMemo(
+    () => Array.from({ length: maxSelectableHorizon }, (_, idx) => idx + 1),
+    [maxSelectableHorizon]
+  )
+
+  useEffect(() => {
+    if (planningHorizon > maxSelectableHorizon) {
+      setPlanningHorizon(maxSelectableHorizon)
+    }
+  }, [planningHorizon, maxSelectableHorizon])
 
   // Teams record for FormationPitch
   const teamsRecord = useMemo(() => {
@@ -391,10 +454,43 @@ export function Planner() {
     if (selectedPathIndex === null || !paths.length) return null
     return paths[selectedPathIndex] ?? null
   }, [selectedPathIndex, paths])
+  const pathForSquadDisplay = selectedPath ?? paths[0] ?? null
+  const chipByGameweek = useMemo(() => {
+    const byGw: Partial<Record<number, ChipType>> = {}
+    for (const [chip, gw] of Object.entries(chipPlan) as [ChipType, number][]) {
+      if (gw) {
+        byGw[gw] = chip
+      }
+    }
+    return byGw
+  }, [chipPlan])
+  const effectiveChipByGameweek = useMemo(() => {
+    const byGw: Partial<Record<number, ChipType>> = { ...chipByGameweek }
+    if (!selectedPath) {
+      return byGw
+    }
+    for (const [gwStr, gwData] of Object.entries(selectedPath.transfers_by_gw)) {
+      const chip = gwData.chip_played as ChipType | undefined
+      if (chip) {
+        byGw[Number(gwStr)] = chip
+      }
+    }
+    return byGw
+  }, [chipByGameweek, selectedPath])
 
   // GW-aware effective squad: apply transfers up to and including selectedGameweek
   const effectiveSquad = useMemo(() => {
     if (!optimizeData?.current_squad?.player_ids) return []
+    if (pathForSquadDisplay && selectedGameweek !== null) {
+      const pathGw = pathForSquadDisplay.transfers_by_gw[selectedGameweek]
+      if (
+        (pathGw?.chip_played === 'free_hit' ||
+          effectiveChipByGameweek[selectedGameweek] === 'free_hit') &&
+        Array.isArray(pathGw?.squad_ids)
+      ) {
+        return pathGw.squad_ids as number[]
+      }
+    }
     let squad = [...optimizeData.current_squad.player_ids]
     const gws = predictionsRange?.gameweeks ?? []
     for (const gw of gws) {
@@ -411,11 +507,23 @@ export function Planner() {
     userTransfers,
     selectedGameweek,
     predictionsRange?.gameweeks,
+    pathForSquadDisplay,
+    effectiveChipByGameweek,
   ])
 
   // GW-aware effective bank: apply transfer costs up to and including selectedGameweek
   const effectiveBank = useMemo(() => {
     if (!optimizeData?.current_squad?.bank) return 0
+    if (pathForSquadDisplay && selectedGameweek !== null) {
+      const pathGw = pathForSquadDisplay.transfers_by_gw[selectedGameweek]
+      if (
+        (pathGw?.chip_played === 'free_hit' ||
+          effectiveChipByGameweek[selectedGameweek] === 'free_hit') &&
+        typeof pathGw.bank === 'number'
+      ) {
+        return pathGw.bank
+      }
+    }
     let bank = optimizeData.current_squad.bank
     const gws = predictionsRange?.gameweeks ?? []
     for (const gw of gws) {
@@ -436,6 +544,8 @@ export function Planner() {
     selectedGameweek,
     predictionsRange?.gameweeks,
     playersData?.players,
+    pathForSquadDisplay,
+    effectiveChipByGameweek,
   ])
 
   // Calculate per-GW FT state with rollover logic
@@ -454,6 +564,10 @@ export function Planner() {
 
     for (const gw of predictionsRange.gameweeks) {
       result[gw] = available
+      if (isUnlimitedTransferChip(effectiveChipByGameweek[gw])) {
+        // WC/FH weeks allow unlimited moves and do not change FT balance in this model.
+        continue
+      }
       const transfers = transfersByGw[gw] ?? 0
 
       if (transfers === 0) {
@@ -463,15 +577,43 @@ export function Planner() {
       }
     }
     return result
-  }, [predictionsRange?.gameweeks, effectiveFt, userTransfers])
+  }, [predictionsRange?.gameweeks, effectiveFt, userTransfers, effectiveChipByGameweek])
 
   // Hits for the first GW (used by squad predictions for hit cost deduction)
   const firstGw = predictionsRange?.gameweeks[0]
   const firstGwTransfers = firstGw ? userTransfers.filter((f) => f.gameweek === firstGw).length : 0
+  const firstGwHasUnlimitedChip = firstGw
+    ? isUnlimitedTransferChip(effectiveChipByGameweek[firstGw])
+    : false
   const hitsCount = firstGw
-    ? Math.max(0, firstGwTransfers - (ftByGameweek[firstGw] ?? effectiveFt))
+    ? firstGwHasUnlimitedChip
+      ? 0
+      : Math.max(0, firstGwTransfers - (ftByGameweek[firstGw] ?? effectiveFt))
     : 0
   const hitsCost = hitsCount * HIT_COST
+
+  const selectedGwTransferStatus = useMemo(() => {
+    if (selectedGameweek === null) {
+      return null
+    }
+    const available = ftByGameweek[selectedGameweek] ?? effectiveFt
+    const used = userTransfers.filter((f) => f.gameweek === selectedGameweek).length
+    const chip = effectiveChipByGameweek[selectedGameweek]
+    const hasUnlimitedChip = isUnlimitedTransferChip(chip)
+    const remaining = hasUnlimitedChip ? available : Math.max(0, available - used)
+    const hits = hasUnlimitedChip ? 0 : Math.max(0, used - available)
+    const hitPts = hits * HIT_COST
+    const statusLabel = hasUnlimitedChip
+      ? `${remaining} FT (${CHIP_SHORT_LABELS[chip as keyof ChipPlan]})`
+      : `${remaining} FT${hitPts > 0 ? ` (-${hitPts})` : ''}`
+
+    return {
+      available,
+      used,
+      hits,
+      statusLabel,
+    }
+  }, [selectedGameweek, ftByGameweek, effectiveFt, userTransfers, effectiveChipByGameweek])
 
   // Get the selected player's data
   const selectedPlayerData = useMemo(() => {
@@ -552,8 +694,11 @@ export function Planner() {
       params.delete('constraints')
     }
 
+    localStorage.setItem('fpl_planner_horizon', String(planningHorizon))
+    params.set('horizon', String(planningHorizon))
+
     window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`)
-  }, [managerId, parsedConstraints])
+  }, [managerId, parsedConstraints, planningHorizon])
 
   const handleLoadManager = () => {
     const id = parseInt(managerInput, 10)
@@ -567,6 +712,7 @@ export function Planner() {
       setSolveChipPlan({})
       setSolveFtValue(1.5)
       setSolveObjectiveMode('expected')
+      setSolvePlanningHorizon(planningHorizon)
       setSolveConstraints({})
       setFreeTransfers(null)
     }
@@ -620,16 +766,19 @@ export function Planner() {
     setSelectedPathIndex(null)
   }
 
-  const handlePlayerSelect = (playerId: number) => {
-    if (selectedPlayer === playerId) {
-      setSelectedPlayer(null)
-      setReplacementSearch('')
-    } else {
-      setSelectedPlayer(playerId)
-      setSidebarTab('projections')
-      setReplacementSearch('')
-    }
-  }
+  const handlePlayerSelect = useCallback(
+    (playerId: number) => {
+      if (selectedPlayer === playerId) {
+        setSelectedPlayer(null)
+        setReplacementSearch('')
+      } else {
+        setSelectedPlayer(playerId)
+        setSidebarTab('projections')
+        setReplacementSearch('')
+      }
+    },
+    [selectedPlayer]
+  )
 
   const handleSelectReplacement = (replacement: PlayerMultiWeekPrediction) => {
     if (!selectedPlayerData || selectedGameweek === null) return
@@ -674,6 +823,8 @@ export function Planner() {
     setSolveChipPlan({})
     setSolveFtValue(1.5)
     setSolveObjectiveMode('expected')
+    setPlanningHorizon(DEFAULT_PLANNING_HORIZON)
+    setSolvePlanningHorizon(DEFAULT_PLANNING_HORIZON)
     setSolveConstraints({})
     setChipPlan({})
     setShowAdvancedSettings(false)
@@ -695,6 +846,7 @@ export function Planner() {
     setSolveChipPlan({ ...chipPlan })
     setSolveFtValue(ftValue)
     setSolveObjectiveMode(objectiveMode)
+    setSolvePlanningHorizon(planningHorizon)
     setSolveConstraints(parsedConstraints.constraints)
     setSolveRequested(true)
     // Minimum display time so the skeleton always appears
@@ -744,57 +896,109 @@ export function Planner() {
     setSavedPlans((prev) => prev.filter((p) => p.id !== planId))
   }
 
-  const applyDecay = (baseMins: number, gws: number[]): Record<number, number> => {
+  const applyUniformXMins = useCallback((xMins: number, gws: number[]): Record<number, number> => {
     const result: Record<number, number> = {}
-    for (let i = 0; i < gws.length; i++) {
-      result[gws[i]] = Math.round(baseMins * Math.pow(0.97, i))
+    for (const gw of gws) {
+      result[gw] = xMins
     }
     return result
-  }
+  }, [])
 
-  const handleXMinsChange = (playerId: number, xMins: number, gameweek?: number) => {
-    setXMinsOverrides((prev) => {
-      const existing =
-        typeof prev[playerId] === 'object' && prev[playerId] !== null
-          ? { ...(prev[playerId] as Record<number, number>) }
-          : {}
-      if (gameweek !== undefined) {
-        // Per-GW override from drawer — replace just this GW
-        existing[gameweek] = xMins
-      } else {
-        // Explorer override — apply with 0.97 decay to all GWs
-        const gws = predictionsRange?.gameweeks ?? []
-        const decayed = applyDecay(xMins, gws)
-        Object.assign(existing, decayed)
+  const getBaselineXMins = useCallback(
+    (playerId: number, gw: number): number | null => {
+      const pred = playerPredictionsMap.get(playerId)
+      if (!pred) return null
+      const base = pred.expected_mins?.[gw]
+      return typeof base === 'number' ? base : null
+    },
+    [playerPredictionsMap]
+  )
+
+  const pruneNoopOverridesForPlayer = useCallback(
+    (playerId: number, overrides: Record<number, number>): Record<number, number> => {
+      const pruned: Record<number, number> = {}
+      for (const [gwKey, value] of Object.entries(overrides)) {
+        const gw = Number(gwKey)
+        if (!Number.isFinite(gw) || !Number.isFinite(value)) continue
+        const baseline = getBaselineXMins(playerId, gw)
+        if (baseline !== null && value === baseline) {
+          continue
+        }
+        pruned[gw] = value
       }
-      return { ...prev, [playerId]: existing }
-    })
-  }
+      return pruned
+    },
+    [getBaselineXMins]
+  )
 
-  // Get effective points: raw predictions by default, scaled only with user xMins override
+  const handleXMinsChange = useCallback(
+    (playerId: number, xMins: number, gameweek?: number) => {
+      setXMinsOverrides((prev) => {
+        const existing =
+          typeof prev[playerId] === 'object' && prev[playerId] !== null
+            ? { ...(prev[playerId] as Record<number, number>) }
+            : {}
+        if (gameweek !== undefined) {
+          // Per-GW override from drawer — replace just this GW
+          existing[gameweek] = xMins
+        } else {
+          // Explorer override — apply uniformly to all visible GWs.
+          const gws = predictionsRange?.gameweeks ?? []
+          const uniform = applyUniformXMins(xMins, gws)
+          Object.assign(existing, uniform)
+        }
+
+        const pruned = pruneNoopOverridesForPlayer(playerId, existing)
+        if (Object.keys(pruned).length === 0) {
+          const next = { ...prev }
+          delete next[playerId]
+          return next
+        }
+
+        return { ...prev, [playerId]: pruned }
+      })
+    },
+    [applyUniformXMins, predictionsRange?.gameweeks, pruneNoopOverridesForPlayer]
+  )
+
+  useEffect(() => {
+    if (!playerPredictionsMap.size) return
+
+    setXMinsOverrides((prev) => {
+      let changed = false
+      const next: XMinsOverrides = {}
+
+      for (const [playerIdKey, rawOverride] of Object.entries(prev)) {
+        const playerId = Number(playerIdKey)
+        if (!Number.isFinite(playerId)) continue
+
+        if (typeof rawOverride !== 'object' || rawOverride === null) {
+          next[playerId] = rawOverride
+          continue
+        }
+
+        const pruned = pruneNoopOverridesForPlayer(playerId, rawOverride as Record<number, number>)
+        if (Object.keys(pruned).length > 0) {
+          next[playerId] = pruned
+          if (
+            Object.keys(pruned).length !== Object.keys(rawOverride as Record<number, number>).length
+          ) {
+            changed = true
+          }
+        } else {
+          changed = true
+        }
+      }
+
+      return changed ? next : prev
+    })
+  }, [playerPredictionsMap])
+
+  // Get effective points from API-recalculated predictions.
   const getEffectivePoints = (playerId: number, gw: number): number => {
     const pred = playerPredictionsMap.get(playerId)
     // No fixture in this GW = blank gameweek, no points
     if (pred && !predictionsRange?.fixtures?.[pred.team]?.[gw]?.length) return 0
-
-    const override = debouncedXMins[playerId]
-    if (typeof override === 'object' && override !== null && override[gw] != null) {
-      const ifFitPts = pred?.if_fit_predictions?.[gw] ?? pred?.predictions[gw] ?? 0
-      const ifFitMins = pred?.expected_mins_if_fit ?? 90
-      const ifFitBreakdown = pred?.if_fit_breakdowns?.[gw]
-      const fixtureCount = Math.max(
-        1,
-        predictionsRange?.fixtures?.[pred?.team ?? 0]?.[gw]?.length ?? 1
-      )
-      return scalePoints(
-        ifFitPts,
-        ifFitMins,
-        override[gw],
-        ifFitBreakdown,
-        fixtureCount,
-        pred?.position
-      )
-    }
 
     return pred?.predictions[gw] ?? 0
   }
@@ -989,8 +1193,10 @@ export function Planner() {
                   </h4>
                   <p className="text-sm text-foreground-muted">
                     <span className="text-foreground font-medium">FT Value</span> controls hit
-                    aversion — higher values make the solver prefer rolling transfers. Solver depth
-                    is fixed to <span className="text-foreground font-medium">Deep</span>.
+                    aversion — higher values make the solver prefer rolling transfers.
+                    <span className="text-foreground font-medium"> GW Horizon</span> sets how many
+                    weeks the solver optimizes over. Solver depth is fixed to
+                    <span className="text-foreground font-medium"> Deep</span>.
                   </p>
                 </div>
               </div>
@@ -1023,14 +1229,14 @@ export function Planner() {
           </div>
 
           <div className="space-y-2">
-            <label className="form-label">Free Transfers</label>
+            <label className="form-label">GW Horizon</label>
             <FormSelect
-              value={freeTransfers ?? effectiveFt}
-              onChange={(e) => setFreeTransfers(parseInt(e.target.value, 10))}
+              value={planningHorizon}
+              onChange={(e) => setPlanningHorizon(parseInt(e.target.value, 10))}
             >
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n} FT
+              {horizonOptions.map((value) => (
+                <option key={`horizon-top-${value}`} value={value}>
+                  {value} GW{value === 1 ? '' : 's'}
                 </option>
               ))}
             </FormSelect>
@@ -1066,33 +1272,10 @@ export function Planner() {
                 highlight={effectiveBank !== optimizeData.current_squad.bank}
               />
               <StatPanel
-                label="Transfers"
-                value={(() => {
-                  if (selectedGameweek !== null) {
-                    const available = ftByGameweek[selectedGameweek] ?? effectiveFt
-                    const used = userTransfers.filter((f) => f.gameweek === selectedGameweek).length
-                    const remaining = Math.max(0, available - used)
-                    const hits = Math.max(0, used - available)
-                    const hitPts = hits * HIT_COST
-                    return `${remaining} FT${hitPts > 0 ? ` (-${hitPts})` : ''}`
-                  }
-                  return `${effectiveFt} FT`
-                })()}
-                animationDelay={100}
-                highlight={(() => {
-                  if (selectedGameweek !== null) {
-                    const available = ftByGameweek[selectedGameweek] ?? effectiveFt
-                    const used = userTransfers.filter((f) => f.gameweek === selectedGameweek).length
-                    return used > available
-                  }
-                  return false
-                })()}
-              />
-              <StatPanel
-                label={`Projected (${predictionsRange?.gameweeks.length ?? 6} GWs)`}
+                label={`Projected (${displayHorizonLength} GWs)`}
                 value={`${selectedPath ? selectedPath.total_score.toFixed(1) : (squadPredictions?.total ?? '...')} pts`}
                 highlight
-                animationDelay={150}
+                animationDelay={100}
               />
             </StatPanelGrid>
 
@@ -1200,6 +1383,9 @@ export function Planner() {
                                 )}
                                 {gwData.action === 'bank' ? (
                                   <span className="text-foreground-dim">Roll</span>
+                                ) : gwData.chip_played === 'free_hit' &&
+                                  gwData.moves.length === 0 ? (
+                                  <span className="text-foreground-dim">FH squad optimized</span>
                                 ) : (
                                   gwData.moves.map((m, mi) => (
                                     <span key={mi}>
@@ -1255,7 +1441,7 @@ export function Planner() {
                         heading="Solver Settings"
                         description="Deep search is fixed. Tune objective mode and hit aversion."
                       >
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                           <FormField label="Objective">
                             <div className="flex items-center gap-1">
                               {(Object.keys(OBJECTIVE_LABELS) as PlannerObjectiveMode[]).map(
@@ -1290,6 +1476,18 @@ export function Planner() {
                                 {ftValue.toFixed(1)}
                               </span>
                             </div>
+                          </FormField>
+                          <FormField label="Free Transfers">
+                            <FormSelect
+                              value={freeTransfers ?? effectiveFt}
+                              onChange={(e) => setFreeTransfers(parseInt(e.target.value, 10))}
+                            >
+                              {[1, 2, 3, 4, 5].map((n) => (
+                                <option key={`advanced-ft-${n}`} value={n}>
+                                  {n} FT
+                                </option>
+                              ))}
+                            </FormSelect>
                           </FormField>
                         </div>
                       </FormSectionCard>
@@ -1548,9 +1746,31 @@ export function Planner() {
                     )
                   })}
                 </div>
+                {selectedGameweek !== null && selectedGwTransferStatus && (
+                  <div className="rounded-lg border border-border/60 bg-surface-elevated/60 px-3 py-2 flex items-center justify-between">
+                    <span className="text-xs text-foreground-muted">
+                      GW{selectedGameweek} transfer budget
+                    </span>
+                    <span
+                      className={`font-mono text-sm ${
+                        selectedGwTransferStatus.hits > 0 ? 'text-destructive' : 'text-foreground'
+                      }`}
+                    >
+                      {selectedGwTransferStatus.statusLabel}
+                      <span className="text-foreground-muted">
+                        {' '}
+                        ({selectedGwTransferStatus.used}
+                        {selectedGwTransferStatus.hits > 0
+                          ? ` used, ${selectedGwTransferStatus.available} free`
+                          : `/${selectedGwTransferStatus.available} used`}
+                        )
+                      </span>
+                    </span>
+                  </div>
+                )}
                 <div className="pt-3 border-t border-border/50 flex items-center justify-between">
                   <span className="text-xs text-foreground-muted">
-                    Total ({predictionsRange?.gameweeks.length ?? 6} GWs)
+                    Total ({displayHorizonLength} GWs)
                     {selectedPath && ' \u2014 Plan ' + selectedPath.id}
                   </span>
                   <span className="font-mono font-bold text-fpl-green text-lg">

@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Services;
 
 use SuperFPL\Api\Database;
+use SuperFPL\Api\Prediction\PredictionScaler;
 use SuperFPL\FplClient\FplClient;
 
 class TransferOptimizerService
 {
-    private const PLANNING_HORIZON = 6; // Gameweeks to look ahead
+    private const DEFAULT_PLANNING_HORIZON = 6; // Gameweeks to look ahead
+    private const MIN_PLANNING_HORIZON = 1;
+    private const MAX_PLANNING_HORIZON = 12;
     private const HIT_COST = 4; // Points cost per extra transfer
     private const HIT_THRESHOLD = 6; // Minimum net gain required to recommend a hit
     private const CHIP_WILDCARD = 'wildcard';
@@ -25,9 +28,6 @@ class TransferOptimizerService
     private const OBJECTIVE_EXPECTED = 'expected';
     private const OBJECTIVE_FLOOR = 'floor';
     private const OBJECTIVE_CEILING = 'ceiling';
-    private const POSITION_GKP = 1;
-    private const POSITION_DEF = 2;
-    private const POSITION_MID = 3;
     private const CONSTRAINT_CHIP_KEYS = [
         self::CHIP_WILDCARD,
         self::CHIP_BENCH_BOOST,
@@ -66,8 +66,9 @@ class TransferOptimizerService
         bool $chipCompare = false,
         string $objectiveMode = self::OBJECTIVE_EXPECTED,
         array $constraints = [],
+        int $planningHorizon = self::DEFAULT_PLANNING_HORIZON,
     ): array {
-        $context = $this->buildPlanningContext($managerId, $freeTransfers, $xMinsOverrides);
+        $context = $this->buildPlanningContext($managerId, $freeTransfers, $xMinsOverrides, $planningHorizon);
         $planFromGw = $context['plan_from_gw'];
         $upcomingGws = $context['upcoming_gws'];
         $currentSquad = $context['current_squad'];
@@ -224,9 +225,10 @@ class TransferOptimizerService
         int $freeTransfers = 0,
         array $chipPlan = [],
         array $chipAllow = [],
-        array $chipForbid = []
+        array $chipForbid = [],
+        int $planningHorizon = self::DEFAULT_PLANNING_HORIZON
     ): array {
-        $context = $this->buildPlanningContext($managerId, $freeTransfers);
+        $context = $this->buildPlanningContext($managerId, $freeTransfers, [], $planningHorizon);
         $upcomingGws = $context['upcoming_gws'];
 
         $requestedChipPlan = $this->normalizeChipPlan($chipPlan, $upcomingGws);
@@ -250,11 +252,19 @@ class TransferOptimizerService
         ];
     }
 
-    private function buildPlanningContext(int $managerId, int $freeTransfers, array $xMinsOverrides = []): array
+    private function buildPlanningContext(
+        int $managerId,
+        int $freeTransfers,
+        array $xMinsOverrides = [],
+        int $planningHorizon = self::DEFAULT_PLANNING_HORIZON
+    ): array
     {
         $currentGw = $this->gameweekService->getCurrentGameweek();
         $planFromGw = $this->gameweekService->getNextActionableGameweek();
-        $upcomingGws = $this->gameweekService->getUpcomingGameweeks(self::PLANNING_HORIZON, $planFromGw);
+        $normalizedHorizon = $this->normalizePlanningHorizon($planningHorizon);
+        $maxRemainingGws = max(1, 39 - $planFromGw);
+        $horizon = min($normalizedHorizon, $maxRemainingGws);
+        $upcomingGws = $this->gameweekService->getUpcomingGameweeks($horizon, $planFromGw);
         $fixtureCounts = $this->gameweekService->getFixtureCounts($upcomingGws);
 
         // Get manager's current squad — use current GW picks so squad matches bank
@@ -303,7 +313,7 @@ class TransferOptimizerService
                     $ifFitBreakdown = is_array($pred['if_fit_breakdown'] ?? null)
                         ? $pred['if_fit_breakdown']
                         : [];
-                    $predictedPoints = $this->scalePredictionForXMinsOverride(
+                    $predictedPoints = PredictionScaler::scaleFromIfFitBreakdown(
                         $ifFitPoints,
                         $ifFitMins,
                         $overrideMins,
@@ -355,6 +365,14 @@ class TransferOptimizerService
         ];
     }
 
+    private function normalizePlanningHorizon(int $planningHorizon): int
+    {
+        return max(
+            self::MIN_PLANNING_HORIZON,
+            min(self::MAX_PLANNING_HORIZON, $planningHorizon)
+        );
+    }
+
     private function resolveXMinsOverride(array $xMinsOverrides, int $playerId, int $gameweek): ?float
     {
         if (!isset($xMinsOverrides[$playerId])) {
@@ -374,66 +392,6 @@ class TransferOptimizerService
         }
 
         return max(0.0, min(95.0, (float) $raw));
-    }
-
-    /**
-     * Scale if-fit prediction to custom xMins while capping bounded components.
-     *
-     * @param array<string, mixed> $ifFitBreakdown
-     */
-    private function scalePredictionForXMinsOverride(
-        float $ifFitPoints,
-        float $ifFitMins,
-        float $overrideMins,
-        array $ifFitBreakdown,
-        int $fixtureCount,
-        int $position
-    ): float {
-        if ($ifFitMins <= 0) {
-            return 0.0;
-        }
-
-        $ratio = $overrideMins / $ifFitMins;
-        if ($ratio < 0) {
-            return 0.0;
-        }
-
-        $components = [];
-        foreach ($ifFitBreakdown as $key => $value) {
-            if (is_string($key) && is_numeric($value)) {
-                $components[$key] = (float) $value;
-            }
-        }
-
-        if (empty($components)) {
-            return round($ifFitPoints * $ratio, 4);
-        }
-
-        $appearanceCap = 2.0 * max(1, $fixtureCount);
-        $bonusCap = 3.0 * max(1, $fixtureCount);
-        $cleanSheetCapPerFixture = match ($position) {
-            self::POSITION_GKP, self::POSITION_DEF => 4.0,
-            self::POSITION_MID => 1.0,
-            default => 0.0,
-        };
-        $cleanSheetCap = $cleanSheetCapPerFixture * max(1, $fixtureCount);
-        $defContributionCap = $position >= self::POSITION_DEF ? 2.0 * max(1, $fixtureCount) : 0.0;
-        $scaledTotal = 0.0;
-        foreach ($components as $key => $value) {
-            $scaled = $value * $ratio;
-            if ($key === 'appearance' && $scaled > 0) {
-                $scaled = min($appearanceCap, $scaled);
-            } elseif ($key === 'bonus' && $scaled > 0) {
-                $scaled = min($bonusCap, $scaled);
-            } elseif ($key === 'clean_sheet' && $scaled > 0 && $cleanSheetCapPerFixture > 0) {
-                $scaled = min($cleanSheetCap, $scaled);
-            } elseif ($key === 'defensive_contribution' && $scaled > 0 && $defContributionCap > 0) {
-                $scaled = min($defContributionCap, $scaled);
-            }
-            $scaledTotal += $scaled;
-        }
-
-        return round($scaledTotal, 4);
     }
 
     private function normalizeObjectiveMode(string $objectiveMode): string

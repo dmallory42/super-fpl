@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Prediction;
 
 /**
- * Calculates expected negative points from cards, own goals, and penalty misses.
+ * Calculates expected negative points from disciplinary cards only.
  *
  * Simple per-90 rates from FPL actuals:
  * - Yellow card: -1 point
  * - Red card: -3 points
- * - Own goal: -2 points
- * - Penalty missed: -2 points
+ *
+ * Own goals and penalty misses are intentionally excluded here:
+ * - Own goals are rare and highly volatile match events
+ * - Penalty miss risk is already embedded in PenaltyProbability
  */
 class CardProbability
 {
@@ -22,9 +24,9 @@ class CardProbability
     private const RELIABLE_MINUTES_THRESHOLD = 270;
 
     /**
-     * League-average deduction rate per 90 (~0.17 yellows, rare reds/OGs/pen misses).
+     * League-average disciplinary deduction rate per 90.
      */
-    private const BASELINE_DEDUCTIONS_PER_90 = -0.20;
+    private const BASELINE_DEDUCTIONS_PER_90 = -0.16;
 
     /**
      * Calculate expected deduction points per match.
@@ -42,18 +44,11 @@ class CardProbability
 
         $yellowCards = (int) ($player['yellow_cards'] ?? 0);
         $redCards = (int) ($player['red_cards'] ?? 0);
-        $ownGoals = (int) ($player['own_goals'] ?? 0);
-        $penaltiesMissed = (int) ($player['penalties_missed'] ?? 0);
-
         $yellowPer90 = ($yellowCards / $minutes) * 90;
         $redPer90 = ($redCards / $minutes) * 90;
-        $ownGoalsPer90 = ($ownGoals / $minutes) * 90;
-        $penMissedPer90 = ($penaltiesMissed / $minutes) * 90;
 
         $rawDeductions = ($yellowPer90 * -1)
-            + ($redPer90 * -3)
-            + ($ownGoalsPer90 * -2)
-            + ($penMissedPer90 * -2);
+            + ($redPer90 * -3);
 
         // Regress toward league-average baseline for small sample sizes
         if ($minutes < self::RELIABLE_MINUTES_THRESHOLD) {

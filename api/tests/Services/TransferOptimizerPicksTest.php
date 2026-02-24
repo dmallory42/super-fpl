@@ -183,6 +183,44 @@ class TransferOptimizerPicksTest extends TestCase
         $this->assertSame('none', $result['chip_mode']);
     }
 
+    public function testPlanningHorizonControlsUpcomingGameweeksWindow(): void
+    {
+        $db = $this->createMock(Database::class);
+        $fplClient = $this->createMock(FplClient::class);
+        $predictionService = $this->createMock(PredictionService::class);
+        $gameweekService = $this->createMock(GameweekService::class);
+
+        $gameweekService->method('getCurrentGameweek')->willReturn(26);
+        $gameweekService->method('hasGameweekStarted')->with(26)->willReturn(true);
+        $gameweekService->method('getNextActionableGameweek')->willReturn(27);
+        $gameweekService->expects($this->once())
+            ->method('getUpcomingGameweeks')
+            ->with(4, 27)
+            ->willReturn([27, 28, 29, 30]);
+        $gameweekService->method('getFixtureCounts')->willReturn([
+            27 => [],
+            28 => [],
+            29 => [],
+            30 => [],
+        ]);
+
+        $entryEndpoint = $this->createMock(EntryEndpoint::class);
+        $entryEndpoint->method('getRaw')->willReturn([
+            'last_deadline_bank' => 20,
+            'last_deadline_value' => 1000,
+        ]);
+        $entryEndpoint->method('picks')->with(26)->willReturn($this->createMockPicks());
+        $fplClient->method('entry')->willReturn($entryEndpoint);
+
+        $db->method('fetchAll')->willReturn([]);
+        $predictionService->method('getPredictions')->willReturn([]);
+
+        $service = new TransferOptimizerService($db, $fplClient, $predictionService, $gameweekService);
+        $result = $service->getOptimalPlan(8028, skipSolve: true, planningHorizon: 4);
+
+        $this->assertSame([27, 28, 29, 30], $result['planning_horizon']);
+    }
+
     public function testSuggestChipPlanIncludesRankedSuggestions(): void
     {
         $db = $this->createMock(Database::class);
