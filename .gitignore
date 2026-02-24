@@ -54,3 +54,6 @@ tsconfig.tsbuildinfo
 
 # Worktrees
 .worktrees/
+
+# Local-only deployment notes
+docs/DEPLOYMENT_PLAN.md
