@@ -19,6 +19,16 @@ if ($corsOriginsEnv !== '') {
     $corsAllowedOrigins = ['*'];
 }
 
+$fplConnectTimeout = (float) (getenv('SUPERFPL_FPL_CONNECT_TIMEOUT') ?: 8);
+if ($fplConnectTimeout <= 0) {
+    $fplConnectTimeout = 8;
+}
+
+$fplRequestTimeout = (float) (getenv('SUPERFPL_FPL_REQUEST_TIMEOUT') ?: 15);
+if ($fplRequestTimeout <= 0) {
+    $fplRequestTimeout = 15;
+}
+
 return [
     'database' => [
         'path' => getenv('SUPERFPL_DB_PATH') ?: (__DIR__ . '/../data/superfpl.db'),
@@ -29,6 +39,8 @@ return [
     ],
     'fpl' => [
         'rate_limit_dir' => getenv('SUPERFPL_RATE_LIMIT_DIR') ?: '/tmp/fpl-rate-limit',
+        'connect_timeout' => $fplConnectTimeout,
+        'request_timeout' => $fplRequestTimeout,
     ],
     'logs' => [
         'error_log' => __DIR__ . '/../cache/logs/api-error.log',

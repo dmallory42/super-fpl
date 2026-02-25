@@ -74,7 +74,9 @@ $cache = new FileCache($cacheDir);
 $fplClient = new FplClient(
     cache: $cache,
     cacheTtl: $config['cache']['ttl'],
-    rateLimitDir: $config['fpl']['rate_limit_dir']
+    rateLimitDir: $config['fpl']['rate_limit_dir'],
+    connectTimeout: (float) ($config['fpl']['connect_timeout'] ?? 8.0),
+    requestTimeout: (float) ($config['fpl']['request_timeout'] ?? 15.0)
 );
 $responseCacheClient = createResponseCacheClient();
 

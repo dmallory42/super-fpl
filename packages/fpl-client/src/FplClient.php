@@ -23,14 +23,18 @@ class FplClient
     public function __construct(
         ?CacheInterface $cache = null,
         int $cacheTtl = 300,
-        string $rateLimitDir = '/tmp'
+        string $rateLimitDir = '/tmp',
+        float $connectTimeout = 8.0,
+        float $requestTimeout = 15.0
     ) {
         $rateLimiter = new RateLimiter($rateLimitDir);
         $this->httpClient = new HttpClient(
             baseUrl: self::BASE_URL,
             rateLimiter: $rateLimiter,
             cache: $cache,
-            cacheTtl: $cacheTtl
+            cacheTtl: $cacheTtl,
+            connectTimeout: $connectTimeout,
+            requestTimeout: $requestTimeout
         );
     }
 

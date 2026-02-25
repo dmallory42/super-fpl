@@ -14,7 +14,9 @@ class HttpClient
         private readonly string $baseUrl,
         private readonly RateLimiter $rateLimiter,
         private readonly ?CacheInterface $cache = null,
-        private readonly int $cacheTtl = 300
+        private readonly int $cacheTtl = 300,
+        private readonly float $connectTimeout = 8.0,
+        private readonly float $requestTimeout = 15.0
     ) {
     }
 
@@ -42,13 +44,29 @@ class HttpClient
                     'User-Agent: ' . self::USER_AGENT,
                     'Accept: application/json',
                 ],
-                'timeout' => 30,
+                'timeout' => $this->requestTimeout,
+            ],
+            'socket' => [
+                'connect_timeout' => $this->connectTimeout,
             ],
         ]);
 
+        $startedAt = microtime(true);
         $response = @file_get_contents($url, false, $context);
 
         if ($response === false) {
+            $lastError = error_get_last();
+            $message = is_array($lastError) ? (string) ($lastError['message'] ?? '') : '';
+            $elapsed = microtime(true) - $startedAt;
+            if (
+                stripos($message, 'timed out') !== false
+                || $elapsed >= max(0.05, $this->requestTimeout - 0.05)
+            ) {
+                throw new \RuntimeException(
+                    sprintf('Request timed out after %.2fs: %s', $this->requestTimeout, $url)
+                );
+            }
+
             throw new \RuntimeException("Failed to fetch: {$url}");
         }
 
