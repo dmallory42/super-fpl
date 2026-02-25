@@ -119,6 +119,30 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame('Origin not allowed', $response['json']['error'] ?? null);
     }
 
+    public function testCorsPreflightDefaultAllowsViteDevOrigin(): void
+    {
+        $response = $this->callApi(
+            '/api/health',
+            'OPTIONS',
+            ['REQ_ORIGIN' => 'http://localhost:5173']
+        );
+
+        self::assertSame(204, $response['status']);
+        self::assertSame('', trim($response['body']));
+    }
+
+    public function testCorsPreflightDefaultRejectsWildcardBehavior(): void
+    {
+        $response = $this->callApi(
+            '/api/health',
+            'OPTIONS',
+            ['REQ_ORIGIN' => 'https://evil.example']
+        );
+
+        self::assertSame(403, $response['status']);
+        self::assertSame('Origin not allowed', $response['json']['error'] ?? null);
+    }
+
     public function testAdminRoutesRequireTokenWhenConfigured(): void
     {
         $response = $this->callApi(

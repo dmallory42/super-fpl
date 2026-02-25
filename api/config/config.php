@@ -16,7 +16,7 @@ if ($corsOriginsEnv !== '') {
         explode(',', $corsOriginsEnv)
     )));
 } elseif ($appEnv !== 'production') {
-    $corsAllowedOrigins = ['*'];
+    $corsAllowedOrigins = ['http://localhost:5173'];
 }
 
 $fplConnectTimeout = (float) (getenv('SUPERFPL_FPL_CONNECT_TIMEOUT') ?: 8);

@@ -15,7 +15,9 @@
 		}
 		uri strip_prefix /api
 		root * /srv/api/public
-		php_fastcgi php:9000
+		php_fastcgi php:9000 {
+			env SUPERFPL_CORS_ALLOWED_ORIGINS "{$SUPERFPL_CORS_ALLOWED_ORIGINS:https://superfpl.com,https://www.superfpl.com}"
+		}
 		file_server
 	}
 
