@@ -3,13 +3,13 @@
 Fantasy Premier League analytics app with:
 - PHP API (`api/`)
 - React + TypeScript frontend (`frontend/`)
-- Dockerized nginx/php/cron/redis local stack
+- Dockerized caddy/php/cron/redis local stack
 
 ## Tech Stack
 
 - Backend: PHP 8.2, SQLite, PHPUnit
 - Frontend: React, Vite, TanStack Query, Playwright
-- Infra (local): Docker Compose (`nginx`, `php`, `cron`, `redis`)
+- Infra (local): Docker Compose (`caddy`, `php`, `cron`, `redis`)
 
 ## Prerequisites
 
@@ -35,7 +35,7 @@ This will:
 
 App URLs:
 - Frontend: `http://localhost:5173`
-- API (via nginx): `http://localhost:8080/api`
+- API (via Caddy): `http://localhost:8080/api`
 
 Optional local env (for odds sync):
 

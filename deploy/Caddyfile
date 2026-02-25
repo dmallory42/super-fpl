@@ -14,7 +14,7 @@
 			max_size 2MB
 		}
 		uri strip_prefix /api
-		root * /srv/api/public
+		root * /var/www/html/api/public
 		php_fastcgi php:9000 {
 			env SUPERFPL_CORS_ALLOWED_ORIGINS "{$SUPERFPL_CORS_ALLOWED_ORIGINS:https://superfpl.com,https://www.superfpl.com}"
 		}

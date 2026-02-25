@@ -1,0 +1,15 @@
+:80 {
+	encode zstd gzip
+
+	@api path /api*
+	handle @api {
+		request_body {
+			max_size 2MB
+		}
+		root * /var/www/html/api/public
+		rewrite * /index.php
+		php_fastcgi php:9000
+	}
+
+	respond 404
+}
