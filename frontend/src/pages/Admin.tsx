@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { usePlayers } from '../hooks/usePlayers'
 import {
+  fetchAdminSession,
   fetchPenaltyTakers,
+  loginAdmin,
   setPenaltyOrder,
   clearPenaltyOrder,
   setXMins,
@@ -17,12 +19,23 @@ import { getPositionName } from '../types/player'
 const POSITION_LABELS: Record<number, string> = { 1: 'GKP', 2: 'DEF', 3: 'MID', 4: 'FWD' }
 
 export function Admin() {
+  const queryClient = useQueryClient()
+  const [loginToken, setLoginToken] = useState('')
+  const {
+    data: adminSession,
+    isLoading: adminSessionLoading,
+    isError: adminSessionError,
+  } = useQuery({
+    queryKey: ['admin-session'],
+    queryFn: fetchAdminSession,
+    retry: false,
+  })
+
   const { data: playersData, isLoading: playersLoading } = usePlayers()
   const { data: penaltyData } = useQuery({
     queryKey: ['penalty-takers'],
     queryFn: fetchPenaltyTakers,
   })
-  const queryClient = useQueryClient()
 
   // Penalty takers section state
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
@@ -31,6 +44,10 @@ export function Admin() {
   const [xminsSearch, setXminsSearch] = useState('')
   const [addingPlayerId, setAddingPlayerId] = useState<number | null>(null)
   const [addingValue, setAddingValue] = useState('')
+
+  useEffect(() => {
+    localStorage.removeItem('superfpl_admin_token')
+  }, [])
 
   const teams = useMemo(() => {
     if (!playersData?.teams) return []
@@ -94,6 +111,20 @@ export function Admin() {
     return new Map(playersData.teams.map((t) => [t.id, t.short_name]))
   }, [playersData])
 
+  const loginMutation = useMutation({
+    mutationFn: async () => {
+      const token = loginToken.trim()
+      if (!token) {
+        throw new Error('Enter your admin token.')
+      }
+      await loginAdmin(token)
+    },
+    onSuccess: async () => {
+      setLoginToken('')
+      await queryClient.invalidateQueries({ queryKey: ['admin-session'] })
+    },
+  })
+
   // Mutations
   const penaltyMutation = useMutation({
     mutationFn: async ({ playerId, order }: { playerId: number; order: number | null }) => {
@@ -124,6 +155,56 @@ export function Admin() {
       setXminsSearch('')
     },
   })
+
+  if (adminSessionLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-surface rounded animate-shimmer" />
+        <div className="h-64 bg-surface rounded animate-shimmer" />
+      </div>
+    )
+  }
+
+  if (adminSessionError || adminSession?.authenticated !== true) {
+    return (
+      <div className="space-y-8">
+        <div className="animate-fade-in-up">
+          <h2 className="font-display text-2xl font-bold tracking-wider uppercase">
+            <GradientText>Admin</GradientText>
+          </h2>
+          <p className="text-sm text-foreground-muted mt-1">
+            Sign in with your admin token to manage protected settings.
+          </p>
+        </div>
+
+        <BroadcastCard title="Admin Sign In" animationDelay={100}>
+          <div className="flex flex-col gap-3 max-w-md">
+            <FormInput
+              type="password"
+              placeholder="Enter admin token"
+              value={loginToken}
+              onChange={(e) => setLoginToken(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !loginMutation.isPending) {
+                  loginMutation.mutate()
+                }
+              }}
+            />
+            <button
+              className="btn-primary w-full sm:w-auto"
+              onClick={() => loginMutation.mutate()}
+              disabled={loginMutation.isPending}
+            >
+              {loginMutation.isPending ? 'Signing in…' : 'Sign In'}
+            </button>
+            {loginMutation.error instanceof Error && (
+              <p className="text-sm text-destructive">{loginMutation.error.message}</p>
+            )}
+          </div>
+        </BroadcastCard>
+      </div>
+    )
+  }
 
   if (playersLoading) {
     return (

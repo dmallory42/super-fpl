@@ -6,7 +6,7 @@ export interface ApiResponse<T> {
 }
 
 async function fetchApi<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${API_BASE}${endpoint}`)
+  const response = await fetch(`${API_BASE}${endpoint}`, { credentials: 'include' })
   const raw = await response.text()
   let parsed: unknown = null
 
@@ -40,16 +40,35 @@ async function fetchApi<T>(endpoint: string): Promise<T> {
   return parsed as T
 }
 
-function getAdminTokenHeader(): Record<string, string> {
+function getXsrfToken(): string {
   if (typeof window === 'undefined') {
-    return {}
+    return ''
   }
-  const token = window.localStorage.getItem('superfpl_admin_token')?.trim() ?? ''
-  return token ? { 'X-Admin-Token': token } : {}
+
+  const match = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('XSRF-TOKEN='))
+
+  if (!match) {
+    return ''
+  }
+
+  return decodeURIComponent(match.slice('XSRF-TOKEN='.length))
 }
 
 async function fetchApiMutation(endpoint: string, init: RequestInit): Promise<void> {
-  const response = await fetch(`${API_BASE}${endpoint}`, init)
+  const headers = new Headers(init.headers ?? {})
+  const xsrfToken = getXsrfToken()
+  if (xsrfToken) {
+    headers.set('X-XSRF-Token', xsrfToken)
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...init,
+    headers,
+    credentials: 'include',
+  })
   if (response.ok) {
     return
   }
@@ -869,6 +888,22 @@ export interface PenaltyTakersResponse {
   penalty_takers: PenaltyTaker[]
 }
 
+export interface AdminSessionResponse {
+  authenticated: boolean
+}
+
+export async function loginAdmin(token: string): Promise<void> {
+  await fetchApiMutation('/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  })
+}
+
+export async function fetchAdminSession(): Promise<AdminSessionResponse> {
+  return fetchApi<AdminSessionResponse>('/admin/session')
+}
+
 export async function fetchPenaltyTakers(): Promise<PenaltyTakersResponse> {
   return fetchApi<PenaltyTakersResponse>('/penalty-takers')
 }
@@ -876,7 +911,7 @@ export async function fetchPenaltyTakers(): Promise<PenaltyTakersResponse> {
 export async function setPenaltyOrder(playerId: number, order: number): Promise<void> {
   await fetchApiMutation(`/players/${playerId}/penalty-order`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAdminTokenHeader() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ penalty_order: order }),
   })
 }
@@ -884,7 +919,6 @@ export async function setPenaltyOrder(playerId: number, order: number): Promise<
 export async function clearPenaltyOrder(playerId: number): Promise<void> {
   await fetchApiMutation(`/players/${playerId}/penalty-order`, {
     method: 'DELETE',
-    headers: { ...getAdminTokenHeader() },
   })
 }
 
@@ -892,7 +926,7 @@ export async function clearPenaltyOrder(playerId: number): Promise<void> {
 export async function setXMins(playerId: number, mins: number): Promise<void> {
   await fetchApiMutation(`/players/${playerId}/xmins`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getAdminTokenHeader() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ expected_mins: mins }),
   })
 }
@@ -900,7 +934,6 @@ export async function setXMins(playerId: number, mins: number): Promise<void> {
 export async function clearXMins(playerId: number): Promise<void> {
   await fetchApiMutation(`/players/${playerId}/xmins`, {
     method: 'DELETE',
-    headers: { ...getAdminTokenHeader() },
   })
 }
 

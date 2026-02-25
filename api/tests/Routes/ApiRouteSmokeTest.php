@@ -131,6 +131,84 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame('Unauthorized', $response['json']['error'] ?? null);
     }
 
+    public function testAdminLoginSetsSessionAndXsrfCookies(): void
+    {
+        $response = $this->callApi(
+            '/api/admin/login',
+            'POST',
+            ['SUPERFPL_ADMIN_TOKEN' => 'abc123'],
+            json_encode(['token' => 'abc123'])
+        );
+
+        self::assertSame(200, $response['status']);
+        self::assertSame(true, $response['json']['success'] ?? false);
+
+        $cookies = $this->extractSetCookies($response['set_cookies']);
+        self::assertArrayHasKey('superfpl_admin', $cookies);
+        self::assertArrayHasKey('XSRF-TOKEN', $cookies);
+    }
+
+    public function testAdminMutationRequiresCsrfTokenEvenWithSessionCookie(): void
+    {
+        $login = $this->callApi(
+            '/api/admin/login',
+            'POST',
+            ['SUPERFPL_ADMIN_TOKEN' => 'abc123'],
+            json_encode(['token' => 'abc123'])
+        );
+        $cookies = $this->extractSetCookies($login['set_cookies']);
+        $cookieHeader = sprintf(
+            'superfpl_admin=%s; XSRF-TOKEN=%s',
+            $cookies['superfpl_admin'] ?? '',
+            $cookies['XSRF-TOKEN'] ?? ''
+        );
+
+        $response = $this->callApi(
+            '/api/players/1/xmins',
+            'PUT',
+            [
+                'SUPERFPL_ADMIN_TOKEN' => 'abc123',
+                'REQ_COOKIE' => $cookieHeader,
+            ],
+            json_encode(['expected_mins' => 75])
+        );
+
+        self::assertSame(403, $response['status']);
+        self::assertSame('Invalid CSRF token', $response['json']['error'] ?? null);
+    }
+
+    public function testAdminMutationSucceedsWithSessionAndCsrfToken(): void
+    {
+        $login = $this->callApi(
+            '/api/admin/login',
+            'POST',
+            ['SUPERFPL_ADMIN_TOKEN' => 'abc123'],
+            json_encode(['token' => 'abc123'])
+        );
+        $cookies = $this->extractSetCookies($login['set_cookies']);
+        $xsrf = $cookies['XSRF-TOKEN'] ?? '';
+        $cookieHeader = sprintf(
+            'superfpl_admin=%s; XSRF-TOKEN=%s',
+            $cookies['superfpl_admin'] ?? '',
+            $xsrf
+        );
+
+        $response = $this->callApi(
+            '/api/players/1/xmins',
+            'PUT',
+            [
+                'SUPERFPL_ADMIN_TOKEN' => 'abc123',
+                'REQ_COOKIE' => $cookieHeader,
+                'REQ_X_XSRF_TOKEN' => $xsrf,
+            ],
+            json_encode(['expected_mins' => 75])
+        );
+
+        self::assertSame(200, $response['status']);
+        self::assertSame(true, $response['json']['success'] ?? false);
+        self::assertSame(75, $response['json']['expected_mins'] ?? null);
+    }
+
     public function testProductionUnhandledErrorsAreSanitized(): void
     {
         $response = $this->callApi(
@@ -151,9 +229,9 @@ class ApiRouteSmokeTest extends TestCase
 
     /**
      * @param array<string, string> $envOverrides
-     * @return array{status: int, body: string, json: array<string, mixed>, headers: array<int, string>}
+     * @return array{status: int, body: string, json: array<string, mixed>, headers: array<int, string>, set_cookies: array<int, string>}
      */
-    private function callApi(string $uri, string $method = 'GET', array $envOverrides = []): array
+    private function callApi(string $uri, string $method = 'GET', array $envOverrides = [], ?string $body = null): array
     {
         $env = array_merge($_ENV, [
             'PATH' => getenv('PATH') ?: '',
@@ -175,6 +253,9 @@ class ApiRouteSmokeTest extends TestCase
         $process = proc_open($command, $descriptors, $pipes, $this->projectRoot, $env);
         self::assertIsResource($process, 'Failed to start route harness process');
 
+        if ($body !== null) {
+            fwrite($pipes[0], $body);
+        }
         fclose($pipes[0]);
         $stdout = stream_get_contents($pipes[1]);
         fclose($pipes[1]);
@@ -191,6 +272,8 @@ class ApiRouteSmokeTest extends TestCase
         $body = (string) ($decoded['body'] ?? '');
         $headers = $decoded['headers'] ?? [];
         self::assertIsArray($headers, "Response headers are not an array for {$method} {$uri}");
+        $setCookies = $decoded['set_cookies'] ?? [];
+        self::assertIsArray($setCookies, "Set-Cookie data is not an array for {$method} {$uri}");
 
         $json = [];
         if (trim($body) !== '') {
@@ -203,7 +286,32 @@ class ApiRouteSmokeTest extends TestCase
             'body' => $body,
             'json' => $json,
             'headers' => $headers,
+            'set_cookies' => $setCookies,
         ];
+    }
+
+    /**
+     * @param array<int, string> $setCookies
+     * @return array<string, string>
+     */
+    private function extractSetCookies(array $setCookies): array
+    {
+        $cookies = [];
+        foreach ($setCookies as $header) {
+            if (!is_string($header) || $header === '' || !str_contains($header, '=')) {
+                continue;
+            }
+
+            $cookieDef = explode(';', trim($header), 2)[0];
+            [$name, $value] = explode('=', $cookieDef, 2);
+            $cookieName = trim($name);
+            if ($cookieName === '') {
+                continue;
+            }
+            $cookies[$cookieName] = trim($value);
+        }
+
+        return $cookies;
     }
 
     private function deleteTree(string $path): void

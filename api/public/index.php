@@ -89,6 +89,8 @@ if (str_starts_with($uri, '/api')) {
 try {
     match (true) {
         $uri === '' || $uri === '/health' => handleHealth(),
+        $uri === '/admin/login' && $_SERVER['REQUEST_METHOD'] === 'POST' => handleAdminLogin($config),
+        $uri === '/admin/session' => handleAdminSession($config),
         $uri === '/players' => handlePlayers($db, $config),
         $uri === '/players/enhanced' => handlePlayersEnhanced($db, $config),
         $uri === '/fixtures' => handleFixtures($db, $config),
@@ -270,17 +272,19 @@ function applyCorsHeaders(array $config): void
         } else {
             header("Access-Control-Allow-Origin: {$origin}");
             appendVaryHeader('Origin');
+            header('Access-Control-Allow-Credentials: true');
         }
     }
 
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Admin-Token');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-XSRF-Token');
     header('Access-Control-Max-Age: 600');
 }
 
 function applyBaseHeaders(array $config): void
 {
     applyCorsHeaders($config);
+    ensureXsrfTokenCookie();
     header('Cache-Control: no-cache, no-store, must-revalidate');
     header('Content-Type: application/json; charset=utf-8');
     header('X-Content-Type-Options: nosniff');
@@ -333,29 +337,231 @@ function getExpectedAdminToken(array $config): string
     return is_string($token) ? trim($token) : '';
 }
 
-function getProvidedAdminToken(): string
+function isHttpsRequest(): bool
 {
-    $headerToken = trim((string) ($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? ''));
-    if ($headerToken !== '') {
-        return $headerToken;
+    $https = strtolower((string) ($_SERVER['HTTPS'] ?? ''));
+    if ($https !== '' && $https !== 'off') {
+        return true;
     }
 
-    $authorization = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
-    if ($authorization !== '' && preg_match('/^Bearer\s+(.+)$/i', $authorization, $matches) === 1) {
-        return trim((string) $matches[1]);
+    $proto = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    if ($proto !== '' && $proto === 'https') {
+        return true;
     }
 
-    return '';
+    return false;
+}
+
+function setCookieValue(string $name, string $value, bool $httpOnly, int $ttlSeconds): void
+{
+    $expiresAt = time() + $ttlSeconds;
+    $parts = [
+        sprintf('%s=%s', $name, rawurlencode($value)),
+        'Path=/',
+        'Max-Age=' . $ttlSeconds,
+        'Expires=' . gmdate('D, d M Y H:i:s \G\M\T', $expiresAt),
+        'SameSite=Lax',
+    ];
+
+    if (isHttpsRequest()) {
+        $parts[] = 'Secure';
+    }
+
+    if ($httpOnly) {
+        $parts[] = 'HttpOnly';
+    }
+
+    $cookieHeader = implode('; ', $parts);
+    header('Set-Cookie: ' . $cookieHeader, false);
+    if (!isset($GLOBALS['superfpl_set_cookies']) || !is_array($GLOBALS['superfpl_set_cookies'])) {
+        $GLOBALS['superfpl_set_cookies'] = [];
+    }
+    $GLOBALS['superfpl_set_cookies'][] = $cookieHeader;
+}
+
+/**
+ * @return array<string, string>
+ */
+function parseCookieHeader(): array
+{
+    $rawCookie = trim((string) ($_SERVER['HTTP_COOKIE'] ?? ''));
+    if ($rawCookie === '') {
+        return [];
+    }
+
+    $pairs = explode(';', $rawCookie);
+    $cookies = [];
+    foreach ($pairs as $pair) {
+        $trimmed = trim($pair);
+        if ($trimmed === '' || !str_contains($trimmed, '=')) {
+            continue;
+        }
+
+        [$name, $value] = explode('=', $trimmed, 2);
+        $cookieName = trim($name);
+        if ($cookieName === '') {
+            continue;
+        }
+
+        $cookies[$cookieName] = urldecode(trim($value));
+    }
+
+    return $cookies;
+}
+
+function getRequestCookie(string $name): string
+{
+    if (isset($_COOKIE[$name]) && is_string($_COOKIE[$name]) && $_COOKIE[$name] !== '') {
+        return $_COOKIE[$name];
+    }
+
+    $cookies = parseCookieHeader();
+    $value = $cookies[$name] ?? '';
+    return is_string($value) ? trim($value) : '';
+}
+
+function createRandomToken(int $byteLength = 32): string
+{
+    try {
+        return bin2hex(random_bytes($byteLength));
+    } catch (\Throwable) {
+        return bin2hex(pack('d', microtime(true))) . bin2hex(pack('d', mt_rand()));
+    }
+}
+
+function ensureXsrfTokenCookie(): string
+{
+    $existing = getRequestCookie('XSRF-TOKEN');
+    if ($existing !== '') {
+        return $existing;
+    }
+
+    $token = createRandomToken(16);
+    setCookieValue('XSRF-TOKEN', $token, false, 43200);
+    return $token;
+}
+
+function getExpectedAdminSessionHash(array $config): string
+{
+    $expectedToken = getExpectedAdminToken($config);
+    if ($expectedToken === '') {
+        return '';
+    }
+
+    return hash('sha256', $expectedToken);
+}
+
+function hasValidAdminSession(array $config): bool
+{
+    $expectedHash = getExpectedAdminSessionHash($config);
+    if ($expectedHash === '') {
+        return false;
+    }
+
+    $session = getRequestCookie('superfpl_admin');
+    return $session !== '' && hash_equals($expectedHash, $session);
+}
+
+function hasValidAdminCsrf(): bool
+{
+    $cookieToken = getRequestCookie('XSRF-TOKEN');
+    $headerToken = trim((string) ($_SERVER['HTTP_X_XSRF_TOKEN'] ?? ''));
+
+    return $cookieToken !== '' && $headerToken !== '' && hash_equals($cookieToken, $headerToken);
+}
+
+function readRequestBody(): string
+{
+    $rawBody = file_get_contents('php://input');
+    if (!is_string($rawBody)) {
+        $rawBody = '';
+    }
+
+    if ($rawBody === '' && PHP_SAPI === 'cli') {
+        $stdin = file_get_contents('php://stdin');
+        if (is_string($stdin)) {
+            $rawBody = $stdin;
+        }
+    }
+
+    return $rawBody;
+}
+
+/**
+ * @return array<string, mixed>|null
+ */
+function decodeJsonRequestBody(): ?array
+{
+    $rawBody = readRequestBody();
+    if (trim($rawBody) === '') {
+        return [];
+    }
+
+    $decoded = json_decode($rawBody, true);
+    return is_array($decoded) ? $decoded : null;
+}
+
+function handleAdminLogin(array $config): void
+{
+    $expectedToken = getExpectedAdminToken($config);
+    if ($expectedToken === '') {
+        http_response_code(503);
+        echo json_encode(['error' => 'Admin auth not configured']);
+        return;
+    }
+
+    $body = decodeJsonRequestBody();
+    if (!is_array($body)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON body']);
+        return;
+    }
+
+    $providedToken = trim((string) ($body['token'] ?? ''));
+    if ($providedToken === '' || !hash_equals($expectedToken, $providedToken)) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Unauthorized']);
+        return;
+    }
+
+    $sessionHash = getExpectedAdminSessionHash($config);
+    setCookieValue('superfpl_admin', $sessionHash, true, 43200);
+    ensureXsrfTokenCookie();
+
+    echo json_encode(['success' => true]);
+}
+
+function handleAdminSession(array $config): void
+{
+    $expectedToken = getExpectedAdminToken($config);
+    if ($expectedToken === '') {
+        http_response_code(503);
+        echo json_encode(['error' => 'Admin auth not configured']);
+        return;
+    }
+
+    if (!hasValidAdminSession($config)) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Unauthorized']);
+        return;
+    }
+
+    echo json_encode(['authenticated' => true]);
 }
 
 function withAdminToken(array $config, callable $handler): void
 {
     $expectedToken = getExpectedAdminToken($config);
     if ($expectedToken !== '') {
-        $providedToken = getProvidedAdminToken();
-        if ($providedToken === '' || !hash_equals($expectedToken, $providedToken)) {
+        if (!hasValidAdminSession($config)) {
             http_response_code(401);
             echo json_encode(['error' => 'Unauthorized']);
+            return;
+        }
+
+        if (!hasValidAdminCsrf()) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Invalid CSRF token']);
             return;
         }
     }
@@ -1730,7 +1936,12 @@ function handlePlannerChipSuggest(Database $db, FplClient $fplClient): void
 
 function handleSetXMins(Database $db, int $playerId): void
 {
-    $body = json_decode(file_get_contents('php://input'), true);
+    $body = decodeJsonRequestBody();
+    if (!is_array($body)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON body']);
+        return;
+    }
     $expectedMins = $body['expected_mins'] ?? null;
 
     if ($expectedMins === null || !is_numeric($expectedMins)) {
@@ -1755,7 +1966,12 @@ function handleClearXMins(Database $db, int $playerId): void
 
 function handleSetPenaltyOrder(Database $db, int $playerId): void
 {
-    $body = json_decode(file_get_contents('php://input'), true);
+    $body = decodeJsonRequestBody();
+    if (!is_array($body)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON body']);
+        return;
+    }
     $order = $body['penalty_order'] ?? null;
 
     if ($order === null || !is_numeric($order) || (int) $order < 1 || (int) $order > 5) {
@@ -1779,7 +1995,12 @@ function handleClearPenaltyOrder(Database $db, int $playerId): void
 
 function handleSetTeamPenaltyTakers(Database $db, int $teamId): void
 {
-    $body = json_decode(file_get_contents('php://input'), true);
+    $body = decodeJsonRequestBody();
+    if (!is_array($body)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid JSON body']);
+        return;
+    }
     $takers = $body['takers'] ?? [];
 
     if (!is_array($takers) || empty($takers)) {

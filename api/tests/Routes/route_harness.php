@@ -23,6 +23,27 @@ if (is_string($adminToken) && $adminToken !== '') {
     $_SERVER['HTTP_X_ADMIN_TOKEN'] = $adminToken;
 }
 
+$xsrfToken = getenv('REQ_X_XSRF_TOKEN');
+if (is_string($xsrfToken) && $xsrfToken !== '') {
+    $_SERVER['HTTP_X_XSRF_TOKEN'] = $xsrfToken;
+}
+
+$cookieHeader = getenv('REQ_COOKIE');
+if (is_string($cookieHeader) && $cookieHeader !== '') {
+    $_SERVER['HTTP_COOKIE'] = $cookieHeader;
+    foreach (explode(';', $cookieHeader) as $pair) {
+        $parts = explode('=', trim($pair), 2);
+        if (count($parts) !== 2) {
+            continue;
+        }
+        $name = trim($parts[0]);
+        if ($name === '') {
+            continue;
+        }
+        $_COOKIE[$name] = urldecode(trim($parts[1]));
+    }
+}
+
 $_GET = [];
 $query = parse_url($uri, PHP_URL_QUERY);
 if (is_string($query) && $query !== '') {
@@ -42,11 +63,16 @@ register_shutdown_function(static function (): void {
         $status = 200;
     }
     $headers = headers_list();
+    $setCookies = $GLOBALS['superfpl_set_cookies'] ?? [];
+    if (!is_array($setCookies)) {
+        $setCookies = [];
+    }
 
     echo json_encode([
         'status' => $status,
         'body' => (string) $body,
         'headers' => $headers,
+        'set_cookies' => array_values($setCookies),
     ], JSON_UNESCAPED_SLASHES);
 });
 
