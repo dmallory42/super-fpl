@@ -104,19 +104,19 @@ docker compose up -d cron
 
 ## Production Security Env Vars
 
-Set these in `.env.production`:
+Use `.env.example` as the source-of-truth template for all required variables.
+
+For production, set these in `.env.production`:
 
 - `SUPERFPL_APP_ENV=production`
 - `SUPERFPL_DEBUG=0`
 - `SUPERFPL_CORS_ALLOWED_ORIGINS=https://superfpl.com,https://www.superfpl.com`
 - `SUPERFPL_ADMIN_TOKEN=<long-random-token>` (recommended)
 - `REDIS_PASSWORD=<strong-password>` (recommended)
+- `SUPERFPL_FPL_CONNECT_TIMEOUT=8`
+- `SUPERFPL_FPL_REQUEST_TIMEOUT=15`
 
-If `SUPERFPL_ADMIN_TOKEN` is set and you use the in-app Admin page, set it in browser local storage:
-
-```js
-localStorage.setItem('superfpl_admin_token', 'your_token_here')
-```
+Admin access now uses secure cookies (via `/api/admin/login`) rather than browser local storage.
 
 ## Caching
 
