@@ -46,6 +46,8 @@ class LeagueService
     public function getAllStandings(int $leagueId): array
     {
         try {
+            // Ensure FK target exists before caching members from paginated results.
+            $this->ensureLeagueExists($leagueId);
             $allResults = $this->fplClient->league($leagueId)->getAllResults();
 
             // Cache all members
@@ -58,6 +60,21 @@ class LeagueService
             // Fall back to cached data
             return $this->getCachedStandings($leagueId);
         }
+    }
+
+    private function ensureLeagueExists(int $leagueId): void
+    {
+        $existing = $this->db->fetchOne('SELECT id FROM leagues WHERE id = ?', [$leagueId]);
+        if ($existing !== null) {
+            return;
+        }
+
+        $this->db->upsert('leagues', [
+            'id' => $leagueId,
+            'name' => "League {$leagueId}",
+            'type' => 'classic',
+            'last_synced' => date('Y-m-d H:i:s'),
+        ], ['id']);
     }
 
     /**
