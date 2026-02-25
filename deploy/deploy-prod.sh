@@ -3,6 +3,7 @@ set -euo pipefail
 
 APP_DIR="${APP_DIR:-/opt/superfpl}"
 ENV_FILE="${ENV_FILE:-.env.production}"
+DEPLOY_REF="${DEPLOY_REF:-main}"
 
 cd "$APP_DIR"
 
@@ -18,10 +19,20 @@ if command -v stat >/dev/null 2>&1; then
   fi
 fi
 
-echo "Fetching latest main..."
-git fetch origin main
-git checkout main
-git pull --ff-only origin main
+echo "Fetching latest refs..."
+git fetch --prune --tags origin
+
+if git rev-parse -q --verify "refs/tags/$DEPLOY_REF" >/dev/null; then
+  echo "Checking out tag $DEPLOY_REF..."
+  git checkout --detach "refs/tags/$DEPLOY_REF"
+elif git rev-parse -q --verify "refs/remotes/origin/$DEPLOY_REF" >/dev/null; then
+  echo "Checking out branch $DEPLOY_REF..."
+  git checkout "$DEPLOY_REF"
+  git pull --ff-only origin "$DEPLOY_REF"
+else
+  echo "Error: DEPLOY_REF '$DEPLOY_REF' not found in origin branches or tags"
+  exit 1
+fi
 
 echo "Installing node dependencies..."
 export HUSKY=0
