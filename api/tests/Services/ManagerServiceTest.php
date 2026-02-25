@@ -117,4 +117,88 @@ class ManagerServiceTest extends TestCase
         $this->assertSame(true, (bool) ($result['cached'] ?? false));
         $this->assertSame(99, (int) ($result['picks'][0]['element'] ?? 0));
     }
+
+    public function testGetPicksReturnsFreshDataWhenCacheWriteFails(): void
+    {
+        $entry = $this->createMock(EntryEndpoint::class);
+        $entry->method('picks')->with(12)->willReturn([
+            'picks' => [
+                [
+                    'element' => 101,
+                    'position' => 1,
+                    'multiplier' => 2,
+                    'is_captain' => true,
+                    'is_vice_captain' => false,
+                ],
+            ],
+        ]);
+
+        $fplClient = $this->createMock(FplClient::class);
+        $fplClient->method('entry')->with(9001)->willReturn($entry);
+
+        $db = $this->getMockBuilder(Database::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['query'])
+            ->getMock();
+        $db->method('query')->willThrowException(new \RuntimeException('db write failed'));
+
+        $service = new ManagerService($db, $fplClient);
+        $result = $service->getPicks(9001, 12);
+
+        $this->assertNotNull($result);
+        $this->assertSame(101, (int) ($result['picks'][0]['element'] ?? 0));
+    }
+
+    public function testGetHistoryReturnsFreshDataWhenCacheWriteFails(): void
+    {
+        $historyPayload = [
+            'current' => [
+                [
+                    'event' => 1,
+                    'points' => 60,
+                    'total_points' => 60,
+                    'overall_rank' => 100000,
+                    'bank' => 10,
+                    'value' => 1005,
+                    'event_transfers_cost' => 0,
+                    'points_on_bench' => 5,
+                ],
+            ],
+        ];
+
+        $entry = $this->createMock(EntryEndpoint::class);
+        $entry->method('history')->willReturn($historyPayload);
+        $fplClient = $this->createMock(FplClient::class);
+        $fplClient->method('entry')->with(8123)->willReturn($entry);
+
+        $db = $this->getMockBuilder(Database::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['upsert'])
+            ->getMock();
+        $db->method('upsert')->willThrowException(new \RuntimeException('db write failed'));
+
+        $service = new ManagerService($db, $fplClient);
+        $result = $service->getHistory(8123);
+
+        $this->assertSame($historyPayload, $result);
+    }
+
+    public function testGetHistoryReturnsNullWhenApiAndCacheReadFail(): void
+    {
+        $entry = $this->createMock(EntryEndpoint::class);
+        $entry->method('history')->willThrowException(new \RuntimeException('api down'));
+        $fplClient = $this->createMock(FplClient::class);
+        $fplClient->method('entry')->with(9555)->willReturn($entry);
+
+        $db = $this->getMockBuilder(Database::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['fetchAll'])
+            ->getMock();
+        $db->method('fetchAll')->willThrowException(new \RuntimeException('db read failed'));
+
+        $service = new ManagerService($db, $fplClient);
+        $result = $service->getHistory(9555);
+
+        $this->assertNull($result);
+    }
 }

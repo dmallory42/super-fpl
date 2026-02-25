@@ -22,18 +22,27 @@ class ManagerService
      */
     public function getById(int $id): ?array
     {
-        // Try to fetch fresh data from FPL API
+        // Prefer fresh API data and treat cache-write failures as non-fatal.
         try {
             $entryData = $this->fplClient->entry($id)->getRaw();
-            $this->cacheManager($entryData);
+            try {
+                $this->cacheManager($entryData);
+            } catch (\Throwable $cacheError) {
+                error_log("ManagerService: Failed to cache manager {$id}: " . $cacheError->getMessage());
+            }
             return $this->formatManagerResponse($entryData);
         } catch (\Throwable $e) {
             error_log("ManagerService: Failed to fetch manager {$id} from API: " . $e->getMessage());
-            // Fall back to cached data if API fails
-            $cached = $this->db->fetchOne(
-                'SELECT * FROM managers WHERE id = ?',
-                [$id]
-            );
+            // Fall back to cached data if API fails.
+            try {
+                $cached = $this->db->fetchOne(
+                    'SELECT * FROM managers WHERE id = ?',
+                    [$id]
+                );
+            } catch (\Throwable $cacheError) {
+                error_log("ManagerService: Failed to read cached manager {$id}: " . $cacheError->getMessage());
+                return null;
+            }
 
             if ($cached === null) {
                 return null;
@@ -59,11 +68,26 @@ class ManagerService
     {
         try {
             $picksData = $this->fplClient->entry($managerId)->picks($gameweek);
-            $this->cacheManagerPicks($managerId, $gameweek, $picksData);
+            try {
+                $this->cacheManagerPicks($managerId, $gameweek, $picksData);
+            } catch (\Throwable $cacheError) {
+                error_log(
+                    "ManagerService: Failed to cache picks for manager {$managerId} GW{$gameweek}: "
+                    . $cacheError->getMessage()
+                );
+            }
             return $picksData;
         } catch (\Throwable $e) {
-            // Fall back to cached picks
-            $cached = $this->getCachedPicks($managerId, $gameweek);
+            // Fall back to cached picks.
+            try {
+                $cached = $this->getCachedPicks($managerId, $gameweek);
+            } catch (\Throwable $cacheError) {
+                error_log(
+                    "ManagerService: Failed to read cached picks for manager {$managerId} GW{$gameweek}: "
+                    . $cacheError->getMessage()
+                );
+                return null;
+            }
             if (empty($cached)) {
                 return null;
             }
@@ -80,11 +104,20 @@ class ManagerService
     {
         try {
             $historyData = $this->fplClient->entry($managerId)->history();
-            $this->cacheManagerHistory($managerId, $historyData);
+            try {
+                $this->cacheManagerHistory($managerId, $historyData);
+            } catch (\Throwable $cacheError) {
+                error_log("ManagerService: Failed to cache history for manager {$managerId}: " . $cacheError->getMessage());
+            }
             return $historyData;
         } catch (\Throwable $e) {
-            // Fall back to cached history
-            $cached = $this->getCachedHistory($managerId);
+            // Fall back to cached history.
+            try {
+                $cached = $this->getCachedHistory($managerId);
+            } catch (\Throwable $cacheError) {
+                error_log("ManagerService: Failed to read cached history for manager {$managerId}: " . $cacheError->getMessage());
+                return null;
+            }
             if (empty($cached)) {
                 return null;
             }

@@ -64,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // Initialize database
 $db = new Database($config['database']['path']);
 $db->init();
+logDatabaseIntegrityWarning($db, $config);
 
 // Initialize FPL client with caching
 $cacheDir = $config['cache']['path'];
@@ -91,7 +92,7 @@ if (str_starts_with($uri, '/api')) {
 
 try {
     match (true) {
-        $uri === '' || $uri === '/health' => handleHealth(),
+        $uri === '' || $uri === '/health' => handleHealth($db, $config),
         $uri === '/admin/login' && $_SERVER['REQUEST_METHOD'] === 'POST' => handleAdminLogin($config),
         $uri === '/admin/session' => handleAdminSession($config),
         $uri === '/players' => handlePlayers($db, $config),
@@ -591,9 +592,114 @@ function withAdminToken(array $config, callable $handler): void
     $handler();
 }
 
-function handleHealth(): void
+function handleHealth(Database $db, array $config): void
 {
-    echo json_encode(['status' => 'ok', 'timestamp' => date('c')]);
+    $dbHealth = getDatabaseHealthStatus($db, $config);
+    $status = ($dbHealth['status'] ?? 'error') === 'ok' ? 'ok' : 'degraded';
+
+    if ($status !== 'ok') {
+        http_response_code(503);
+    }
+
+    echo json_encode([
+        'status' => $status,
+        'timestamp' => date('c'),
+        'checks' => [
+            'database' => [
+                'status' => $dbHealth['status'] ?? 'error',
+                'checked_at' => $dbHealth['checked_at'] ?? date('c'),
+                'message' => $dbHealth['message'] ?? null,
+            ],
+        ],
+    ]);
+}
+
+/**
+ * @return array{status: string, checked_at: string, message: string|null, source: string}
+ */
+function getDatabaseHealthStatus(Database $db, array $config, int $ttlSeconds = 60): array
+{
+    $cacheBase = is_string($config['cache']['path'] ?? null)
+        ? (string) $config['cache']['path']
+        : (__DIR__ . '/../cache');
+    $healthDir = rtrim($cacheBase, '/\\') . '/health';
+    $healthFile = $healthDir . '/db_integrity.json';
+    $now = time();
+
+    if (file_exists($healthFile)) {
+        $mtime = @filemtime($healthFile);
+        if (is_int($mtime) && ($now - $mtime) <= $ttlSeconds) {
+            $cachedRaw = @file_get_contents($healthFile);
+            if (is_string($cachedRaw) && $cachedRaw !== '') {
+                $cached = json_decode($cachedRaw, true);
+                if (
+                    is_array($cached)
+                    && is_string($cached['status'] ?? null)
+                    && in_array($cached['status'], ['ok', 'error'], true)
+                    && is_string($cached['checked_at'] ?? null)
+                ) {
+                    return [
+                        'status' => $cached['status'],
+                        'checked_at' => $cached['checked_at'],
+                        'message' => isset($cached['message']) && is_string($cached['message'])
+                            ? $cached['message']
+                            : null,
+                        'source' => 'cache',
+                    ];
+                }
+            }
+        }
+    }
+
+    $status = 'ok';
+    $message = null;
+
+    try {
+        $result = $db->getPdo()->query('PRAGMA quick_check')->fetchColumn();
+        $normalized = strtolower(trim((string) $result));
+        if ($normalized !== 'ok') {
+            $status = 'error';
+            $message = (string) $result;
+        }
+    } catch (Throwable $e) {
+        $status = 'error';
+        $message = $e->getMessage();
+    }
+
+    $checkedAt = date('c');
+    $payload = [
+        'status' => $status,
+        'checked_at' => $checkedAt,
+        'message' => $message,
+    ];
+
+    if (!is_dir($healthDir)) {
+        @mkdir($healthDir, 0755, true);
+    }
+    @file_put_contents($healthFile, (string) json_encode($payload, JSON_UNESCAPED_SLASHES));
+
+    return [
+        'status' => $status,
+        'checked_at' => $checkedAt,
+        'message' => $message,
+        'source' => 'fresh',
+    ];
+}
+
+function logDatabaseIntegrityWarning(Database $db, array $config): void
+{
+    $health = getDatabaseHealthStatus($db, $config);
+    if (($health['status'] ?? 'error') !== 'error') {
+        return;
+    }
+
+    // Log only when a fresh check runs to avoid noisy duplicate warnings.
+    if (($health['source'] ?? '') !== 'fresh') {
+        return;
+    }
+
+    $message = trim((string) ($health['message'] ?? 'unknown'));
+    error_log('HEALTH WARNING: SQLite integrity check failed: ' . $message);
 }
 
 function handleSyncStatus(array $config): void

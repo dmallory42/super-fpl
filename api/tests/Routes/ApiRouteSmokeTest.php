@@ -45,6 +45,8 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame(200, $response['status']);
         self::assertSame('ok', $response['json']['status'] ?? null);
         self::assertIsString($response['json']['timestamp'] ?? null);
+        self::assertSame('ok', $response['json']['checks']['database']['status'] ?? null);
+        self::assertIsString($response['json']['checks']['database']['checked_at'] ?? null);
     }
 
     public function testSyncStatusDefaultsToZeroForFreshCache(): void
