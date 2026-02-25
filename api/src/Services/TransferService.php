@@ -63,8 +63,9 @@ class TransferService
                 'web_name' => $player['web_name'] ?? "Player $playerId",
                 'team' => $player['club_id'] ?? 0,
                 'position' => $player['position'] ?? 0,
-                'now_cost' => $player['now_cost'] ?? 0,
-                'selling_price' => $pick['selling_price'] ?? $player['now_cost'] ?? 0,
+                'now_cost' => (float) (($player['now_cost'] ?? 0) / 10),
+                // FPL API values are in tenths (e.g. 55 = 5.5m). Normalize before budgeting.
+                'selling_price' => (float) (($pick['selling_price'] ?? $player['now_cost'] ?? 0) / 10),
                 'predicted_points' => $prediction['predicted_points'] ?? 0,
                 'form' => (float) ($player['form'] ?? 0),
                 'chance_of_playing' => $player['chance_of_playing'] ?? 100,
