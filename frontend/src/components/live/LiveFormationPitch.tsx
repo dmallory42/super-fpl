@@ -116,7 +116,7 @@ export function LiveFormationPitch({
                   points={player.points}
                   multiplier={player.multiplier}
                   isCaptain={player.is_captain}
-                  isViceCaptain={false} // TODO: Add vice captain to response if needed
+                  isViceCaptain={false}
                   status={status}
                   matchMinute={minutes}
                   effectiveOwnership={effectiveOwnership?.[player.player_id]}
