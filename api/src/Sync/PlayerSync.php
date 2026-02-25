@@ -67,11 +67,14 @@ class PlayerSync
 
         // Calculate appearances and update database
         $count = 0;
+        $skippedPlayerIds = [];
         foreach ($playerIds as $index => $playerId) {
             $endpoint = $endpoints[$index];
             $data = $responses[$endpoint] ?? null;
 
             if ($data === null || !isset($data['history'])) {
+                $skippedPlayerIds[] = (int) $playerId;
+                error_log("PlayerSync: skipped player {$playerId} — API returned null");
                 continue;
             }
 
@@ -163,6 +166,13 @@ class PlayerSync
 
             $count++;
         }
+
+        error_log(sprintf(
+            'PlayerSync syncAppearances summary: total=%d synced=%d skipped=%d',
+            count($playerIds),
+            $count,
+            count($skippedPlayerIds)
+        ));
 
         return $count;
     }
