@@ -1411,10 +1411,17 @@ function handleCompare(Database $db, FplClient $fplClient): void
 
     $managerIds = array_map('intval', explode(',', $idsParam));
     $managerIds = array_filter($managerIds, fn($id) => $id > 0);
+    $managerIds = array_values(array_unique($managerIds));
 
     if (count($managerIds) < 2) {
         http_response_code(400);
         echo json_encode(['error' => 'Need at least 2 manager IDs to compare']);
+        return;
+    }
+
+    if (count($managerIds) > 50) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Too many manager IDs (max 50)']);
         return;
     }
 

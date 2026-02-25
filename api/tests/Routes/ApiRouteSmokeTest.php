@@ -297,6 +297,15 @@ class ApiRouteSmokeTest extends TestCase
         self::assertStringContainsString('chip_forbid', (string) ($response['json']['error'] ?? ''));
     }
 
+    public function testCompareRejectsTooManyManagerIds(): void
+    {
+        $ids = implode(',', range(1, 51));
+        $response = $this->callApi("/api/compare?ids={$ids}");
+
+        self::assertSame(400, $response['status']);
+        self::assertSame('Too many manager IDs (max 50)', $response['json']['error'] ?? null);
+    }
+
     public function testProductionUnhandledErrorsAreSanitized(): void
     {
         $response = $this->callApi(
