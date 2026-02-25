@@ -131,6 +131,25 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame('Unauthorized', $response['json']['error'] ?? null);
     }
 
+    public function testAdminRoutesReturn503WhenTokenNotConfigured(): void
+    {
+        $response = $this->callApi('/api/sync/players');
+
+        self::assertSame(503, $response['status']);
+        self::assertSame('Admin auth not configured', $response['json']['error'] ?? null);
+    }
+
+    public function testStartupLogsWarningWhenAdminTokenMissing(): void
+    {
+        $this->callApi('/api/health');
+        $contents = file_exists($this->errorLogPath) ? (string) file_get_contents($this->errorLogPath) : '';
+
+        self::assertStringContainsString(
+            'SECURITY WARNING: SUPERFPL_ADMIN_TOKEN is empty; admin endpoints are disabled.',
+            $contents
+        );
+    }
+
     public function testAdminLoginSetsSessionAndXsrfCookies(): void
     {
         $response = $this->callApi(

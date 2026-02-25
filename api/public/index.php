@@ -54,6 +54,7 @@ set_exception_handler(static function (Throwable $e): void {
 });
 
 configureErrorLogDestination($config);
+logAdminAuthConfiguration($config);
 applyBaseHeaders($config);
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -337,6 +338,21 @@ function getExpectedAdminToken(array $config): string
     return is_string($token) ? trim($token) : '';
 }
 
+function logAdminAuthConfiguration(array $config): void
+{
+    static $logged = false;
+    if ($logged) {
+        return;
+    }
+    $logged = true;
+
+    if (getExpectedAdminToken($config) !== '') {
+        return;
+    }
+
+    error_log('SECURITY WARNING: SUPERFPL_ADMIN_TOKEN is empty; admin endpoints are disabled.');
+}
+
 function isHttpsRequest(): bool
 {
     $https = strtolower((string) ($_SERVER['HTTPS'] ?? ''));
@@ -552,18 +568,22 @@ function handleAdminSession(array $config): void
 function withAdminToken(array $config, callable $handler): void
 {
     $expectedToken = getExpectedAdminToken($config);
-    if ($expectedToken !== '') {
-        if (!hasValidAdminSession($config)) {
-            http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
-            return;
-        }
+    if ($expectedToken === '') {
+        http_response_code(503);
+        echo json_encode(['error' => 'Admin auth not configured']);
+        return;
+    }
 
-        if (!hasValidAdminCsrf()) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Invalid CSRF token']);
-            return;
-        }
+    if (!hasValidAdminSession($config)) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Unauthorized']);
+        return;
+    }
+
+    if (!hasValidAdminCsrf()) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid CSRF token']);
+        return;
     }
 
     $handler();
