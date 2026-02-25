@@ -191,6 +191,19 @@ class ApiRouteSmokeTest extends TestCase
         self::assertArrayHasKey('XSRF-TOKEN', $cookies);
     }
 
+    public function testAdminLoginRejectsMalformedJsonBody(): void
+    {
+        $response = $this->callApi(
+            '/api/admin/login',
+            'POST',
+            ['SUPERFPL_ADMIN_TOKEN' => 'abc123'],
+            '{"token":'
+        );
+
+        self::assertSame(400, $response['status']);
+        self::assertSame('Invalid JSON body', $response['json']['error'] ?? null);
+    }
+
     public function testAdminMutationRequiresCsrfTokenEvenWithSessionCookie(): void
     {
         $login = $this->callApi(
@@ -250,6 +263,37 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame(200, $response['status']);
         self::assertSame(true, $response['json']['success'] ?? false);
         self::assertSame(75, $response['json']['expected_mins'] ?? null);
+    }
+
+    public function testAdminMutationRejectsMalformedJsonBody(): void
+    {
+        $login = $this->callApi(
+            '/api/admin/login',
+            'POST',
+            ['SUPERFPL_ADMIN_TOKEN' => 'abc123'],
+            json_encode(['token' => 'abc123'])
+        );
+        $cookies = $this->extractSetCookies($login['set_cookies']);
+        $xsrf = $cookies['XSRF-TOKEN'] ?? '';
+        $cookieHeader = sprintf(
+            'superfpl_admin=%s; XSRF-TOKEN=%s',
+            $cookies['superfpl_admin'] ?? '',
+            $xsrf
+        );
+
+        $response = $this->callApi(
+            '/api/players/1/xmins',
+            'PUT',
+            [
+                'SUPERFPL_ADMIN_TOKEN' => 'abc123',
+                'REQ_COOKIE' => $cookieHeader,
+                'REQ_X_XSRF_TOKEN' => $xsrf,
+            ],
+            '{"expected_mins":'
+        );
+
+        self::assertSame(400, $response['status']);
+        self::assertSame('Invalid JSON body', $response['json']['error'] ?? null);
     }
 
     public function testPlannerOptimizeRejectsInvalidChipPlanShape(): void
