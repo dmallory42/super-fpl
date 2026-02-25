@@ -9,6 +9,31 @@ use PDOStatement;
 
 class Database
 {
+    /**
+     * @var array<int, string>
+     */
+    private const ALLOWED_MUTATION_TABLES = [
+        'clubs',
+        'players',
+        'fixtures',
+        'player_gameweek_history',
+        'managers',
+        'manager_picks',
+        'manager_history',
+        'leagues',
+        'league_members',
+        'player_predictions',
+        'seasons',
+        'player_season_history',
+        'fixture_odds',
+        'player_goalscorer_odds',
+        'player_assist_odds',
+        'prediction_snapshots',
+        'sample_picks',
+        'understat_season_history',
+        'understat_team_season',
+    ];
+
     private PDO $pdo;
     private string $dbPath;
 
@@ -220,6 +245,7 @@ class Database
      */
     public function insert(string $table, array $data): int
     {
+        $this->assertValidMutationTable($table);
         $columns = array_keys($data);
         $placeholders = array_fill(0, count($columns), '?');
 
@@ -243,6 +269,7 @@ class Database
      */
     public function upsert(string $table, array $data, array $conflictKeys): int
     {
+        $this->assertValidMutationTable($table);
         $columns = array_keys($data);
         $placeholders = array_fill(0, count($columns), '?');
 
@@ -272,5 +299,15 @@ class Database
     public function getPdo(): PDO
     {
         return $this->pdo;
+    }
+
+    /**
+     * Column names must be static, code-defined identifiers (never user input).
+     */
+    private function assertValidMutationTable(string $table): void
+    {
+        if (!in_array($table, self::ALLOWED_MUTATION_TABLES, true)) {
+            throw new \InvalidArgumentException("Invalid table name: {$table}");
+        }
     }
 }
