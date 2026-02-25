@@ -1753,63 +1753,323 @@ function handleTransferTargets(Database $db, FplClient $fplClient): void
     ]);
 }
 
+/**
+ * @return array<int, string>
+ */
+function getPlannerValidChips(): array
+{
+    return ['wildcard', 'bench_boost', 'free_hit', 'triple_captain'];
+}
+
+/**
+ * @return mixed
+ */
+function decodeJsonQueryParam(string $param)
+{
+    if (!array_key_exists($param, $_GET)) {
+        return null;
+    }
+
+    try {
+        return json_decode((string) $_GET[$param], true, 512, JSON_THROW_ON_ERROR);
+    } catch (\JsonException) {
+        throw new \InvalidArgumentException("Invalid JSON for {$param}");
+    }
+}
+
+/**
+ * @param mixed $value
+ */
+function parsePlannerGameweekValue(string $label, $value): int
+{
+    if (!is_numeric($value)) {
+        throw new \InvalidArgumentException("Invalid {$label}: expected integer gameweek");
+    }
+
+    $gw = (int) $value;
+    if ($gw < 1 || $gw > 38) {
+        throw new \InvalidArgumentException("Invalid {$label}: expected gameweek between 1 and 38");
+    }
+
+    return $gw;
+}
+
+/**
+ * @return array<string, int>
+ */
+function parsePlannerChipPlanFromQuery(): array
+{
+    $chipPlan = [];
+    $decodedPlan = decodeJsonQueryParam('chip_plan');
+    if ($decodedPlan !== null) {
+        if (!is_array($decodedPlan) || array_is_list($decodedPlan)) {
+            throw new \InvalidArgumentException('Invalid chip_plan: expected JSON object keyed by chip name');
+        }
+
+        foreach ($decodedPlan as $chip => $week) {
+            if (!is_string($chip) || !in_array($chip, getPlannerValidChips(), true)) {
+                throw new \InvalidArgumentException("Invalid chip_plan chip: {$chip}");
+            }
+            $chipPlan[$chip] = parsePlannerGameweekValue("chip_plan.{$chip}", $week);
+        }
+    }
+
+    $legacyChipParams = [
+        'wildcard_gw' => 'wildcard',
+        'bench_boost_gw' => 'bench_boost',
+        'free_hit_gw' => 'free_hit',
+        'triple_captain_gw' => 'triple_captain',
+    ];
+
+    foreach ($legacyChipParams as $param => $chipName) {
+        if (!array_key_exists($param, $_GET)) {
+            continue;
+        }
+
+        $chipPlan[$chipName] = parsePlannerGameweekValue($param, $_GET[$param]);
+    }
+
+    return $chipPlan;
+}
+
+/**
+ * @return array<int, string>
+ */
+function parsePlannerChipAllowFromQuery(): array
+{
+    $decodedAllow = decodeJsonQueryParam('chip_allow');
+    if ($decodedAllow === null) {
+        return [];
+    }
+
+    if (!is_array($decodedAllow) || !array_is_list($decodedAllow)) {
+        throw new \InvalidArgumentException('Invalid chip_allow: expected JSON array of chip names');
+    }
+
+    $chips = [];
+    foreach ($decodedAllow as $chip) {
+        if (!is_string($chip) || !in_array($chip, getPlannerValidChips(), true)) {
+            throw new \InvalidArgumentException('Invalid chip_allow: contains unknown chip');
+        }
+        $chips[] = $chip;
+    }
+
+    return array_values(array_unique($chips));
+}
+
+/**
+ * @return array<string, array<int, int>>
+ */
+function parsePlannerChipForbidFromQuery(): array
+{
+    $decodedForbid = decodeJsonQueryParam('chip_forbid');
+    if ($decodedForbid === null) {
+        return [];
+    }
+
+    if (!is_array($decodedForbid) || array_is_list($decodedForbid)) {
+        throw new \InvalidArgumentException(
+            'Invalid chip_forbid: expected JSON object mapping chip names to gameweek arrays'
+        );
+    }
+
+    $chipForbid = [];
+    foreach ($decodedForbid as $chip => $weeks) {
+        if (!is_string($chip) || !in_array($chip, getPlannerValidChips(), true)) {
+            throw new \InvalidArgumentException("Invalid chip_forbid chip: {$chip}");
+        }
+        if (!is_array($weeks) || !array_is_list($weeks)) {
+            throw new \InvalidArgumentException("Invalid chip_forbid.{$chip}: expected array of gameweeks");
+        }
+
+        $normalizedWeeks = [];
+        foreach ($weeks as $index => $week) {
+            $normalizedWeeks[] = parsePlannerGameweekValue("chip_forbid.{$chip}[{$index}]", $week);
+        }
+        $chipForbid[$chip] = array_values(array_unique($normalizedWeeks));
+    }
+
+    return $chipForbid;
+}
+
+/**
+ * @return array<int, array{gameweek: int, out: int, in: int}>
+ */
+function parsePlannerFixedTransfersFromQuery(): array
+{
+    $decoded = decodeJsonQueryParam('fixed_transfers');
+    if ($decoded === null) {
+        return [];
+    }
+
+    if (!is_array($decoded) || !array_is_list($decoded)) {
+        throw new \InvalidArgumentException('Invalid fixed_transfers: expected JSON array');
+    }
+
+    $fixedTransfers = [];
+    foreach ($decoded as $index => $transfer) {
+        if (!is_array($transfer)) {
+            throw new \InvalidArgumentException("Invalid fixed_transfers[{$index}]: expected object");
+        }
+
+        if (!array_key_exists('gameweek', $transfer)) {
+            throw new \InvalidArgumentException("Invalid fixed_transfers[{$index}]: missing gameweek");
+        }
+        if (!array_key_exists('out', $transfer)) {
+            throw new \InvalidArgumentException("Invalid fixed_transfers[{$index}]: missing out");
+        }
+        if (!array_key_exists('in', $transfer)) {
+            throw new \InvalidArgumentException("Invalid fixed_transfers[{$index}]: missing in");
+        }
+
+        $gameweek = parsePlannerGameweekValue("fixed_transfers[{$index}].gameweek", $transfer['gameweek']);
+        if (!is_numeric($transfer['out']) || (int) $transfer['out'] <= 0) {
+            throw new \InvalidArgumentException("Invalid fixed_transfers[{$index}].out: expected positive integer");
+        }
+        if (!is_numeric($transfer['in']) || (int) $transfer['in'] <= 0) {
+            throw new \InvalidArgumentException("Invalid fixed_transfers[{$index}].in: expected positive integer");
+        }
+
+        $fixedTransfers[] = [
+            'gameweek' => $gameweek,
+            'out' => (int) $transfer['out'],
+            'in' => (int) $transfer['in'],
+        ];
+    }
+
+    return $fixedTransfers;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function parsePlannerConstraintsFromQuery(): array
+{
+    $decoded = decodeJsonQueryParam('constraints');
+    if ($decoded === null) {
+        return [];
+    }
+
+    if (!is_array($decoded) || array_is_list($decoded)) {
+        throw new \InvalidArgumentException('Invalid constraints: expected JSON object');
+    }
+
+    $allowedKeys = ['lock_ids', 'avoid_ids', 'max_hits', 'chip_windows'];
+    $unknownKeys = array_diff(array_keys($decoded), $allowedKeys);
+    if (!empty($unknownKeys)) {
+        throw new \InvalidArgumentException('Invalid constraints keys: ' . implode(', ', $unknownKeys));
+    }
+
+    $constraints = [];
+
+    if (array_key_exists('lock_ids', $decoded)) {
+        if (!is_array($decoded['lock_ids']) || !array_is_list($decoded['lock_ids'])) {
+            throw new \InvalidArgumentException('Invalid constraints.lock_ids: expected array of player IDs');
+        }
+        $constraints['lock_ids'] = array_map(
+            static function ($id): int {
+                if (!is_numeric($id) || (int) $id <= 0) {
+                    throw new \InvalidArgumentException('Invalid constraints.lock_ids: expected positive integers');
+                }
+                return (int) $id;
+            },
+            $decoded['lock_ids']
+        );
+    }
+
+    if (array_key_exists('avoid_ids', $decoded)) {
+        if (!is_array($decoded['avoid_ids']) || !array_is_list($decoded['avoid_ids'])) {
+            throw new \InvalidArgumentException('Invalid constraints.avoid_ids: expected array of player IDs');
+        }
+        $constraints['avoid_ids'] = array_map(
+            static function ($id): int {
+                if (!is_numeric($id) || (int) $id <= 0) {
+                    throw new \InvalidArgumentException('Invalid constraints.avoid_ids: expected positive integers');
+                }
+                return (int) $id;
+            },
+            $decoded['avoid_ids']
+        );
+    }
+
+    if (array_key_exists('max_hits', $decoded)) {
+        if (!is_numeric($decoded['max_hits']) || (int) $decoded['max_hits'] < 0) {
+            throw new \InvalidArgumentException('Invalid constraints.max_hits: expected non-negative integer');
+        }
+        $constraints['max_hits'] = (int) $decoded['max_hits'];
+    }
+
+    if (array_key_exists('chip_windows', $decoded)) {
+        if (!is_array($decoded['chip_windows']) || array_is_list($decoded['chip_windows'])) {
+            throw new \InvalidArgumentException(
+                'Invalid constraints.chip_windows: expected object keyed by chip name'
+            );
+        }
+
+        $windows = [];
+        foreach ($decoded['chip_windows'] as $chip => $window) {
+            if (!is_string($chip) || !in_array($chip, getPlannerValidChips(), true)) {
+                throw new \InvalidArgumentException("Invalid constraints.chip_windows chip: {$chip}");
+            }
+            if (!is_array($window)) {
+                throw new \InvalidArgumentException("Invalid constraints.chip_windows.{$chip}: expected object");
+            }
+
+            $normalizedWindow = [];
+            if (array_key_exists('from', $window)) {
+                $normalizedWindow['from'] = parsePlannerGameweekValue(
+                    "constraints.chip_windows.{$chip}.from",
+                    $window['from']
+                );
+            }
+            if (array_key_exists('to', $window)) {
+                $normalizedWindow['to'] = parsePlannerGameweekValue(
+                    "constraints.chip_windows.{$chip}.to",
+                    $window['to']
+                );
+            }
+            if (
+                isset($normalizedWindow['from'], $normalizedWindow['to'])
+                && $normalizedWindow['from'] > $normalizedWindow['to']
+            ) {
+                throw new \InvalidArgumentException(
+                    "Invalid constraints.chip_windows.{$chip}: from must be <= to"
+                );
+            }
+
+            $windows[$chip] = $normalizedWindow;
+        }
+        $constraints['chip_windows'] = $windows;
+    }
+
+    return $constraints;
+}
+
 function handlePlannerOptimize(Database $db, FplClient $fplClient): void
 {
     $managerId = isset($_GET['manager']) ? (int) $_GET['manager'] : null;
     // ft=0 means "auto-detect from FPL API"; omitting ft also auto-detects
     $freeTransfers = isset($_GET['ft']) ? (int) $_GET['ft'] : 0;
 
-    // Parse chip plan from query params (legacy + JSON)
-    $chipPlan = [];
-    if (isset($_GET['chip_plan'])) {
-        $decodedPlan = json_decode($_GET['chip_plan'], true);
-        if (is_array($decodedPlan)) {
-            foreach (['wildcard', 'bench_boost', 'free_hit', 'triple_captain'] as $chip) {
-                if (isset($decodedPlan[$chip])) {
-                    $chipPlan[$chip] = (int) $decodedPlan[$chip];
-                }
-            }
-        }
-    }
-    if (isset($_GET['wildcard_gw'])) {
-        $chipPlan['wildcard'] = (int) $_GET['wildcard_gw'];
-    }
-    if (isset($_GET['bench_boost_gw'])) {
-        $chipPlan['bench_boost'] = (int) $_GET['bench_boost_gw'];
-    }
-    if (isset($_GET['free_hit_gw'])) {
-        $chipPlan['free_hit'] = (int) $_GET['free_hit_gw'];
-    }
-    if (isset($_GET['triple_captain_gw'])) {
-        $chipPlan['triple_captain'] = (int) $_GET['triple_captain_gw'];
-    }
-
     $chipMode = $_GET['chip_mode'] ?? 'locked';
+    $chipPlan = [];
     $chipAllow = [];
-    if (isset($_GET['chip_allow'])) {
-        $decodedAllow = json_decode($_GET['chip_allow'], true);
-        if (is_array($decodedAllow)) {
-            $chipAllow = array_values(array_map('strval', $decodedAllow));
-        }
-    }
     $chipForbid = [];
-    if (isset($_GET['chip_forbid'])) {
-        $decodedForbid = json_decode($_GET['chip_forbid'], true);
-        if (is_array($decodedForbid)) {
-            $chipForbid = $decodedForbid;
-        }
+    $fixedTransfers = [];
+    $constraints = [];
+    try {
+        $chipPlan = parsePlannerChipPlanFromQuery();
+        $chipAllow = parsePlannerChipAllowFromQuery();
+        $chipForbid = parsePlannerChipForbidFromQuery();
+        $fixedTransfers = parsePlannerFixedTransfersFromQuery();
+        $constraints = parsePlannerConstraintsFromQuery();
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(400);
+        echo json_encode(['error' => $e->getMessage()]);
+        return;
     }
 
     $xMinsOverrides = parseXMinsOverridesFromQuery();
-
-    // Parse fixed transfers (JSON array of {gameweek, out, in})
-    $fixedTransfers = [];
-    if (isset($_GET['fixed_transfers'])) {
-        $decoded = json_decode($_GET['fixed_transfers'], true);
-        if (is_array($decoded)) {
-            $fixedTransfers = $decoded;
-        }
-    }
 
     // Parse FT value (float, default 1.5)
     $ftValue = isset($_GET['ft_value']) ? (float) $_GET['ft_value'] : 1.5;
@@ -1832,14 +2092,6 @@ function handlePlannerOptimize(Database $db, FplClient $fplClient): void
     // Parse skip_solve flag (return squad data without running PathSolver)
     $skipSolve = isset($_GET['skip_solve']) && $_GET['skip_solve'] === '1';
     $chipCompare = isset($_GET['chip_compare']) && $_GET['chip_compare'] === '1';
-
-    $constraints = [];
-    if (isset($_GET['constraints'])) {
-        $decoded = json_decode($_GET['constraints'], true);
-        if (is_array($decoded)) {
-            $constraints = $decoded;
-        }
-    }
 
     if ($managerId === null) {
         http_response_code(400);
@@ -1901,32 +2153,14 @@ function handlePlannerChipSuggest(Database $db, FplClient $fplClient): void
         return;
     }
 
-    $chipPlan = [];
-    if (isset($_GET['chip_plan'])) {
-        $decodedPlan = json_decode($_GET['chip_plan'], true);
-        if (is_array($decodedPlan)) {
-            foreach (['wildcard', 'bench_boost', 'free_hit', 'triple_captain'] as $chip) {
-                if (isset($decodedPlan[$chip])) {
-                    $chipPlan[$chip] = (int) $decodedPlan[$chip];
-                }
-            }
-        }
-    }
-
-    $chipAllow = [];
-    if (isset($_GET['chip_allow'])) {
-        $decodedAllow = json_decode($_GET['chip_allow'], true);
-        if (is_array($decodedAllow)) {
-            $chipAllow = array_values(array_map('strval', $decodedAllow));
-        }
-    }
-
-    $chipForbid = [];
-    if (isset($_GET['chip_forbid'])) {
-        $decodedForbid = json_decode($_GET['chip_forbid'], true);
-        if (is_array($decodedForbid)) {
-            $chipForbid = $decodedForbid;
-        }
+    try {
+        $chipPlan = parsePlannerChipPlanFromQuery();
+        $chipAllow = parsePlannerChipAllowFromQuery();
+        $chipForbid = parsePlannerChipForbidFromQuery();
+    } catch (\InvalidArgumentException $e) {
+        http_response_code(400);
+        echo json_encode(['error' => $e->getMessage()]);
+        return;
     }
 
     $predictionService = new PredictionService($db);

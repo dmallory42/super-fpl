@@ -228,6 +228,51 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame(75, $response['json']['expected_mins'] ?? null);
     }
 
+    public function testPlannerOptimizeRejectsInvalidChipPlanShape(): void
+    {
+        $chipPlan = rawurlencode(json_encode([1, 2, 3]));
+        $response = $this->callApi("/api/planner/optimize?manager=1&chip_plan={$chipPlan}");
+
+        self::assertSame(400, $response['status']);
+        self::assertStringContainsString('chip_plan', (string) ($response['json']['error'] ?? ''));
+    }
+
+    public function testPlannerOptimizeRejectsInvalidConstraints(): void
+    {
+        $constraints = rawurlencode(json_encode(['unknown_key' => true]));
+        $response = $this->callApi("/api/planner/optimize?manager=1&constraints={$constraints}");
+
+        self::assertSame(400, $response['status']);
+        self::assertStringContainsString('constraints', (string) ($response['json']['error'] ?? ''));
+    }
+
+    public function testPlannerOptimizeRejectsInvalidFixedTransfers(): void
+    {
+        $fixedTransfers = rawurlencode(json_encode([['gameweek' => 30, 'in' => 99]]));
+        $response = $this->callApi("/api/planner/optimize?manager=1&fixed_transfers={$fixedTransfers}");
+
+        self::assertSame(400, $response['status']);
+        self::assertStringContainsString('fixed_transfers', (string) ($response['json']['error'] ?? ''));
+    }
+
+    public function testPlannerOptimizeRejectsInvalidChipAllowValues(): void
+    {
+        $chipAllow = rawurlencode(json_encode(['wildcard', 'not_a_chip']));
+        $response = $this->callApi("/api/planner/optimize?manager=1&chip_allow={$chipAllow}");
+
+        self::assertSame(400, $response['status']);
+        self::assertStringContainsString('chip_allow', (string) ($response['json']['error'] ?? ''));
+    }
+
+    public function testPlannerOptimizeRejectsInvalidChipForbidStructure(): void
+    {
+        $chipForbid = rawurlencode(json_encode(['wildcard']));
+        $response = $this->callApi("/api/planner/optimize?manager=1&chip_forbid={$chipForbid}");
+
+        self::assertSame(400, $response['status']);
+        self::assertStringContainsString('chip_forbid', (string) ($response['json']['error'] ?? ''));
+    }
+
     public function testProductionUnhandledErrorsAreSanitized(): void
     {
         $response = $this->callApi(
