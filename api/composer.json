@@ -14,12 +14,33 @@
         {
             "type": "path",
             "url": "../packages/fpl-client"
+        },
+        {
+            "type": "path",
+            "url": "../../maia"
+        },
+        {
+            "type": "path",
+            "url": "../../maia/src/Core"
+        },
+        {
+            "type": "path",
+            "url": "../../maia/src/Orm"
+        },
+        {
+            "type": "path",
+            "url": "../../maia/src/Auth"
+        },
+        {
+            "type": "path",
+            "url": "../../maia/src/Cli"
         }
     ],
     "require": {
         "php": ">=8.2",
         "superfpl/fpl-client": "*",
-        "predis/predis": "^2.3"
+        "predis/predis": "^2.3",
+        "maia/framework": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0",
