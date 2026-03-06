@@ -8,6 +8,11 @@ $uri = getenv('REQ_URI') ?: '/api/health';
 $_SERVER['REQUEST_METHOD'] = $method;
 $_SERVER['REQUEST_URI'] = $uri;
 
+if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+    $_SERVER['CONTENT_TYPE'] = 'application/json';
+    $_SERVER['HTTP_CONTENT_TYPE'] = 'application/json';
+}
+
 $origin = getenv('REQ_ORIGIN');
 if (is_string($origin) && $origin !== '') {
     $_SERVER['HTTP_ORIGIN'] = $origin;
@@ -63,9 +68,19 @@ register_shutdown_function(static function (): void {
         $status = 200;
     }
     $headers = headers_list();
-    $setCookies = $GLOBALS['superfpl_set_cookies'] ?? [];
-    if (!is_array($setCookies)) {
-        $setCookies = [];
+    $setCookies = [];
+    foreach ($headers as $header) {
+        if (stripos($header, 'Set-Cookie:') !== 0) {
+            continue;
+        }
+        $setCookies[] = trim(substr($header, strlen('Set-Cookie:')));
+    }
+
+    $legacyCookies = $GLOBALS['superfpl_set_cookies'] ?? [];
+    if (is_array($legacyCookies)) {
+        foreach ($legacyCookies as $cookie) {
+            $setCookies[] = (string) $cookie;
+        }
     }
 
     echo json_encode([

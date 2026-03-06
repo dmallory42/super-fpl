@@ -362,6 +362,11 @@ class AdminController extends LegacyController
             'httponly' => $httpOnly,
             'samesite' => 'Lax',
         ]);
+
+        if (!isset($GLOBALS['superfpl_set_cookies']) || !is_array($GLOBALS['superfpl_set_cookies'])) {
+            $GLOBALS['superfpl_set_cookies'] = [];
+        }
+        $GLOBALS['superfpl_set_cookies'][] = sprintf('%s=%s', $name, rawurlencode($value));
     }
 
     private function cachePath(string $suffix): string
