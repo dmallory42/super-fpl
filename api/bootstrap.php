@@ -25,6 +25,7 @@ if (!is_array($config)) {
 // Keep the existing schema bootstrap in place until the Database class is removed later in the migration.
 $database = new Database($config['database']['path']);
 $database->init();
+$app->container()->instance(Database::class, $database);
 
 $connection = new Connection('sqlite:' . $config['database']['path']);
 $connection->execute('PRAGMA foreign_keys = ON');
