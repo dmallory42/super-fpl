@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Sync;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use Maia\Orm\QueryBuilder;
 use SuperFPL\Api\Clients\OddsApiClient;
 
 /**
@@ -51,7 +52,7 @@ class OddsSync
     ];
 
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly OddsApiClient $client
     ) {
     }
@@ -74,7 +75,7 @@ class OddsSync
                 continue;
             }
 
-            $this->db->upsert('fixture_odds', [
+            $this->upsert('fixture_odds', [
                 'fixture_id' => $fixture['id'],
                 'home_win_prob' => $odds['home_win_prob'],
                 'draw_prob' => $odds['draw_prob'],
@@ -135,7 +136,7 @@ class OddsSync
                     $lineCount = 0;
                 }
 
-                $this->db->upsert('player_goalscorer_odds', [
+                $this->upsert('player_goalscorer_odds', [
                     'player_id' => $player['id'],
                     'fixture_id' => $fixture['id'],
                     'anytime_scorer_prob' => $prob,
@@ -193,7 +194,7 @@ class OddsSync
                     $lineCount = 0;
                 }
 
-                $this->db->upsert('player_assist_odds', [
+                $this->upsert('player_assist_odds', [
                     'player_id' => $player['id'],
                     'fixture_id' => $fixture['id'],
                     'anytime_assist_prob' => $prob,
@@ -216,7 +217,7 @@ class OddsSync
      */
     private function getUpcomingFixtures(): array
     {
-        return $this->db->fetchAll(
+        return $this->fetchAll(
             "SELECT f.*, h.name as home_name, a.name as away_name
             FROM fixtures f
             JOIN clubs h ON f.home_club_id = h.id
@@ -325,7 +326,7 @@ class OddsSync
     {
         // Check known aliases first
         if (isset(self::PLAYER_ALIASES[$name])) {
-            $player = $this->db->fetchOne(
+            $player = $this->fetchOne(
                 'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
                 [self::PLAYER_ALIASES[$name]]
             );
@@ -335,7 +336,7 @@ class OddsSync
         }
 
         // Try exact web_name match
-        $player = $this->db->fetchOne(
+        $player = $this->fetchOne(
             'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
             [$name]
         );
@@ -355,7 +356,7 @@ class OddsSync
         if (count($parts) >= 2) {
             $firstName = $parts[0];
             $strippedFirstName = strtolower($this->stripAccents($firstName));
-            $candidates = $this->db->fetchAll(
+            $candidates = $this->fetchAll(
                 'SELECT id, first_name, second_name FROM players WHERE second_name LIKE ?',
                 ['%' . $lastName . '%']
             );
@@ -372,7 +373,7 @@ class OddsSync
         }
 
         // Try exact last-name match on web_name
-        $player = $this->db->fetchOne(
+        $player = $this->fetchOne(
             'SELECT id FROM players WHERE LOWER(web_name) = LOWER(?)',
             [$lastName]
         );
@@ -382,7 +383,7 @@ class OddsSync
 
         // Try second_name match (accent-insensitive) — only if unique
         $prefix = mb_substr($lastName, 0, 3);
-        $candidates = $this->db->fetchAll(
+        $candidates = $this->fetchAll(
             'SELECT id, second_name FROM players WHERE second_name LIKE ?',
             [$prefix . '%']
         );
@@ -398,7 +399,7 @@ class OddsSync
         }
 
         // Try fuzzy matching with LIKE — only if unique
-        $likeMatches = $this->db->fetchAll(
+        $likeMatches = $this->fetchAll(
             'SELECT id FROM players WHERE LOWER(web_name) LIKE LOWER(?)',
             ['%' . $lastName . '%']
         );
@@ -421,5 +422,34 @@ class OddsSync
         $adjustment = $winProb * 0.3 + $drawProb * 0.5;
 
         return min(0.5, max(0.1, $baseCs + $adjustment));
+    }
+
+    /**
+     * @param array<int, mixed> $params
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchAll(string $sql, array $params = []): array
+    {
+        return $this->connection->query($sql, $params);
+    }
+
+    /**
+     * @param array<int, mixed> $params
+     * @return array<string, mixed>|null
+     */
+    private function fetchOne(string $sql, array $params = []): ?array
+    {
+        $rows = $this->connection->query($sql, $params);
+
+        return $rows[0] ?? null;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, string> $conflictKeys
+     */
+    private function upsert(string $table, array $data, array $conflictKeys): void
+    {
+        QueryBuilder::table($table, $this->connection)->upsert($data, $conflictKeys);
     }
 }

@@ -12,7 +12,7 @@ echo "Time (UTC): " . gmdate('Y-m-d H:i:s') . "\n";
 
 $start = microtime(true);
 
-$sync = new FixtureSync($db, $fplClient);
+$sync = new FixtureSync($connection, $fplClient);
 $count = $sync->sync();
 
 $elapsed = round(microtime(true) - $start, 2);

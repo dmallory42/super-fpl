@@ -72,19 +72,19 @@ function runTask(string $name, callable $fn): void
 // Build task lists per phase
 $tasks = [];
 
-$syncFixtures = function () use ($db, $fplClient) {
-    $sync = new FixtureSync($db, $fplClient);
+$syncFixtures = function () use ($connection, $fplClient) {
+    $sync = new FixtureSync($connection, $fplClient);
     $count = $sync->sync();
     echo "  Fixtures synced: {$count}\n";
 };
 
-$syncPlayers = function () use ($db, $fplClient) {
-    $sync = new PlayerSync($db, $fplClient);
+$syncPlayers = function () use ($connection, $fplClient) {
+    $sync = new PlayerSync($connection, $fplClient);
     $result = $sync->sync();
     echo "  Teams: {$result['teams']}, Players: {$result['players']}\n";
 };
 
-$syncOdds = function () use ($db, $config, $cacheDir) {
+$syncOdds = function () use ($connection, $config, $cacheDir) {
     $apiKey = $config['odds_api']['api_key'] ?? '';
     if (empty($apiKey)) {
         echo "  Skipped (ODDS_API_KEY not set)\n";
@@ -95,7 +95,7 @@ $syncOdds = function () use ($db, $config, $cacheDir) {
         mkdir($oddsCacheDir, 0755, true);
     }
     $client = new OddsApiClient($apiKey, $oddsCacheDir);
-    $sync = new OddsSync($db, $client);
+    $sync = new OddsSync($connection, $client);
 
     $matchResult = $sync->syncMatchOdds();
     echo "  Match odds: {$matchResult['fixtures']} fixtures, {$matchResult['matched']} matched\n";
@@ -112,7 +112,7 @@ $syncOdds = function () use ($db, $config, $cacheDir) {
     }
 };
 
-$syncUnderstat = function () use ($db, $cacheDir) {
+$syncUnderstat = function () use ($connection, $cacheDir) {
     $understatCacheDir = $cacheDir . '/understat';
     if (!is_dir($understatCacheDir)) {
         mkdir($understatCacheDir, 0755, true);
@@ -120,7 +120,7 @@ $syncUnderstat = function () use ($db, $cacheDir) {
     // Current season: year of August start (2025 for 2025-26 season)
     $season = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
     $client = new UnderstatClient($understatCacheDir);
-    $sync = new UnderstatSync($db, $client);
+    $sync = new UnderstatSync($connection, $client);
     $result = $sync->sync($season);
     echo "  Matched: {$result['matched']}/{$result['total']}, Unmatched: {$result['unmatched']}\n";
     if (!empty($result['unmatched_players'])) {
@@ -128,62 +128,62 @@ $syncUnderstat = function () use ($db, $cacheDir) {
     }
 };
 
-$syncManagers = function () use ($db, $fplClient) {
-    $sync = new ManagerSync($db, $fplClient);
+$syncManagers = function () use ($connection, $fplClient) {
+    $sync = new ManagerSync($connection, $fplClient);
     $result = $sync->syncAll();
     echo "  Synced: {$result['synced']}, Failed: {$result['failed']}\n";
 };
 
-$snapshotPrevGw = function () use ($db) {
-    $gwService = new GameweekService($db);
+$snapshotPrevGw = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
     if ($currentGw <= 1) {
         echo "  Skipped (GW1, no previous GW)\n";
         return;
     }
     $prevGw = $currentGw - 1;
-    $existing = $db->fetchOne(
+    $existing = $connection->query(
         "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
         [$prevGw]
     );
-    if ((int) ($existing['cnt'] ?? 0) > 0) {
+    if ((int) (($existing[0]['cnt'] ?? 0)) > 0) {
         echo "  Skipped (GW{$prevGw} already snapshotted)\n";
         return;
     }
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $count = $service->snapshotPredictions($prevGw, false, 'sync_prev_gw');
     echo "  Snapshotted GW{$prevGw}: {$count} predictions\n";
 };
 
-$snapshotCurrentGwPreDeadline = function () use ($db) {
-    $gwService = new GameweekService($db);
+$snapshotCurrentGwPreDeadline = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $existing = $db->fetchOne(
+    $existing = $connection->query(
         "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ? AND is_pre_deadline = 1",
         [$currentGw]
     );
-    if ((int) ($existing['cnt'] ?? 0) > 0) {
+    if ((int) (($existing[0]['cnt'] ?? 0)) > 0) {
         echo "  Skipped (GW{$currentGw} pre-deadline snapshot already exists)\n";
         return;
     }
 
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $count = $service->snapshotPredictions($currentGw, true, 'sync_pre_deadline');
     echo "  Pre-deadline snapshot GW{$currentGw}: {$count} predictions\n";
 };
 
-$snapshotCurrentGw = function () use ($db) {
-    $gwService = new GameweekService($db);
+$snapshotCurrentGw = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $count = $service->snapshotPredictions($currentGw, false, 'sync_post_gameweek');
     echo "  Snapshotted GW{$currentGw}: {$count} predictions\n";
 };
 
-$generatePredictions = function () use ($db) {
-    $gwService = new GameweekService($db);
+$generatePredictions = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $endGw = min($currentGw + 5, 38);
     for ($gw = $currentGw; $gw <= $endGw; $gw++) {
         $predictions = $service->generatePredictions($gw);
@@ -191,35 +191,35 @@ $generatePredictions = function () use ($db) {
     }
 };
 
-$syncAppearances = function () use ($db, $fplClient) {
-    $sync = new PlayerSync($db, $fplClient);
+$syncAppearances = function () use ($connection, $fplClient) {
+    $sync = new PlayerSync($connection, $fplClient);
     $count = $sync->syncAppearances();
     echo "  Players updated: {$count}\n";
 };
 
-$syncSeasonHistory = function () use ($db, $fplClient) {
-    $sync = new PlayerSync($db, $fplClient);
+$syncSeasonHistory = function () use ($connection, $fplClient) {
+    $sync = new PlayerSync($connection, $fplClient);
     $count = $sync->syncSeasonHistory();
     echo "  Records synced: {$count}\n";
 };
 
-$syncUnderstatHistory = function () use ($db, $cacheDir) {
+$syncUnderstatHistory = function () use ($connection, $cacheDir) {
     $understatCacheDir = $cacheDir . '/understat';
     if (!is_dir($understatCacheDir)) {
         mkdir($understatCacheDir, 0755, true);
     }
     $season = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
     $client = new UnderstatClient($understatCacheDir);
-    $sync = new UnderstatSync($db, $client);
+    $sync = new UnderstatSync($connection, $client);
     $result = $sync->syncHistory($season);
     echo "  Seasons: " . implode(', ', $result['seasons']) . "\n";
     echo "  Player records: {$result['player_records']}, Team records: {$result['team_records']}\n";
 };
 
-$syncSamples = function () use ($db, $fplClient, $cacheDir) {
-    $gwService = new GameweekService($db);
+$syncSamples = function () use ($connection, $fplClient, $cacheDir) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $sampleService = new SampleService($db, $fplClient, $cacheDir . '/samples');
+    $sampleService = new SampleService($connection, $fplClient, $cacheDir . '/samples');
     $results = $sampleService->sampleManagersForGameweek($currentGw);
     foreach ($results as $tier => $count) {
         echo "  {$tier}: {$count} managers\n";

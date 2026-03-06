@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 
 class PlayerMetricsService
 {
     private const PENALTY_XG = 0.76;
 
-    public function __construct(private Database $db)
+    public function __construct(private Connection $connection)
     {
     }
 
@@ -76,7 +76,7 @@ class PlayerMetricsService
      */
     public function getAllWithMetrics(array $filters = []): array
     {
-        $playerService = new PlayerService($this->db);
+        $playerService = new PlayerService($this->connection);
         $players = $playerService->getAll($filters);
 
         return array_map(function ($player) {

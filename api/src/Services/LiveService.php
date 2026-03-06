@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 
 /**
@@ -12,11 +13,13 @@ use SuperFPL\FplClient\FplClient;
  */
 class LiveService
 {
+    use ConnectionSql;
+
     private const CACHE_TTL = 60; // 60 seconds cache for live data
     private const RECENTLY_FINISHED_WINDOW_SECONDS = 21600; // 6 hours
 
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient,
         private readonly string $cacheDir
     ) {
@@ -29,7 +32,7 @@ class LiveService
      */
     public function getLiveData(int $gameweek): array
     {
-        $fixtures = $this->db->fetchAll('SELECT * FROM fixtures WHERE gameweek = ?', [$gameweek]);
+        $fixtures = $this->fetchAll('SELECT * FROM fixtures WHERE gameweek = ?', [$gameweek]);
 
         // Check cache first
         $cached = $this->getFromCache($gameweek);
@@ -171,7 +174,7 @@ class LiveService
             $players = [];
         } else {
             $placeholders = implode(',', array_fill(0, count($squadIds), '?'));
-            $players = $this->db->fetchAll(
+            $players = $this->fetchAll(
                 "SELECT id, web_name, club_id as team, position as element_type FROM players WHERE id IN ($placeholders)",
                 $squadIds
             );
@@ -253,7 +256,7 @@ class LiveService
     public function getBonusPredictions(int $gameweek, ?array $fixtures = null): array
     {
         if ($fixtures === null) {
-            $fixtures = $this->db->fetchAll(
+            $fixtures = $this->fetchAll(
                 'SELECT * FROM fixtures WHERE gameweek = ?',
                 [$gameweek]
             );
@@ -503,7 +506,7 @@ class LiveService
         }
 
         $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
-        $players = $this->db->fetchAll(
+        $players = $this->fetchAll(
             "SELECT id, web_name, club_id, position FROM players WHERE id IN ($placeholders)",
             array_values($playerIds)
         );
@@ -577,7 +580,7 @@ class LiveService
     private function getManagerPicks(int $managerId, int $gameweek): array
     {
         // Try cache first
-        $cached = $this->db->fetchAll(
+        $cached = $this->fetchAll(
             'SELECT player_id as element, position, multiplier FROM manager_picks
             WHERE manager_id = ? AND gameweek = ?
             ORDER BY position',
@@ -638,5 +641,10 @@ class LiveService
     private function getCacheFile(int $gameweek): string
     {
         return "{$this->cacheDir}/live_gw{$gameweek}.json";
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

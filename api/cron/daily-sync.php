@@ -12,14 +12,14 @@ echo "Time: " . date('Y-m-d H:i:s') . "\n\n";
 
 // Run player sync
 echo "Syncing players and teams...\n";
-$playerSync = new PlayerSync($db, $fplClient);
+$playerSync = new PlayerSync($connection, $fplClient);
 $playerResult = $playerSync->sync();
 echo "  - Teams synced: {$playerResult['teams']}\n";
 echo "  - Players synced: {$playerResult['players']}\n";
 
 // Run fixture sync
 echo "Syncing fixtures...\n";
-$fixtureSync = new FixtureSync($db, $fplClient);
+$fixtureSync = new FixtureSync($connection, $fplClient);
 $fixtureCount = $fixtureSync->sync();
 echo "  - Fixtures synced: {$fixtureCount}\n";
 

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Sync;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use Maia\Orm\QueryBuilder;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\ParallelHttpClient;
 
@@ -13,7 +14,7 @@ class PlayerSync
     private const FPL_API_BASE = 'https://fantasy.premierleague.com/api/';
 
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -48,7 +49,7 @@ class PlayerSync
     public function syncAppearances(): int
     {
         // Get all player IDs with minutes > 0
-        $players = $this->db->fetchAll('SELECT id FROM players WHERE minutes > 0');
+        $players = $this->fetchAll('SELECT id FROM players WHERE minutes > 0');
         $playerIds = array_column($players, 'id');
 
         if (empty($playerIds)) {
@@ -136,13 +137,13 @@ class PlayerSync
             }
 
             // Update player record
-            $this->db->query(
+            $this->connection->execute(
                 'UPDATE players SET appearances = ? WHERE id = ?',
                 [$appearances, $playerId]
             );
 
             foreach ($byGw as $gameweek => $row) {
-                $this->db->upsert('player_gameweek_history', [
+                $this->upsert('player_gameweek_history', [
                     'player_id' => $playerId,
                     'gameweek' => $gameweek,
                     'fixture_id' => $row['fixture_id'],
@@ -161,7 +162,7 @@ class PlayerSync
                     'expected_goals_conceded' => round((float) $row['expected_goals_conceded'], 3),
                     'value' => $row['value'],
                     'selected' => $row['selected'],
-                ], ['player_id', 'gameweek']);
+                ], conflictKeys: ['player_id', 'gameweek']);
             }
 
             $count++;
@@ -186,7 +187,7 @@ class PlayerSync
     public function syncSeasonHistory(): int
     {
         // Get all players with their code (needed for player_season_history PK)
-        $players = $this->db->fetchAll('SELECT id, code FROM players WHERE minutes > 0');
+        $players = $this->fetchAll('SELECT id, code FROM players WHERE minutes > 0');
 
         if (empty($players)) {
             return 0;
@@ -218,7 +219,7 @@ class PlayerSync
                     continue;
                 }
                 if (!isset($seenSeasons[$seasonId])) {
-                    $this->db->upsert('seasons', [
+                    $this->upsert('seasons', [
                         'id' => $seasonId,
                         'start_date' => null,
                         'end_date' => null,
@@ -226,7 +227,7 @@ class PlayerSync
                     $seenSeasons[$seasonId] = true;
                 }
 
-                $this->db->upsert('player_season_history', [
+                $this->upsert('player_season_history', [
                     'player_code' => $player['code'],
                     'season_id' => $seasonId,
                     'total_points' => $season['total_points'] ?? 0,
@@ -257,7 +258,7 @@ class PlayerSync
         $count = 0;
 
         foreach ($teams as $team) {
-            $this->db->upsert('clubs', [
+            $this->upsert('clubs', [
                 'id' => $team['id'],
                 'name' => $team['name'],
                 'short_name' => $team['short_name'],
@@ -265,7 +266,7 @@ class PlayerSync
                 'strength_attack_away' => $team['strength_attack_away'] ?? null,
                 'strength_defence_home' => $team['strength_defence_home'] ?? null,
                 'strength_defence_away' => $team['strength_defence_away'] ?? null,
-            ], ['id']);
+            ]);
 
             $count++;
         }
@@ -281,7 +282,7 @@ class PlayerSync
         $count = 0;
 
         foreach ($elements as $player) {
-            $this->db->upsert('players', [
+            $this->upsert('players', [
                 'id' => $player['id'],
                 'code' => $player['code'],
                 'web_name' => $player['web_name'],
@@ -316,7 +317,7 @@ class PlayerSync
                 'penalties_saved' => $player['penalties_saved'] ?? 0,
                 'goals_conceded' => $player['goals_conceded'] ?? 0,
                 'updated_at' => date('Y-m-d H:i:s'),
-            ], ['id']);
+            ]);
 
             $count++;
         }
@@ -333,5 +334,23 @@ class PlayerSync
             return 0.0;
         }
         return round(($stat / $minutes) * 90, 2);
+    }
+
+    /**
+     * @param array<int, mixed> $params
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchAll(string $sql, array $params = []): array
+    {
+        return $this->connection->query($sql, $params);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, string> $conflictKeys
+     */
+    private function upsert(string $table, array $data, array $conflictKeys = ['id']): void
+    {
+        QueryBuilder::table($table, $this->connection)->upsert($data, $conflictKeys);
     }
 }

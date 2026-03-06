@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 
 class ManagerSeasonAnalysisService
 {
+    use ConnectionSql;
+
     /** @var array<int, array<int, float>> */
     private array $expectedPointCache = [];
 
@@ -22,7 +25,7 @@ class ManagerSeasonAnalysisService
     private array $playerNameCache = [];
 
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -38,7 +41,7 @@ class ManagerSeasonAnalysisService
         $this->snapshotPointCache = [];
         $this->playerNameCache = [];
 
-        $managerService = new ManagerService($this->db, $this->fplClient);
+        $managerService = new ManagerService($this->connection, $this->fplClient);
         $history = $managerService->getHistory($managerId);
 
         if ($history === null || empty($history['current']) || !is_array($history['current'])) {
@@ -429,7 +432,7 @@ class ManagerSeasonAnalysisService
      */
     private function cacheManagerPicks(int $managerId, int $gw, array $picks): void
     {
-        $this->db->query(
+        $this->execute(
             'DELETE FROM manager_picks WHERE manager_id = ? AND gameweek = ?',
             [$managerId, $gw]
         );
@@ -440,7 +443,7 @@ class ManagerSeasonAnalysisService
                 continue;
             }
 
-            $this->db->insert('manager_picks', [
+            $this->insert('manager_picks', [
                 'manager_id' => $managerId,
                 'gameweek' => $gw,
                 'player_id' => $playerId,
@@ -459,7 +462,11 @@ class ManagerSeasonAnalysisService
         }
 
         $row = $this->safeFetchOne(
-            'SELECT predicted_points FROM prediction_snapshots WHERE player_id = ? AND gameweek = ?',
+            'SELECT predicted_points
+             FROM prediction_snapshots
+             WHERE player_id = ? AND gameweek = ?
+             ORDER BY is_pre_deadline ASC
+             LIMIT 1',
             [$playerId, $gw]
         );
 
@@ -517,7 +524,11 @@ class ManagerSeasonAnalysisService
         }
 
         $row = $this->safeFetchOne(
-            'SELECT predicted_points, is_pre_deadline FROM prediction_snapshots WHERE player_id = ? AND gameweek = ?',
+            'SELECT predicted_points, is_pre_deadline
+             FROM prediction_snapshots
+             WHERE player_id = ? AND gameweek = ?
+             ORDER BY is_pre_deadline DESC
+             LIMIT 1',
             [$playerId, $gw]
         );
 
@@ -570,18 +581,25 @@ class ManagerSeasonAnalysisService
 
         // Load from snapshots first (preferred source)
         $snapshots = $this->safeFetchAll(
-            "SELECT player_id, gameweek, predicted_points, is_pre_deadline FROM prediction_snapshots WHERE player_id IN ($placeholders)",
+            "SELECT player_id, gameweek, predicted_points, is_pre_deadline
+             FROM prediction_snapshots
+             WHERE player_id IN ($placeholders)
+             ORDER BY gameweek, player_id, is_pre_deadline ASC",
             $playerIds
         );
         foreach ($snapshots as $row) {
             $gw = (int) $row['gameweek'];
             $pid = (int) $row['player_id'];
             $value = (float) $row['predicted_points'];
-            $this->expectedPointCache[$gw][$pid] = $value;
             $isPreDeadline = (int) ($row['is_pre_deadline'] ?? 0);
+
+            if (!isset($this->expectedPointCache[$gw][$pid]) || $isPreDeadline === 0) {
+                $this->expectedPointCache[$gw][$pid] = $value;
+            }
+
             $this->snapshotPointCache[$gw][$pid] = $this->isSnapshotEligibleForForesight($isPreDeadline)
                 ? $value
-                : null;
+                : ($this->snapshotPointCache[$gw][$pid] ?? null);
         }
 
         // Load fallback predictions for any gaps
@@ -756,7 +774,7 @@ class ManagerSeasonAnalysisService
     private function safeFetchOne(string $sql, array $params = []): ?array
     {
         try {
-            return $this->db->fetchOne($sql, $params);
+            return $this->fetchOne($sql, $params);
         } catch (\Throwable $e) {
             error_log('ManagerSeasonAnalysisService: DB read failure: ' . $e->getMessage());
             return null;
@@ -770,10 +788,15 @@ class ManagerSeasonAnalysisService
     private function safeFetchAll(string $sql, array $params = []): array
     {
         try {
-            return $this->db->fetchAll($sql, $params);
+            return $this->fetchAll($sql, $params);
         } catch (\Throwable $e) {
             error_log('ManagerSeasonAnalysisService: DB read failure: ' . $e->getMessage());
             return [];
         }
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

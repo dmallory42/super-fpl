@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Models\Club;
 
 class TeamService
 {
     public function __construct(
-        private readonly Database $db
+        private readonly Connection $connection
     ) {
+        Club::setConnection($this->connection);
     }
 
     /**
@@ -20,17 +22,30 @@ class TeamService
      */
     public function getAll(): array
     {
-        return $this->db->fetchAll(
-            'SELECT
-                id,
-                name,
-                short_name,
-                strength_attack_home,
-                strength_attack_away,
-                strength_defence_home,
-                strength_defence_away
-            FROM clubs
-            ORDER BY id'
+        $teams = Club::query()
+            ->select(
+                'id',
+                'name',
+                'short_name',
+                'strength_attack_home',
+                'strength_attack_away',
+                'strength_defence_home',
+                'strength_defence_away'
+            )
+            ->orderBy('id')
+            ->get();
+
+        return array_map(
+            static fn(Club $club): array => [
+                'id' => $club->id,
+                'name' => $club->name,
+                'short_name' => $club->short_name,
+                'strength_attack_home' => $club->strength_attack_home,
+                'strength_attack_away' => $club->strength_attack_away,
+                'strength_defence_home' => $club->strength_defence_home,
+                'strength_defence_away' => $club->strength_defence_away,
+            ],
+            $teams
         );
     }
 }

@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 
 class GameweekService
 {
-    public function __construct(private Database $db)
+    use ConnectionSql;
+
+    public function __construct(
+        private readonly Connection $connection
+    )
     {
     }
 
@@ -17,7 +22,7 @@ class GameweekService
      */
     public function getCurrentGameweek(): int
     {
-        $fixture = $this->db->fetchOne(
+        $fixture = $this->fetchOne(
             "SELECT DISTINCT gameweek FROM fixtures
              WHERE finished = 0 AND gameweek IS NOT NULL AND gameweek > 0
              ORDER BY gameweek ASC LIMIT 1"
@@ -47,7 +52,7 @@ class GameweekService
      */
     public function hasGameweekStarted(int $gameweek): bool
     {
-        $row = $this->db->fetchOne(
+        $row = $this->fetchOne(
             "SELECT MIN(kickoff_time) as first_kickoff FROM fixtures WHERE gameweek = ?",
             [$gameweek]
         );
@@ -77,7 +82,7 @@ class GameweekService
      */
     public function isGameweekFinished(int $gameweek): bool
     {
-        $unfinished = $this->db->fetchOne(
+        $unfinished = $this->fetchOne(
             "SELECT id FROM fixtures WHERE gameweek = ? AND finished = 0 LIMIT 1",
             [$gameweek]
         );
@@ -96,7 +101,7 @@ class GameweekService
 
         $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
 
-        $rows = $this->db->fetchAll(
+        $rows = $this->fetchAll(
             "SELECT gameweek, home_club_id as team_id, COUNT(*) as fixture_count
              FROM fixtures
              WHERE gameweek IN ($placeholders)
@@ -150,11 +155,11 @@ class GameweekService
     public function getBlankGameweekTeams(int $gameweek): array
     {
         // Get all teams
-        $allTeams = $this->db->fetchAll("SELECT id FROM clubs");
+        $allTeams = $this->fetchAll('SELECT id FROM clubs');
         $allTeamIds = array_column($allTeams, 'id');
 
         // Get teams with fixtures this gameweek
-        $teamsWithFixtures = $this->db->fetchAll(
+        $teamsWithFixtures = $this->fetchAll(
             "SELECT DISTINCT home_club_id as team_id FROM fixtures WHERE gameweek = ?
              UNION
              SELECT DISTINCT away_club_id as team_id FROM fixtures WHERE gameweek = ?",
@@ -195,7 +200,7 @@ class GameweekService
             return [];
         }
 
-        $allTeams = $this->db->fetchAll("SELECT id FROM clubs");
+        $allTeams = $this->fetchAll('SELECT id FROM clubs');
         $allTeamIds = array_map(fn($t) => (int) $t['id'], $allTeams);
 
         $counts = $precomputedCounts ?? $this->getFixtureCounts($gameweeks);
@@ -208,5 +213,10 @@ class GameweekService
             }
         }
         return $result;
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

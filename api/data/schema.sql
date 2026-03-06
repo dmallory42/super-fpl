@@ -268,7 +268,7 @@ CREATE TABLE prediction_snapshots (
     snapshot_source TEXT DEFAULT 'legacy',
     is_pre_deadline INTEGER DEFAULT 0,
     snapped_at TIMESTAMP,
-    PRIMARY KEY (player_id, gameweek)
+    PRIMARY KEY (player_id, gameweek, is_pre_deadline)
 );
 
 -- Indexes for common queries

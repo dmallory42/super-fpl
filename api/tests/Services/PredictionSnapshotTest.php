@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\PredictionService;
 
 class PredictionSnapshotTest extends TestCase
 {
-    private Database $db;
+    private TestDatabase $db;
 
     protected function setUp(): void
     {
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->createSchema();
     }
 
@@ -117,7 +117,7 @@ class PredictionSnapshotTest extends TestCase
                 snapshot_source TEXT DEFAULT 'legacy',
                 is_pre_deadline INTEGER DEFAULT 0,
                 snapped_at TIMESTAMP,
-                PRIMARY KEY (player_id, gameweek)
+                PRIMARY KEY (player_id, gameweek, is_pre_deadline)
             )
         ");
 
@@ -249,14 +249,20 @@ class PredictionSnapshotTest extends TestCase
         );
     }
 
-    private function insertSnapshot(int $playerId, int $gameweek, float $points, float $confidence = 0.7): void
+    private function insertSnapshot(
+        int $playerId,
+        int $gameweek,
+        float $points,
+        float $confidence = 0.7,
+        int $isPreDeadline = 0
+    ): void
     {
         $this->db->query(
             "INSERT INTO prediction_snapshots (
                 player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapshot_source, is_pre_deadline, snapped_at
             )
-            VALUES (?, ?, ?, ?, '{}', 'v2.0', 'test', 1, datetime('now'))",
-            [$playerId, $gameweek, $points, $confidence]
+            VALUES (?, ?, ?, ?, '{}', 'v2.0', 'test', ?, datetime('now'))",
+            [$playerId, $gameweek, $points, $confidence, $isPreDeadline]
         );
     }
 

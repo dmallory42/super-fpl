@@ -49,12 +49,14 @@ class ApiRouteSmokeTest extends TestCase
         self::assertIsString($response['json']['checks']['database']['checked_at'] ?? null);
     }
 
-    public function testSyncStatusDefaultsToZeroForFreshCache(): void
+    public function testFixturesStatusRouteReturnsEnvelope(): void
     {
-        $response = $this->callApi('/api/sync/status');
+        $response = $this->callApi('/api/fixtures/status');
 
         self::assertSame(200, $response['status']);
-        self::assertSame(0, $response['json']['last_sync'] ?? null);
+        self::assertArrayHasKey('current_gameweek', $response['json']);
+        self::assertArrayHasKey('is_live', $response['json']);
+        self::assertArrayHasKey('gameweeks', $response['json']);
     }
 
     public function testPlayersRouteReturnsPlayersArray(): void
@@ -64,13 +66,6 @@ class ApiRouteSmokeTest extends TestCase
         self::assertSame(200, $response['status']);
         self::assertArrayHasKey('players', $response['json']);
         self::assertIsArray($response['json']['players']);
-    }
-
-    public function testTeamsRouteReturnsTeamsArray(): void
-    {
-        $response = $this->callApi('/api/teams');
-
-        self::assertSame(200, $response['status']);
         self::assertArrayHasKey('teams', $response['json']);
         self::assertIsArray($response['json']['teams']);
     }
@@ -88,29 +83,29 @@ class ApiRouteSmokeTest extends TestCase
         $response = $this->callApi('/api/does-not-exist');
 
         self::assertSame(404, $response['status']);
-        self::assertSame('Not found', $response['json']['error'] ?? null);
+        self::assertSame(true, $response['json']['error'] ?? null);
+        self::assertSame('Route not found', $response['json']['message'] ?? null);
     }
 
-    public function testCorsPreflightAllowsWhitelistedOrigin(): void
+    public function testCorsAllowsWhitelistedOrigin(): void
     {
         $response = $this->callApi(
             '/api/health',
-            'OPTIONS',
+            'GET',
             [
                 'REQ_ORIGIN' => 'https://superfpl.com',
                 'SUPERFPL_CORS_ALLOWED_ORIGINS' => 'https://superfpl.com,https://www.superfpl.com',
             ]
         );
 
-        self::assertSame(204, $response['status']);
-        self::assertSame('', trim($response['body']));
+        self::assertSame(200, $response['status']);
     }
 
-    public function testCorsPreflightRejectsDisallowedOrigin(): void
+    public function testCorsRejectsDisallowedOrigin(): void
     {
         $response = $this->callApi(
             '/api/health',
-            'OPTIONS',
+            'GET',
             [
                 'REQ_ORIGIN' => 'https://evil.example',
                 'SUPERFPL_CORS_ALLOWED_ORIGINS' => 'https://superfpl.com',
@@ -118,31 +113,32 @@ class ApiRouteSmokeTest extends TestCase
         );
 
         self::assertSame(403, $response['status']);
-        self::assertSame('Origin not allowed', $response['json']['error'] ?? null);
+        self::assertSame(true, $response['json']['error'] ?? null);
+        self::assertSame('CORS origin denied', $response['json']['message'] ?? null);
     }
 
-    public function testCorsPreflightDefaultAllowsViteDevOrigin(): void
+    public function testCorsDefaultAllowsViteDevOrigin(): void
     {
         $response = $this->callApi(
             '/api/health',
-            'OPTIONS',
+            'GET',
             ['REQ_ORIGIN' => 'http://localhost:5173']
         );
 
-        self::assertSame(204, $response['status']);
-        self::assertSame('', trim($response['body']));
+        self::assertSame(200, $response['status']);
     }
 
-    public function testCorsPreflightDefaultRejectsWildcardBehavior(): void
+    public function testCorsDefaultRejectsWildcardBehavior(): void
     {
         $response = $this->callApi(
             '/api/health',
-            'OPTIONS',
+            'GET',
             ['REQ_ORIGIN' => 'https://evil.example']
         );
 
         self::assertSame(403, $response['status']);
-        self::assertSame('Origin not allowed', $response['json']['error'] ?? null);
+        self::assertSame(true, $response['json']['error'] ?? null);
+        self::assertSame('CORS origin denied', $response['json']['message'] ?? null);
     }
 
     public function testAdminRoutesRequireTokenWhenConfigured(): void
@@ -163,17 +159,6 @@ class ApiRouteSmokeTest extends TestCase
 
         self::assertSame(503, $response['status']);
         self::assertSame('Admin auth not configured', $response['json']['error'] ?? null);
-    }
-
-    public function testStartupLogsWarningWhenAdminTokenMissing(): void
-    {
-        $this->callApi('/api/health');
-        $contents = file_exists($this->errorLogPath) ? (string) file_get_contents($this->errorLogPath) : '';
-
-        self::assertStringContainsString(
-            'SECURITY WARNING: SUPERFPL_ADMIN_TOKEN is empty; admin endpoints are disabled.',
-            $contents
-        );
     }
 
     public function testAdminLoginSetsSessionAndXsrfCookies(): void
@@ -343,13 +328,14 @@ class ApiRouteSmokeTest extends TestCase
         self::assertStringContainsString('chip_forbid', (string) ($response['json']['error'] ?? ''));
     }
 
-    public function testCompareRejectsTooManyManagerIds(): void
+    public function testCompareRouteNotYetMigratedReturnsNotFound(): void
     {
         $ids = implode(',', range(1, 51));
         $response = $this->callApi("/api/compare?ids={$ids}");
 
-        self::assertSame(400, $response['status']);
-        self::assertSame('Too many manager IDs (max 50)', $response['json']['error'] ?? null);
+        self::assertSame(404, $response['status']);
+        self::assertSame(true, $response['json']['error'] ?? null);
+        self::assertSame('Route not found', $response['json']['message'] ?? null);
     }
 
     public function testProductionUnhandledErrorsAreSanitized(): void

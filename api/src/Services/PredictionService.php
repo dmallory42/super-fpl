@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Prediction\PredictionEngine;
+use SuperFPL\Api\Support\ConnectionSql;
 
 class PredictionService
 {
-    private Database $db;
+    use ConnectionSql;
+
+    private Connection $connection;
     private PredictionEngine $engine;
 
-    public function __construct(Database $db)
+    public function __construct(Connection $connection)
     {
-        $this->db = $db;
-        $this->engine = new PredictionEngine($db);
+        $this->connection = $connection;
+        $this->engine = new PredictionEngine($connection);
     }
 
     /**
@@ -42,7 +45,7 @@ class PredictionService
      */
     public function generatePredictions(int $gameweek): array
     {
-        $players = $this->db->fetchAll('SELECT * FROM players');
+        $players = $this->fetchAll('SELECT * FROM players');
         $fixtures = $this->getFixturesForGameweek($gameweek);
         $fixtureOdds = $this->getFixtureOdds($gameweek);
         $goalscorerOdds = $this->getGoalscorerOdds($gameweek);
@@ -209,7 +212,7 @@ class PredictionService
      */
     public function getPlayerPrediction(int $playerId, int $gameweek): ?array
     {
-        $player = $this->db->fetchOne('SELECT * FROM players WHERE id = ?', [$playerId]);
+        $player = $this->fetchOne('SELECT * FROM players WHERE id = ?', [$playerId]);
         if ($player === null) {
             return null;
         }
@@ -223,7 +226,7 @@ class PredictionService
         $playerTeamGames = $teamGames[(int) $player['club_id']] ?? 24;
 
         // Pre-compute penalty takers for the player's team
-        $teamPlayers = $this->db->fetchAll(
+        $teamPlayers = $this->fetchAll(
             'SELECT * FROM players WHERE club_id = ? AND penalty_order IS NOT NULL ORDER BY penalty_order',
             [(int) $player['club_id']]
         );
@@ -324,7 +327,7 @@ class PredictionService
             AND pp.computed_at > datetime('now', '-6 hours')
             ORDER BY pp.predicted_points DESC";
 
-        $results = $this->db->fetchAll($sql, [$gameweek]);
+        $results = $this->fetchAll($sql, [$gameweek]);
         $results = $this->applyBlankFixtureAdjustments($results, $gameweek);
 
         // Add availability to each result
@@ -346,7 +349,7 @@ class PredictionService
      */
     private function cachePrediction(int $playerId, int $gameweek, array $prediction): void
     {
-        $this->db->upsert('player_predictions', [
+        $this->upsert('player_predictions', [
             'player_id' => $playerId,
             'gameweek' => $gameweek,
             'predicted_points' => $prediction['predicted_points'],
@@ -388,7 +391,7 @@ class PredictionService
      */
     private function getFixturesForGameweek(int $gameweek): array
     {
-        return $this->db->fetchAll(
+        return $this->fetchAll(
             'SELECT * FROM fixtures WHERE gameweek = ?',
             [$gameweek]
         );
@@ -401,7 +404,7 @@ class PredictionService
      */
     private function getFixtureOdds(int $gameweek): array
     {
-        $odds = $this->db->fetchAll(
+        $odds = $this->fetchAll(
             "SELECT fo.*
             FROM fixture_odds fo
             JOIN fixtures f ON fo.fixture_id = f.id
@@ -451,7 +454,7 @@ class PredictionService
      */
     private function getTeamsWithFixture(int $gameweek): array
     {
-        $rows = $this->db->fetchAll(
+        $rows = $this->fetchAll(
             "SELECT DISTINCT home_club_id as team_id FROM fixtures WHERE gameweek = ?
              UNION
              SELECT DISTINCT away_club_id as team_id FROM fixtures WHERE gameweek = ?",
@@ -476,7 +479,7 @@ class PredictionService
      */
     private function getGoalscorerOdds(int $gameweek): array
     {
-        $odds = $this->db->fetchAll(
+        $odds = $this->fetchAll(
             "SELECT pgo.*
             FROM player_goalscorer_odds pgo
             JOIN fixtures f ON pgo.fixture_id = f.id
@@ -499,7 +502,7 @@ class PredictionService
      */
     private function getAssistOdds(int $gameweek): array
     {
-        $odds = $this->db->fetchAll(
+        $odds = $this->fetchAll(
             "SELECT pao.*
             FROM player_assist_odds pao
             JOIN fixtures f ON pao.fixture_id = f.id
@@ -522,7 +525,7 @@ class PredictionService
      */
     private function getTeamGames(): array
     {
-        $rows = $this->db->fetchAll(
+        $rows = $this->fetchAll(
             "SELECT club_id, COUNT(*) as games FROM (
                 SELECT home_club_id as club_id FROM fixtures WHERE finished = 1
                 UNION ALL
@@ -565,13 +568,14 @@ class PredictionService
         string $snapshotSource = 'manual'
     ): int
     {
-        $before = (int) $this->db->fetchOne(
-            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
-            [$gameweek]
+        $snapshotFlag = $isPreDeadline ? 1 : 0;
+        $before = (int) $this->fetchOne(
+            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ? AND is_pre_deadline = ?",
+            [$gameweek, $snapshotFlag]
         )['cnt'];
 
         $verb = $isPreDeadline ? 'REPLACE' : 'IGNORE';
-        $this->db->query(
+        $this->execute(
             "INSERT OR {$verb} INTO prediction_snapshots (
                 player_id,
                 gameweek,
@@ -595,12 +599,12 @@ class PredictionService
                 datetime('now')
             FROM player_predictions
             WHERE gameweek = ? AND model_version = 'v2.0'",
-            [$snapshotSource, $isPreDeadline ? 1 : 0, $gameweek]
+            [$snapshotSource, $snapshotFlag, $gameweek]
         );
 
-        $after = (int) $this->db->fetchOne(
-            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
-            [$gameweek]
+        $after = (int) $this->fetchOne(
+            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ? AND is_pre_deadline = ?",
+            [$gameweek, $snapshotFlag]
         )['cnt'];
 
         return $after - $before;
@@ -613,7 +617,7 @@ class PredictionService
      */
     public function getSnapshotPredictions(int $gameweek): array
     {
-        return $this->db->fetchAll(
+        return $this->fetchAll(
             "SELECT
                 ps.player_id,
                 p.web_name,
@@ -627,7 +631,7 @@ class PredictionService
                 ps.breakdown
             FROM prediction_snapshots ps
             JOIN players p ON ps.player_id = p.id
-            WHERE ps.gameweek = ?
+            WHERE ps.gameweek = ? AND ps.is_pre_deadline = 0
             ORDER BY ps.predicted_points DESC",
             [$gameweek]
         );
@@ -640,7 +644,7 @@ class PredictionService
      */
     public function getAccuracy(int $gameweek): array
     {
-        $rows = $this->db->fetchAll(
+        $rows = $this->fetchAll(
             "SELECT
                 ps.player_id,
                 p.web_name,
@@ -649,7 +653,7 @@ class PredictionService
             FROM prediction_snapshots ps
             JOIN players p ON ps.player_id = p.id
             JOIN player_gameweek_history pgh ON ps.player_id = pgh.player_id AND ps.gameweek = pgh.gameweek
-            WHERE ps.gameweek = ?",
+            WHERE ps.gameweek = ? AND ps.is_pre_deadline = 0",
             [$gameweek]
         );
 
@@ -745,7 +749,7 @@ class PredictionService
         }
 
         $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
-        $rows = $this->db->fetchAll(
+        $rows = $this->fetchAll(
             "SELECT ps.predicted_points, pgh.total_points as actual_points
             FROM prediction_snapshots ps
             JOIN player_gameweek_history pgh ON ps.player_id = pgh.player_id AND ps.gameweek = pgh.gameweek
@@ -970,5 +974,10 @@ class PredictionService
                 'No home advantage double-counting when odds present',
             ],
         ];
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Prediction;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Prediction\HistoricalBaselines;
 
 class HistoricalBaselinesTest extends TestCase
 {
-    private Database $db;
+    private TestDatabase $db;
 
     protected function setUp(): void
     {
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->createSchema();
     }
 

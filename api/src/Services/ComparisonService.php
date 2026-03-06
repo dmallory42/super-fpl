@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 
 /**
@@ -13,8 +14,10 @@ use SuperFPL\FplClient\FplClient;
  */
 class ComparisonService
 {
+    use ConnectionSql;
+
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -81,7 +84,7 @@ class ComparisonService
     private function getManagerPicks(int $managerId, int $gameweek): ?array
     {
         // Try cache first
-        $cached = $this->db->fetchAll(
+        $cached = $this->fetchAll(
             'SELECT player_id as element, multiplier, is_captain
             FROM manager_picks
             WHERE manager_id = ? AND gameweek = ?',
@@ -264,7 +267,7 @@ class ComparisonService
 
         $placeholders = implode(',', array_fill(0, count($playerIds), '?'));
 
-        $players = $this->db->fetchAll(
+        $players = $this->fetchAll(
             "SELECT id, web_name, club_id as team, position, now_cost, total_points
             FROM players
             WHERE id IN ({$placeholders})",
@@ -277,5 +280,10 @@ class ComparisonService
         }
 
         return $result;
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

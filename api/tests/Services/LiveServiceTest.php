@@ -6,7 +6,7 @@ namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\LiveService;
 use SuperFPL\FplClient\FplClient;
 
@@ -16,7 +16,7 @@ class LiveServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $db = new Database(':memory:');
+        $db = new TestDatabase(':memory:');
         $fplClient = $this->createMock(FplClient::class);
         $this->service = new LiveService($db, $fplClient, sys_get_temp_dir());
     }

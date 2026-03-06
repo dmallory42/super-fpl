@@ -4,26 +4,28 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Tests\Services;
 
+use Maia\Orm\Connection;
+use Maia\Orm\Model;
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
 use SuperFPL\Api\Services\FixtureService;
 
 class FixtureServiceTest extends TestCase
 {
-    private Database $db;
+    private Connection $connection;
     private FixtureService $service;
 
     protected function setUp(): void
     {
-        $this->db = new Database(':memory:');
+        $this->connection = Connection::sqlite();
+        Model::setConnection($this->connection);
         $this->createSchema();
         $this->insertTestData();
-        $this->service = new FixtureService($this->db);
+        $this->service = new FixtureService($this->connection);
     }
 
     private function createSchema(): void
     {
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             CREATE TABLE fixtures (
                 id INTEGER PRIMARY KEY,
                 gameweek INTEGER,
@@ -41,7 +43,7 @@ class FixtureServiceTest extends TestCase
 
     private function insertTestData(): void
     {
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             INSERT INTO fixtures (id, gameweek, home_club_id, away_club_id, kickoff_time, home_score, away_score, home_difficulty, away_difficulty, finished) VALUES
             (1, 23, 1, 2, '2024-01-01 12:30:00', 2, 1, 3, 4, 1),
             (2, 23, 3, 4, '2024-01-01 15:00:00', 0, 0, 2, 3, 1),

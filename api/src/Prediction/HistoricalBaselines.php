@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Prediction;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 
 /**
  * Provides career historical baselines for regression-to-mean.
@@ -15,6 +16,8 @@ use SuperFPL\Api\Database;
  */
 class HistoricalBaselines
 {
+    use ConnectionSql;
+
     private const MIN_BASELINE_MINUTES = 450;
     private const FULL_CONFIDENCE_MINUTES = 1800;
     private const MIN_CONFIDENCE_WEIGHT = 0.85;
@@ -23,10 +26,12 @@ class HistoricalBaselines
     /** @var array<int, array{xg_per_90: float, xa_per_90: float, total_minutes: int, confidence: float}> */
     private array $cache = [];
 
-    public function __construct(Database $db)
+    public function __construct(
+        private readonly Connection $connection
+    )
     {
-        $this->loadUnderstatBaselines($db);
-        $this->loadFplFallback($db);
+        $this->loadUnderstatBaselines();
+        $this->loadFplFallback();
     }
 
     /**
@@ -86,9 +91,9 @@ class HistoricalBaselines
     /**
      * Load Understat npxG/xA baselines, keyed by player code.
      */
-    private function loadUnderstatBaselines(Database $db): void
+    private function loadUnderstatBaselines(): void
     {
-        $rows = $db->fetchAll(
+        $rows = $this->fetchAll(
             'SELECT p.code, h.minutes, h.npxg, h.xa
              FROM understat_season_history h
              JOIN players p ON p.understat_id = h.understat_id
@@ -125,9 +130,9 @@ class HistoricalBaselines
      * Load FPL player_season_history as fallback for players without Understat data.
      * Only fills in players not already loaded from Understat.
      */
-    private function loadFplFallback(Database $db): void
+    private function loadFplFallback(): void
     {
-        $rows = $db->fetchAll(
+        $rows = $this->fetchAll(
             'SELECT player_code, minutes, expected_goals, expected_assists
              FROM player_season_history
              WHERE minutes > 0'
@@ -161,5 +166,10 @@ class HistoricalBaselines
                 'confidence' => min(1.0, $mins / self::FULL_CONFIDENCE_MINUTES),
             ];
         }
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

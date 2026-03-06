@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Sync;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Clients\UnderstatClient;
 
 /**
@@ -79,7 +79,7 @@ class UnderstatSync
     ];
 
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly UnderstatClient $client
     ) {
     }
@@ -98,10 +98,10 @@ class UnderstatSync
         }
 
         // Build FPL player lookup: club_id => [players]
-        $fplPlayers = $this->db->fetchAll(
+        $fplPlayers = $this->fetchAll(
             'SELECT id, web_name, first_name, second_name, club_id FROM players'
         );
-        $clubNames = $this->db->fetchAll('SELECT id, name FROM clubs');
+        $clubNames = $this->fetchAll('SELECT id, name FROM clubs');
         $clubNameMap = [];
         foreach ($clubNames as $c) {
             $clubNameMap[(int) $c['id']] = $c['name'];
@@ -273,7 +273,7 @@ class UnderstatSync
      */
     private function updatePlayer(int $playerId, array $understatData): void
     {
-        $this->db->query(
+        $this->connection->execute(
             'UPDATE players SET
                 understat_id = ?,
                 npxg = ?,
@@ -311,13 +311,13 @@ class UnderstatSync
 
         // Build lookup of known understat_ids
         $knownIds = [];
-        $rows = $this->db->fetchAll('SELECT understat_id FROM players WHERE understat_id IS NOT NULL');
+        $rows = $this->fetchAll('SELECT understat_id FROM players WHERE understat_id IS NOT NULL');
         foreach ($rows as $row) {
             $knownIds[(int) $row['understat_id']] = true;
         }
 
         // Build club name map for team matching
-        $clubNames = $this->db->fetchAll('SELECT id, name FROM clubs');
+        $clubNames = $this->fetchAll('SELECT id, name FROM clubs');
         $clubNameMap = [];
         foreach ($clubNames as $c) {
             $clubNameMap[(int) $c['id']] = $c['name'];
@@ -340,7 +340,7 @@ class UnderstatSync
                     continue;
                 }
 
-                $this->db->query(
+                $this->connection->execute(
                     'INSERT INTO understat_season_history
                         (understat_id, season, minutes, npxg, xa, goals, assists, shots, key_passes)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -396,7 +396,7 @@ class UnderstatSync
 
                 $clubId = $this->resolveClubId($teamName, $clubNameMap);
 
-                $this->db->query(
+                $this->connection->execute(
                     'INSERT INTO understat_team_season
                         (team_name, club_id, season, games, xgf, xga, npxgf, npxga, scored, missed)
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -431,5 +431,14 @@ class UnderstatSync
             'team_records' => $teamRecords,
             'seasons' => $seasons,
         ];
+    }
+
+    /**
+     * @param array<int, mixed> $params
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchAll(string $sql, array $params = []): array
+    {
+        return $this->connection->query($sql, $params);
     }
 }

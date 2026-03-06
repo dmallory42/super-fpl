@@ -11,7 +11,7 @@ echo "Time: " . date('Y-m-d H:i:s') . "\n\n";
 
 // Run season history sync
 echo "Syncing past season history (this may take a while)...\n";
-$playerSync = new PlayerSync($db, $fplClient);
+$playerSync = new PlayerSync($connection, $fplClient);
 $count = $playerSync->syncSeasonHistory();
 echo "  - Season history records synced: {$count}\n";
 

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Sync;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use Maia\Orm\QueryBuilder;
 use SuperFPL\FplClient\FplClient;
 
 class FixtureSync
 {
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -26,7 +27,7 @@ class FixtureSync
         $count = 0;
 
         foreach ($fixtures as $fixture) {
-            $this->db->upsert('fixtures', [
+            $this->upsert('fixtures', [
                 'id' => $fixture['id'],
                 'gameweek' => $fixture['event'],
                 'home_club_id' => $fixture['team_h'],
@@ -43,5 +44,14 @@ class FixtureSync
         }
 
         return $count;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<int, string> $conflictKeys
+     */
+    private function upsert(string $table, array $data, array $conflictKeys = ['id']): void
+    {
+        QueryBuilder::table($table, $this->connection)->upsert($data, $conflictKeys);
     }
 }

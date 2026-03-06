@@ -12,10 +12,11 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+use Maia\Orm\Connection;
 use SuperFPL\Api\Services\PredictionService;
 
 // Determine gameweek
-$gameweek = isset($argv[1]) ? (int) $argv[1] : detectNextGameweek($db);
+$gameweek = isset($argv[1]) ? (int) $argv[1] : detectNextGameweek($connection);
 
 if ($gameweek < 1 || $gameweek > 38) {
     echo "Invalid gameweek: {$gameweek}\n";
@@ -26,7 +27,7 @@ echo "Generating predictions for GW{$gameweek}...\n";
 
 $startTime = microtime(true);
 
-$service = new PredictionService($db);
+$service = new PredictionService($connection);
 $predictions = $service->generatePredictions($gameweek);
 
 $elapsed = round(microtime(true) - $startTime, 2);
@@ -51,14 +52,15 @@ foreach ($top10 as $i => $pred) {
 /**
  * Detect the next gameweek from fixtures.
  */
-function detectNextGameweek(\SuperFPL\Api\Database $db): int
+function detectNextGameweek(Connection $connection): int
 {
-    $fixture = $db->fetchOne(
+    $rows = $connection->query(
         "SELECT gameweek FROM fixtures
         WHERE finished = 0
         ORDER BY kickoff_time ASC
         LIMIT 1"
     );
+    $fixture = $rows[0] ?? null;
 
     return $fixture ? (int) $fixture['gameweek'] : 1;
 }

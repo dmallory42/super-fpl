@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\TransferOptimizerService;
@@ -95,7 +95,7 @@ class TransferOptimizerServiceTest extends TestCase
      */
     private function makeService(array $players, array $predictionsByGw, array $allUpcomingGws): TransferOptimizerService
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -148,7 +148,7 @@ class TransferOptimizerServiceTest extends TestCase
         ]);
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
-        $db->method('fetchAll')->willReturn($players);
+        $db->method('query')->willReturn($players);
         $predictionService->method('getPredictions')->willReturnCallback(
             static fn(int $gw): array => $predictionsByGw[$gw] ?? []
         );

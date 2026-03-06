@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use SuperFPL\Api\Database;
+use SuperFPL\Api\SchemaMigrator;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\Cache\FileCache;
 
 $config = require __DIR__ . '/../config/config.php';
 
-$db = new Database($config['database']['path']);
-$db->init();
+$connection = SchemaMigrator::createConnection(
+    $config['database']['path'],
+    __DIR__ . '/../data/schema.sql',
+    __DIR__ . '/../data/migrations/add-performance-indexes.sql'
+);
 
 $cacheDir = $config['cache']['path'];
 if (!is_dir($cacheDir)) {

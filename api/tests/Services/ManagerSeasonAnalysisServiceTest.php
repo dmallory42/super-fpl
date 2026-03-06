@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\FplClient\Endpoints\EntryEndpoint;
 use SuperFPL\FplClient\FplClient;
 
 class ManagerSeasonAnalysisServiceTest extends TestCase
 {
-    private Database $db;
+    private TestDatabase $db;
 
     protected function setUp(): void
     {
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->createSchema();
         $this->seedData();
     }
@@ -64,7 +64,7 @@ class ManagerSeasonAnalysisServiceTest extends TestCase
                 snapshot_source TEXT DEFAULT 'legacy',
                 is_pre_deadline INTEGER DEFAULT 0,
                 snapped_at TIMESTAMP,
-                PRIMARY KEY (player_id, gameweek)
+                PRIMARY KEY (player_id, gameweek, is_pre_deadline)
             )
         ");
 

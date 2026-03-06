@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Models\Fixture;
 
 class FixtureService
 {
     public function __construct(
-        private readonly Database $db
+        private readonly Connection $connection
     ) {
+        Fixture::setConnection($this->connection);
     }
 
     /**
@@ -20,28 +22,39 @@ class FixtureService
      */
     public function getAll(?int $gameweek = null): array
     {
-        $sql = 'SELECT
-            id,
-            gameweek,
-            home_club_id,
-            away_club_id,
-            kickoff_time,
-            home_score,
-            away_score,
-            home_difficulty,
-            away_difficulty,
-            finished
-        FROM fixtures';
-
-        $params = [];
+        $query = Fixture::query()->select(
+            'id',
+            'gameweek',
+            'home_club_id',
+            'away_club_id',
+            'kickoff_time',
+            'home_score',
+            'away_score',
+            'home_difficulty',
+            'away_difficulty',
+            'finished'
+        );
 
         if ($gameweek !== null) {
-            $sql .= ' WHERE gameweek = ?';
-            $params[] = $gameweek;
+            $query->where('gameweek', $gameweek);
         }
 
-        $sql .= ' ORDER BY kickoff_time ASC';
+        $fixtures = $query->orderBy('kickoff_time', 'asc')->get();
 
-        return $this->db->fetchAll($sql, $params);
+        return array_map(
+            static fn(Fixture $fixture): array => [
+                'id' => $fixture->id,
+                'gameweek' => $fixture->gameweek,
+                'home_club_id' => $fixture->home_club_id,
+                'away_club_id' => $fixture->away_club_id,
+                'kickoff_time' => $fixture->kickoff_time,
+                'home_score' => $fixture->home_score,
+                'away_score' => $fixture->away_score,
+                'home_difficulty' => $fixture->home_difficulty,
+                'away_difficulty' => $fixture->away_difficulty,
+                'finished' => $fixture->finished,
+            ],
+            $fixtures
+        );
     }
 }

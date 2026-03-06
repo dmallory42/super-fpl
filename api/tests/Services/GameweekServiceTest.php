@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\GameweekService;
 
 class GameweekServiceTest extends TestCase
 {
-    private Database $db;
+    private TestDatabase $db;
     private GameweekService $service;
 
     protected function setUp(): void
     {
         // Use in-memory SQLite for tests
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->createSchema();
         $this->insertTestData();
 

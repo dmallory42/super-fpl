@@ -15,7 +15,7 @@ require __DIR__ . '/bootstrap.php';
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\GameweekService;
 
-$gwService = new GameweekService($db);
+$gwService = new GameweekService($connection);
 $currentGw = $gwService->getCurrentGameweek();
 
 $gameweek = isset($argv[1]) ? (int) $argv[1] : $currentGw - 1;
@@ -27,7 +27,7 @@ if ($gameweek < 1 || $gameweek > 38) {
 
 echo "Snapshotting predictions for GW{$gameweek}...\n";
 
-$service = new PredictionService($db);
+$service = new PredictionService($connection);
 $isPreDeadline = in_array('--pre-deadline', $argv, true);
 $source = $isPreDeadline ? 'manual_pre_deadline' : 'manual';
 $count = $service->snapshotPredictions($gameweek, $isPreDeadline, $source);

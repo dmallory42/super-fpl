@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 
 class LeagueService
 {
+    use ConnectionSql;
+
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -64,12 +67,12 @@ class LeagueService
 
     private function ensureLeagueExists(int $leagueId): void
     {
-        $existing = $this->db->fetchOne('SELECT id FROM leagues WHERE id = ?', [$leagueId]);
+        $existing = $this->fetchOne('SELECT id FROM leagues WHERE id = ?', [$leagueId]);
         if ($existing !== null) {
             return;
         }
 
-        $this->db->upsert('leagues', [
+        $this->upsert('leagues', [
             'id' => $leagueId,
             'name' => "League {$leagueId}",
             'type' => 'classic',
@@ -84,7 +87,7 @@ class LeagueService
      */
     public function getCachedLeague(int $leagueId): ?array
     {
-        $league = $this->db->fetchOne(
+        $league = $this->fetchOne(
             'SELECT * FROM leagues WHERE id = ?',
             [$leagueId]
         );
@@ -116,7 +119,7 @@ class LeagueService
      */
     public function getCachedStandings(int $leagueId): array
     {
-        return $this->db->fetchAll(
+        return $this->fetchAll(
             "SELECT
                 lm.manager_id as entry,
                 lm.rank,
@@ -139,7 +142,7 @@ class LeagueService
      */
     public function getLeagueMemberIds(int $leagueId): array
     {
-        $members = $this->db->fetchAll(
+        $members = $this->fetchAll(
             'SELECT manager_id FROM league_members WHERE league_id = ?',
             [$leagueId]
         );
@@ -154,7 +157,7 @@ class LeagueService
      */
     private function cacheLeague(int $leagueId, array $leagueData): void
     {
-        $this->db->upsert('leagues', [
+        $this->upsert('leagues', [
             'id' => $leagueId,
             'name' => $leagueData['name'] ?? '',
             'type' => $leagueData['league_type'] ?? 'classic',
@@ -176,7 +179,7 @@ class LeagueService
             }
 
             // Cache manager
-            $this->db->upsert('managers', [
+            $this->upsert('managers', [
                 'id' => $managerId,
                 'name' => $result['player_name'] ?? '',
                 'team_name' => $result['entry_name'] ?? '',
@@ -186,11 +189,16 @@ class LeagueService
             ], ['id']);
 
             // Cache league membership
-            $this->db->upsert('league_members', [
+            $this->upsert('league_members', [
                 'league_id' => $leagueId,
                 'manager_id' => $managerId,
                 'rank' => $result['rank'] ?? 0,
             ], ['league_id', 'manager_id']);
         }
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

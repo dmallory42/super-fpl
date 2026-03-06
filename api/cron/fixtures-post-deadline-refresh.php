@@ -87,7 +87,7 @@ if (isset($state[(string) $gw])) {
 echo "Running post-deadline fixture refresh for GW{$gw}...\n";
 $start = microtime(true);
 
-$sync = new FixtureSync($db, $fplClient);
+$sync = new FixtureSync($connection, $fplClient);
 $count = $sync->sync();
 
 $state[(string) $gw] = $now->format(DateTimeInterface::ATOM);
