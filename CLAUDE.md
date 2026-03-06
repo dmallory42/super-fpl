@@ -143,9 +143,12 @@ ESLint v9 flat config in `frontend/eslint.config.js` — TypeScript, React hooks
 
 ### PHP Backend
 - PSR-4 autoloading, namespace: `SuperFPL\Api\`
+- Maia attribute controllers in `api/src/Controllers/` (routes are no longer hand-wired in a giant index file)
 - Services in `api/src/Services/` for business logic
+- Prediction internals in `api/src/Prediction/`
+- Shared DB connection via `Maia\Orm\Connection` from `api/bootstrap.php`
 - FplClient uses fluent API: `$fplClient->entry($id)->getRaw()`
-- Database uses SQLite, schema in `api/data/schema.sql`
+- SQLite schema in `api/data/schema.sql`, incremental migrations in `SuperFPL\Api\SchemaMigrator`
 
 ### TypeScript Frontend
 - React functional components with hooks
@@ -208,10 +211,14 @@ cd frontend && npm test -- src/hooks/useLive.test.tsx
 
 ```php
 // Backend: api/tests/Services/ExampleServiceTest.php
-class ExampleServiceTest extends TestCase {
-    protected function setUp(): void {
-        $this->db = new Database(':memory:');
-        // Create schema and test data
+use Maia\Core\Testing\TestCase;
+
+class ExampleServiceTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->db()->execute('CREATE TABLE ...');
     }
 }
 ```
@@ -261,8 +268,8 @@ docker compose up -d cron
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| PredictionEngine | `api/src/Services/PredictionEngine.php` | Per-player xPts calculation |
-| MinutesProbability | `api/src/Services/MinutesProbability.php` | Playing time model |
+| PredictionEngine | `api/src/Prediction/PredictionEngine.php` | Per-player xPts calculation |
+| MinutesProbability | `api/src/Prediction/MinutesProbability.php` | Playing time model |
 | PathSolver | `api/src/Services/PathSolver.php` | Multi-GW transfer optimizer (beam search) |
 | applyAutoSubs | `frontend/src/hooks/useLive.ts` | Live auto-sub simulation |
 | buildFormation | `frontend/src/hooks/usePlannerOptimize.ts` | XI selection + captain pick |
@@ -276,7 +283,7 @@ docker compose up -d cron
 
 ## API Endpoints
 
-Key endpoints in `api/public/index.php`:
+Key endpoints (registered via Maia controllers):
 - `GET /players` - All players with team data
 - `GET /predictions/{gw}` - Point predictions for gameweek
 - `GET /live/{gw}/manager/{id}` - Live points for manager
