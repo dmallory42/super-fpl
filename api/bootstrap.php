@@ -33,19 +33,8 @@ if (!is_array($config)) {
     throw new RuntimeException('Application config could not be loaded from api/config/config.php.');
 }
 
-$connection = new Connection('sqlite:' . $config['database']['path']);
-$connection->execute('PRAGMA foreign_keys = ON');
-$connection->execute('PRAGMA busy_timeout = 5000');
-
-try {
-    $connection->execute('PRAGMA journal_mode = WAL');
-} catch (Throwable) {
-    // Keep SQLite defaults when WAL is not available on the underlying filesystem.
-}
-
-$connection->execute('PRAGMA synchronous = NORMAL');
-SchemaMigrator::initialize(
-    $connection,
+$connection = SchemaMigrator::createConnection(
+    $config['database']['path'],
     __DIR__ . '/data/schema.sql',
     __DIR__ . '/data/migrations/add-performance-indexes.sql'
 );

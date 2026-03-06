@@ -462,7 +462,11 @@ class ManagerSeasonAnalysisService
         }
 
         $row = $this->safeFetchOne(
-            'SELECT predicted_points FROM prediction_snapshots WHERE player_id = ? AND gameweek = ?',
+            'SELECT predicted_points
+             FROM prediction_snapshots
+             WHERE player_id = ? AND gameweek = ?
+             ORDER BY is_pre_deadline ASC
+             LIMIT 1',
             [$playerId, $gw]
         );
 
@@ -520,7 +524,11 @@ class ManagerSeasonAnalysisService
         }
 
         $row = $this->safeFetchOne(
-            'SELECT predicted_points, is_pre_deadline FROM prediction_snapshots WHERE player_id = ? AND gameweek = ?',
+            'SELECT predicted_points, is_pre_deadline
+             FROM prediction_snapshots
+             WHERE player_id = ? AND gameweek = ?
+             ORDER BY is_pre_deadline DESC
+             LIMIT 1',
             [$playerId, $gw]
         );
 
@@ -573,18 +581,25 @@ class ManagerSeasonAnalysisService
 
         // Load from snapshots first (preferred source)
         $snapshots = $this->safeFetchAll(
-            "SELECT player_id, gameweek, predicted_points, is_pre_deadline FROM prediction_snapshots WHERE player_id IN ($placeholders)",
+            "SELECT player_id, gameweek, predicted_points, is_pre_deadline
+             FROM prediction_snapshots
+             WHERE player_id IN ($placeholders)
+             ORDER BY gameweek, player_id, is_pre_deadline ASC",
             $playerIds
         );
         foreach ($snapshots as $row) {
             $gw = (int) $row['gameweek'];
             $pid = (int) $row['player_id'];
             $value = (float) $row['predicted_points'];
-            $this->expectedPointCache[$gw][$pid] = $value;
             $isPreDeadline = (int) ($row['is_pre_deadline'] ?? 0);
+
+            if (!isset($this->expectedPointCache[$gw][$pid]) || $isPreDeadline === 0) {
+                $this->expectedPointCache[$gw][$pid] = $value;
+            }
+
             $this->snapshotPointCache[$gw][$pid] = $this->isSnapshotEligibleForForesight($isPreDeadline)
                 ? $value
-                : null;
+                : ($this->snapshotPointCache[$gw][$pid] ?? null);
         }
 
         // Load fallback predictions for any gaps

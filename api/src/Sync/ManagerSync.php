@@ -116,7 +116,7 @@ class ManagerSync
                 'team_value' => $history['value'] ?? 0,
                 'transfers_cost' => $history['event_transfers_cost'] ?? 0,
                 'points_on_bench' => $history['points_on_bench'] ?? 0,
-            ]);
+            ], ['manager_id', 'gameweek']);
         }
     }
 
@@ -140,7 +140,7 @@ class ManagerSync
                 'team_value' => $entry['value'],
                 'transfers_cost' => $entry['event_transfers_cost'],
                 'points_on_bench' => $entry['points_on_bench'],
-            ]);
+            ], ['manager_id', 'gameweek']);
             $count++;
         }
 
@@ -181,15 +181,24 @@ class ManagerSync
 
     /**
      * @param array<string, mixed> $data
+     * @param array<int, string> $conflictKeys
      */
-    private function upsert(string $table, array $data): void
+    private function upsert(string $table, array $data, array $conflictKeys = ['id']): void
     {
         $columns = array_keys($data);
         $placeholders = implode(', ', array_fill(0, count($columns), '?'));
         $columnList = implode(', ', $columns);
+        $conflictList = implode(', ', $conflictKeys);
+
+        $updateColumns = array_diff($columns, $conflictKeys);
+        $updateList = implode(', ', array_map(
+            static fn(string $col): string => "{$col} = excluded.{$col}",
+            array_values($updateColumns)
+        ));
 
         $this->connection->execute(
-            "INSERT OR REPLACE INTO {$table} ({$columnList}) VALUES ({$placeholders})",
+            "INSERT INTO {$table} ({$columnList}) VALUES ({$placeholders})
+             ON CONFLICT ({$conflictList}) DO UPDATE SET {$updateList}",
             array_values($data)
         );
     }

@@ -90,6 +90,39 @@ class PredictionServiceTest extends TestCase
         $this->assertSame([], $this->service->getSnapshotPredictions(99));
     }
 
+    public function testPreDeadlineSnapshotsCanCoexistWithLockedSnapshots(): void
+    {
+        $this->insertClub(1, 'Arsenal', 'ARS');
+        $this->insertClub(2, 'Chelsea', 'CHE');
+        $this->insertPlayer(31, 'Martinelli', 1, 3);
+        $this->insertFixture(300, 27, 1, 2);
+        $this->insertPrediction(31, 27, 5.9, 0.75);
+
+        $lockedInserted = $this->service->snapshotPredictions(27, false, 'locked');
+
+        $this->db->query(
+            'UPDATE player_predictions SET predicted_points = ?, predicted_if_fit = ? WHERE player_id = ? AND gameweek = ?',
+            [6.7, 6.7, 31, 27]
+        );
+
+        $preDeadlineInserted = $this->service->snapshotPredictions(27, true, 'pre_deadline');
+        $allSnapshots = $this->db->fetchAll(
+            'SELECT predicted_points, is_pre_deadline FROM prediction_snapshots WHERE player_id = ? AND gameweek = ? ORDER BY is_pre_deadline ASC',
+            [31, 27]
+        );
+        $snapshotRows = $this->service->getSnapshotPredictions(27);
+
+        $this->assertSame(1, $lockedInserted);
+        $this->assertSame(1, $preDeadlineInserted);
+        $this->assertCount(2, $allSnapshots);
+        $this->assertSame(5.9, (float) $allSnapshots[0]['predicted_points']);
+        $this->assertSame(0, (int) $allSnapshots[0]['is_pre_deadline']);
+        $this->assertSame(6.7, (float) $allSnapshots[1]['predicted_points']);
+        $this->assertSame(1, (int) $allSnapshots[1]['is_pre_deadline']);
+        $this->assertCount(1, $snapshotRows);
+        $this->assertSame(5.9, (float) $snapshotRows[0]['predicted_points']);
+    }
+
     public function testMissingGameweekReturnsSafeEmptyResponses(): void
     {
         $predictions = $this->service->getPredictions(99);
@@ -142,13 +175,13 @@ class PredictionServiceTest extends TestCase
         );
     }
 
-    private function insertSnapshot(int $playerId, int $gameweek, float $points): void
+    private function insertSnapshot(int $playerId, int $gameweek, float $points, int $isPreDeadline = 0): void
     {
         $this->db->query(
             "INSERT INTO prediction_snapshots (
                 player_id, gameweek, predicted_points, confidence, breakdown, model_version, snapshot_source, is_pre_deadline, snapped_at
-            ) VALUES (?, ?, ?, 0.8, '{}', 'v2.0', 'test', 1, datetime('now'))",
-            [$playerId, $gameweek, $points]
+            ) VALUES (?, ?, ?, 0.8, '{}', 'v2.0', 'test', ?, datetime('now'))",
+            [$playerId, $gameweek, $points, $isPreDeadline]
         );
     }
 

@@ -61,7 +61,8 @@ class ResponseCacheMiddleware implements Middleware
         $syncVersion = ($syncVersionPath !== '' && file_exists($syncVersionPath))
             ? trim((string) file_get_contents($syncVersionPath))
             : '0';
-        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? $request->path());
+        $queryString = (string) ($_SERVER['QUERY_STRING'] ?? '');
+        $requestUri = $request->path() . ($queryString !== '' ? '?' . $queryString : '');
 
         return 'resp:v1:' . sha1($this->namespace . '|' . $requestUri . '|' . $dbMtime . '|' . $syncVersion);
     }

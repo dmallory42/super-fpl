@@ -10,6 +10,14 @@
             "SuperFPL\\Api\\": "api/src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Maia\\Auth\\": "api/vendor/maia/framework/src/Auth/src/",
+            "Maia\\Cli\\": "api/vendor/maia/framework/src/Cli/src/",
+            "Maia\\Core\\": "api/vendor/maia/framework/src/Core/src/",
+            "Maia\\Orm\\": "api/vendor/maia/framework/src/Orm/src/"
+        }
+    },
     "repositories": [
         {
             "type": "path",

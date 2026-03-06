@@ -568,9 +568,10 @@ class PredictionService
         string $snapshotSource = 'manual'
     ): int
     {
+        $snapshotFlag = $isPreDeadline ? 1 : 0;
         $before = (int) $this->fetchOne(
-            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
-            [$gameweek]
+            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ? AND is_pre_deadline = ?",
+            [$gameweek, $snapshotFlag]
         )['cnt'];
 
         $verb = $isPreDeadline ? 'REPLACE' : 'IGNORE';
@@ -598,12 +599,12 @@ class PredictionService
                 datetime('now')
             FROM player_predictions
             WHERE gameweek = ? AND model_version = 'v2.0'",
-            [$snapshotSource, $isPreDeadline ? 1 : 0, $gameweek]
+            [$snapshotSource, $snapshotFlag, $gameweek]
         );
 
         $after = (int) $this->fetchOne(
-            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
-            [$gameweek]
+            "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ? AND is_pre_deadline = ?",
+            [$gameweek, $snapshotFlag]
         )['cnt'];
 
         return $after - $before;
@@ -630,7 +631,7 @@ class PredictionService
                 ps.breakdown
             FROM prediction_snapshots ps
             JOIN players p ON ps.player_id = p.id
-            WHERE ps.gameweek = ?
+            WHERE ps.gameweek = ? AND ps.is_pre_deadline = 0
             ORDER BY ps.predicted_points DESC",
             [$gameweek]
         );
@@ -652,7 +653,7 @@ class PredictionService
             FROM prediction_snapshots ps
             JOIN players p ON ps.player_id = p.id
             JOIN player_gameweek_history pgh ON ps.player_id = pgh.player_id AND ps.gameweek = pgh.gameweek
-            WHERE ps.gameweek = ?",
+            WHERE ps.gameweek = ? AND ps.is_pre_deadline = 0",
             [$gameweek]
         );
 

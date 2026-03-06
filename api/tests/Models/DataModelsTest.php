@@ -66,7 +66,7 @@ class DataModelsTest extends TestCase
             snapshot_source TEXT,
             is_pre_deadline INTEGER,
             snapped_at TEXT,
-            PRIMARY KEY (player_id, gameweek)
+            PRIMARY KEY (player_id, gameweek, is_pre_deadline)
         )');
 
         $this->db()->execute('CREATE TABLE player_gameweek_history (

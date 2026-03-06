@@ -10,6 +10,31 @@ use RuntimeException;
 
 final class SchemaMigrator
 {
+    private const SNAPSHOT_PRIMARY_KEY = ['player_id', 'gameweek', 'is_pre_deadline'];
+
+    public static function createConnection(string $dbPath, string $schemaPath, string $performanceIndexPath): Connection
+    {
+        $connection = new Connection('sqlite:' . $dbPath);
+        self::configurePragmas($connection);
+        self::initialize($connection, $schemaPath, $performanceIndexPath);
+
+        return $connection;
+    }
+
+    public static function configurePragmas(Connection $connection): void
+    {
+        $connection->execute('PRAGMA foreign_keys = ON');
+        $connection->execute('PRAGMA busy_timeout = 5000');
+
+        try {
+            $connection->execute('PRAGMA journal_mode = WAL');
+        } catch (\Throwable) {
+            // Keep default journal mode when WAL is unavailable on the filesystem.
+        }
+
+        $connection->execute('PRAGMA synchronous = NORMAL');
+    }
+
     public static function initialize(Connection $connection, string $schemaPath, string $performanceIndexPath): void
     {
         if (!self::tableExists($connection, 'clubs')) {
@@ -95,9 +120,11 @@ final class SchemaMigrator
                 snapshot_source TEXT DEFAULT 'legacy',
                 is_pre_deadline INTEGER DEFAULT 0,
                 snapped_at TIMESTAMP,
-                PRIMARY KEY (player_id, gameweek)
+                PRIMARY KEY (player_id, gameweek, is_pre_deadline)
             )
         ");
+
+        self::rebuildPredictionSnapshotsTableIfNeeded($connection);
 
         $connection->execute("
             CREATE TABLE IF NOT EXISTS understat_season_history (
@@ -141,5 +168,69 @@ final class SchemaMigrator
 
         $connection->pdo()->exec($sql);
     }
-}
 
+    private static function rebuildPredictionSnapshotsTableIfNeeded(Connection $connection): void
+    {
+        if (!self::tableExists($connection, 'prediction_snapshots')) {
+            return;
+        }
+
+        $columns = $connection->query('PRAGMA table_info(prediction_snapshots)');
+        $primaryKey = [];
+
+        foreach ($columns as $column) {
+            $pkOrder = (int) ($column['pk'] ?? 0);
+            if ($pkOrder <= 0) {
+                continue;
+            }
+
+            $primaryKey[$pkOrder] = (string) ($column['name'] ?? '');
+        }
+
+        ksort($primaryKey);
+        if (array_values($primaryKey) === self::SNAPSHOT_PRIMARY_KEY) {
+            return;
+        }
+
+        $connection->execute('ALTER TABLE prediction_snapshots RENAME TO prediction_snapshots_legacy');
+        $connection->execute("
+            CREATE TABLE prediction_snapshots (
+                player_id INTEGER,
+                gameweek INTEGER,
+                predicted_points REAL,
+                confidence REAL,
+                breakdown TEXT,
+                model_version TEXT,
+                snapshot_source TEXT DEFAULT 'legacy',
+                is_pre_deadline INTEGER DEFAULT 0,
+                snapped_at TIMESTAMP,
+                PRIMARY KEY (player_id, gameweek, is_pre_deadline)
+            )
+        ");
+        $connection->execute("
+            INSERT INTO prediction_snapshots (
+                player_id,
+                gameweek,
+                predicted_points,
+                confidence,
+                breakdown,
+                model_version,
+                snapshot_source,
+                is_pre_deadline,
+                snapped_at
+            )
+            SELECT
+                player_id,
+                gameweek,
+                predicted_points,
+                confidence,
+                breakdown,
+                model_version,
+                COALESCE(snapshot_source, 'legacy'),
+                COALESCE(is_pre_deadline, 0),
+                snapped_at
+            FROM prediction_snapshots_legacy
+        ");
+        $connection->execute('DROP TABLE prediction_snapshots_legacy');
+    }
+}

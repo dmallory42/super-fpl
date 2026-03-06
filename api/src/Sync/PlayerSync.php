@@ -161,7 +161,7 @@ class PlayerSync
                     'expected_goals_conceded' => round((float) $row['expected_goals_conceded'], 3),
                     'value' => $row['value'],
                     'selected' => $row['selected'],
-                ], ['player_id', 'gameweek']);
+                ], conflictKeys: ['player_id', 'gameweek']);
             }
 
             $count++;
@@ -222,7 +222,7 @@ class PlayerSync
                         'id' => $seasonId,
                         'start_date' => null,
                         'end_date' => null,
-                    ]);
+                    ], ['id']);
                     $seenSeasons[$seasonId] = true;
                 }
 
@@ -240,7 +240,7 @@ class PlayerSync
                     'starts' => $season['starts'] ?? null,
                     'start_cost' => $season['start_cost'] ?? 0,
                     'end_cost' => $season['end_cost'] ?? 0,
-                ]);
+                ], ['player_code', 'season_id']);
 
                 $count++;
             }
@@ -346,15 +346,24 @@ class PlayerSync
 
     /**
      * @param array<string, mixed> $data
+     * @param array<int, string> $conflictKeys
      */
-    private function upsert(string $table, array $data): void
+    private function upsert(string $table, array $data, array $conflictKeys = ['id']): void
     {
         $columns = array_keys($data);
         $placeholders = implode(', ', array_fill(0, count($columns), '?'));
         $columnList = implode(', ', $columns);
+        $conflictList = implode(', ', $conflictKeys);
+
+        $updateColumns = array_diff($columns, $conflictKeys);
+        $updateList = implode(', ', array_map(
+            static fn(string $col): string => "{$col} = excluded.{$col}",
+            array_values($updateColumns)
+        ));
 
         $this->connection->execute(
-            "INSERT OR REPLACE INTO {$table} ({$columnList}) VALUES ({$placeholders})",
+            "INSERT INTO {$table} ({$columnList}) VALUES ({$placeholders})
+             ON CONFLICT ({$conflictList}) DO UPDATE SET {$updateList}",
             array_values($data)
         );
     }

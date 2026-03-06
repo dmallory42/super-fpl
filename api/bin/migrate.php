@@ -3,7 +3,6 @@
 
 declare(strict_types=1);
 
-use Maia\Orm\Connection;
 use SuperFPL\Api\SchemaMigrator;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -22,16 +21,6 @@ if (!is_dir($dataDir)) {
     mkdir($dataDir, 0755, true);
 }
 
-$connection = new Connection('sqlite:' . $dbPath);
-$connection->execute('PRAGMA foreign_keys = ON');
-$connection->execute('PRAGMA busy_timeout = 5000');
-try {
-    $connection->execute('PRAGMA journal_mode = WAL');
-} catch (Throwable) {
-    // Keep default journal mode when WAL is unavailable.
-}
-$connection->execute('PRAGMA synchronous = NORMAL');
-
-SchemaMigrator::initialize($connection, $schemaPath, $performanceIndexPath);
+SchemaMigrator::createConnection($dbPath, $schemaPath, $performanceIndexPath);
 
 echo "Database migrations completed.\n";
