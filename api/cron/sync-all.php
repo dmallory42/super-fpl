@@ -72,8 +72,8 @@ function runTask(string $name, callable $fn): void
 // Build task lists per phase
 $tasks = [];
 
-$syncFixtures = function () use ($db, $fplClient) {
-    $sync = new FixtureSync($db, $fplClient);
+$syncFixtures = function () use ($connection, $fplClient) {
+    $sync = new FixtureSync($connection, $fplClient);
     $count = $sync->sync();
     echo "  Fixtures synced: {$count}\n";
 };

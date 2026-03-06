@@ -19,7 +19,7 @@ echo "  - Players synced: {$playerResult['players']}\n";
 
 // Run fixture sync
 echo "Syncing fixtures...\n";
-$fixtureSync = new FixtureSync($db, $fplClient);
+$fixtureSync = new FixtureSync($connection, $fplClient);
 $fixtureCount = $fixtureSync->sync();
 echo "  - Fixtures synced: {$fixtureCount}\n";
 

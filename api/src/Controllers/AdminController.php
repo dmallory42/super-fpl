@@ -10,6 +10,7 @@ use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
 use Maia\Core\Routing\MiddlewareAttribute;
 use Maia\Core\Routing\Route;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Clients\OddsApiClient;
 use SuperFPL\Api\Clients\UnderstatClient;
 use SuperFPL\Api\Database;
@@ -28,6 +29,7 @@ class AdminController extends LegacyController
     public function __construct(
         Database $db,
         Config $config,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
         parent::__construct($db, $config);
@@ -102,7 +104,7 @@ class AdminController extends LegacyController
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
     public function syncFixtures(): Response
     {
-        $sync = new FixtureSync($this->db, $this->fplClient);
+        $sync = new FixtureSync($this->connection, $this->fplClient);
         $count = $sync->sync();
 
         return Response::json([

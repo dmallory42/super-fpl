@@ -8,6 +8,7 @@ use Maia\Core\Config\Config;
 use Maia\Core\Http\Request;
 use Maia\Core\Testing\TestCase;
 use Maia\Core\Testing\TestResponse;
+use Maia\Orm\Connection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SuperFPL\Api\Controllers\AdminController;
 use SuperFPL\Api\Database;
@@ -32,6 +33,7 @@ class AdminControllerTest extends TestCase
 
         $this->database = new Database(':memory:');
         $this->app->container()->instance(Database::class, $this->database);
+        $this->app->container()->instance(Connection::class, $this->db());
         $this->app->container()->instance(FplClient::class, new FakeFplClient());
 
         $this->configDir = sys_get_temp_dir() . '/superfpl-admin-controller-config-' . bin2hex(random_bytes(6));
