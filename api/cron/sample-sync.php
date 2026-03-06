@@ -15,14 +15,14 @@ echo "Time: " . date('Y-m-d H:i:s') . "\n\n";
 
 // Auto-detect gameweek if not provided
 if ($gameweek === null) {
-    $gwService = new GameweekService($db);
+    $gwService = new GameweekService($connection);
     $gameweek = $gwService->getCurrentGameweek();
 }
 
 echo "Sampling managers for GW{$gameweek}...\n\n";
 
 // Run sample sync
-$sampleService = new SampleService($db, $fplClient, $cacheDir . '/samples');
+$sampleService = new SampleService($connection, $fplClient, $cacheDir . '/samples');
 $results = $sampleService->sampleManagersForGameweek($gameweek);
 
 echo "Results:\n";

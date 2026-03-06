@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\LeagueService;
 use SuperFPL\FplClient\Endpoints\LeagueEndpoint;
 use SuperFPL\FplClient\FplClient;
 
 class LeagueServiceTest extends TestCase
 {
-    private Database $db;
+    private TestDatabase $db;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->db->init();
     }
 

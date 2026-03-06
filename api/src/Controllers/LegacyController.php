@@ -6,19 +6,22 @@ namespace SuperFPL\Api\Controllers;
 
 use Maia\Core\Config\Config;
 use Maia\Core\Http\Request;
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 
 abstract class LegacyController
 {
+    use ConnectionSql;
+
     public function __construct(
-        protected readonly Database $db,
+        protected readonly Connection $connection,
         protected readonly Config $config
     ) {
     }
 
     protected function currentGameweek(): int
     {
-        $fixture = $this->db->fetchOne(
+        $fixture = $this->fetchOne(
             'SELECT gameweek FROM fixtures WHERE finished = 0 ORDER BY kickoff_time LIMIT 1'
         );
 
@@ -94,5 +97,10 @@ abstract class LegacyController
         }
 
         return max(0.0, min(95.0, (float) $raw));
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

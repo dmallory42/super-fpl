@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\ManagerService;
 use SuperFPL\FplClient\Endpoints\EntryEndpoint;
 use SuperFPL\FplClient\FplClient;
 
 class ManagerServiceTest extends TestCase
 {
-    private Database $db;
+    private TestDatabase $db;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->db->init();
     }
 
@@ -136,7 +136,7 @@ class ManagerServiceTest extends TestCase
         $fplClient = $this->createMock(FplClient::class);
         $fplClient->method('entry')->with(9001)->willReturn($entry);
 
-        $db = $this->getMockBuilder(Database::class)
+        $db = $this->getMockBuilder(TestDatabase::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['query'])
             ->getMock();
@@ -171,7 +171,7 @@ class ManagerServiceTest extends TestCase
         $fplClient = $this->createMock(FplClient::class);
         $fplClient->method('entry')->with(8123)->willReturn($entry);
 
-        $db = $this->getMockBuilder(Database::class)
+        $db = $this->getMockBuilder(TestDatabase::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['upsert'])
             ->getMock();
@@ -190,7 +190,7 @@ class ManagerServiceTest extends TestCase
         $fplClient = $this->createMock(FplClient::class);
         $fplClient->method('entry')->with(9555)->willReturn($entry);
 
-        $db = $this->getMockBuilder(Database::class)
+        $db = $this->getMockBuilder(TestDatabase::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['fetchAll'])
             ->getMock();

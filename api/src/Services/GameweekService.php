@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Services;
 
 use Maia\Orm\Connection;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Support\ConnectionSql;
 
 class GameweekService
 {
+    use ConnectionSql;
+
     public function __construct(
-        private readonly Connection|Database $db
+        private readonly Connection $connection
     )
     {
     }
@@ -213,31 +215,8 @@ class GameweekService
         return $result;
     }
 
-    /**
-     * @param array<int, mixed> $params
-     * @return array<int, array<string, mixed>>
-     */
-    private function fetchAll(string $sql, array $params = []): array
+    protected function connection(): Connection
     {
-        if ($this->db instanceof Database) {
-            return $this->db->fetchAll($sql, $params);
-        }
-
-        return $this->db->query($sql, $params);
-    }
-
-    /**
-     * @param array<int, mixed> $params
-     * @return array<string, mixed>|null
-     */
-    private function fetchOne(string $sql, array $params = []): ?array
-    {
-        if ($this->db instanceof Database) {
-            return $this->db->fetchOne($sql, $params);
-        }
-
-        $rows = $this->db->query($sql, $params);
-
-        return $rows[0] ?? null;
+        return $this->connection;
     }
 }

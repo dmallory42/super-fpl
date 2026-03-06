@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\OwnershipService;
 use SuperFPL\FplClient\Endpoints\EntryEndpoint;
 use SuperFPL\FplClient\Endpoints\LeagueEndpoint;
@@ -14,14 +14,14 @@ use SuperFPL\FplClient\FplClient;
 class OwnershipServiceTest extends TestCase
 {
     private string $cacheDir;
-    private Database $db;
+    private TestDatabase $db;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->cacheDir = sys_get_temp_dir() . '/superfpl-ownership-test-' . bin2hex(random_bytes(6));
         mkdir($this->cacheDir, 0777, true);
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->db->init();
     }
 

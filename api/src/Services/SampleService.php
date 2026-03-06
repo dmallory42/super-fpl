@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
+use Maia\Orm\Connection;
 use PDOStatement;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\ParallelHttpClient;
 
@@ -14,6 +15,8 @@ use SuperFPL\FplClient\ParallelHttpClient;
  */
 class SampleService
 {
+    use ConnectionSql;
+
     private const TIERS = [
         'top_10k' => ['min_rank' => 1, 'max_rank' => 10000],
         'top_100k' => ['min_rank' => 1, 'max_rank' => 100000],
@@ -27,7 +30,7 @@ class SampleService
     private ParallelHttpClient $parallelClient;
 
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient,
         private readonly string $cacheDir
     ) {
@@ -71,7 +74,7 @@ class SampleService
     private function getTierData(int $gameweek, string $tier, array $livePoints): ?array
     {
         // Get cached picks for this tier
-        $picks = $this->db->fetchAll(
+        $picks = $this->fetchAll(
             'SELECT player_id, multiplier, manager_id FROM sample_picks
              WHERE gameweek = ? AND tier = ?',
             [$gameweek, $tier]
@@ -191,7 +194,7 @@ class SampleService
         $responses = $this->parallelClient->getBatch(array_values($endpoints));
 
         // Process responses and store picks in one transaction to reduce SQLite I/O churn.
-        $pdo = $this->db->getPdo();
+        $pdo = $this->pdo();
         $sampled = 0;
         $endpointToManager = array_flip($endpoints);
         $insertStmt = $pdo->prepare(
@@ -202,7 +205,7 @@ class SampleService
         $pdo->beginTransaction();
         try {
             // Clear existing samples for this tier/gameweek
-            $this->db->query(
+            $this->execute(
                 'DELETE FROM sample_picks WHERE gameweek = ? AND tier = ?',
                 [$gameweek, $tier]
             );
@@ -329,7 +332,7 @@ class SampleService
      */
     public function hasSamplesForGameweek(int $gameweek): bool
     {
-        $count = $this->db->fetchOne(
+        $count = $this->fetchOne(
             'SELECT COUNT(DISTINCT manager_id) as cnt FROM sample_picks WHERE gameweek = ?',
             [$gameweek]
         );
@@ -345,5 +348,10 @@ class SampleService
     public static function getTiers(): array
     {
         return array_keys(self::TIERS);
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

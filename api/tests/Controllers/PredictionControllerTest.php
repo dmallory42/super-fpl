@@ -7,12 +7,13 @@ namespace SuperFPL\Api\Tests\Controllers;
 use Maia\Core\Http\Request;
 use Maia\Core\Testing\TestCase;
 use Maia\Core\Testing\TestResponse;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Controllers\PredictionController;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 
 class PredictionControllerTest extends TestCase
 {
-    private Database $database;
+    private TestDatabase $database;
 
     protected function controllers(): array
     {
@@ -23,8 +24,8 @@ class PredictionControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->database = new Database(':memory:');
-        $this->app->container()->instance(Database::class, $this->database);
+        $this->database = new TestDatabase(':memory:');
+        $this->app->container()->instance(Connection::class, $this->database);
 
         $futureKickoff = gmdate('Y-m-d\\TH:i:s\\Z', time() + 3600);
 

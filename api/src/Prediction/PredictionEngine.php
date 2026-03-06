@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Prediction;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 
 /**
  * Main prediction engine that combines all probability models
@@ -35,10 +35,10 @@ class PredictionEngine
     /** @var array<int, array<int, array{player_id: int, expected_mins: float}>> Team ID → ordered takers */
     private array $teamPenaltyTakers = [];
 
-    public function __construct(?Database $db = null)
+    public function __construct(?Connection $connection = null)
     {
-        $baselines = $db !== null ? new HistoricalBaselines($db) : null;
-        $this->teamStrength = $db !== null ? new TeamStrength($db) : null;
+        $baselines = $connection !== null ? new HistoricalBaselines($connection) : null;
+        $this->teamStrength = $connection !== null ? new TeamStrength($connection) : null;
         $this->minutesProb = new MinutesProbability();
         $this->goalProb = new GoalProbability($baselines, $this->teamStrength);
         $this->assistProb = new AssistProbability($baselines, $this->teamStrength);

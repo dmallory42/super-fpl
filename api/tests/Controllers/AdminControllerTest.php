@@ -11,7 +11,7 @@ use Maia\Core\Testing\TestResponse;
 use Maia\Orm\Connection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use SuperFPL\Api\Controllers\AdminController;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Tests\Support\FakeFplClient;
 use SuperFPL\FplClient\FplClient;
 
@@ -19,7 +19,7 @@ require_once __DIR__ . '/../Support/FakeFplClient.php';
 
 class AdminControllerTest extends TestCase
 {
-    private Database $database;
+    private TestDatabase $database;
     private string $configDir;
 
     protected function controllers(): array
@@ -31,9 +31,8 @@ class AdminControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->database = new Database(':memory:');
-        $this->app->container()->instance(Database::class, $this->database);
-        $this->app->container()->instance(Connection::class, $this->db());
+        $this->database = new TestDatabase(':memory:');
+        $this->app->container()->instance(Connection::class, $this->database);
         $this->app->container()->instance(FplClient::class, new FakeFplClient());
 
         $this->configDir = sys_get_temp_dir() . '/superfpl-admin-controller-config-' . bin2hex(random_bytes(6));

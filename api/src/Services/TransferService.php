@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 
 /**
@@ -12,6 +13,8 @@ use SuperFPL\FplClient\FplClient;
  */
 class TransferService
 {
+    use ConnectionSql;
+
     private const MAX_PLAYERS_PER_TEAM = 3;
     private const SQUAD_SIZE = 15;
     private const POSITION_LIMITS = [
@@ -22,7 +25,7 @@ class TransferService
     ];
 
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -242,7 +245,7 @@ class TransferService
     private function getManagerSquad(int $managerId, int $gameweek): array
     {
         // Try cached picks first
-        $cached = $this->db->fetchAll(
+        $cached = $this->fetchAll(
             'SELECT player_id, position, multiplier FROM manager_picks
             WHERE manager_id = ? AND gameweek = ?
             ORDER BY position',
@@ -291,7 +294,7 @@ class TransferService
      */
     private function getPredictions(int $gameweek): array
     {
-        return $this->db->fetchAll(
+        return $this->fetchAll(
             'SELECT p.player_id, p.predicted_points, p.confidence,
                     pl.web_name, pl.club_id as team, pl.position, pl.now_cost
             FROM player_predictions p
@@ -307,7 +310,7 @@ class TransferService
      */
     private function getPlayerInfo(int $playerId): ?array
     {
-        return $this->db->fetchOne(
+        return $this->fetchOne(
             'SELECT id, web_name, club_id, position, now_cost, form,
                     chance_of_playing, news, total_points
             FROM players WHERE id = ?',
@@ -455,7 +458,7 @@ class TransferService
         $squadIds = array_column($squad, 'player_id');
 
         // Get all players of same position within budget
-        $players = $this->db->fetchAll(
+        $players = $this->fetchAll(
             'SELECT id, web_name, club_id, position, now_cost, form,
                     chance_of_playing, total_points
             FROM players
@@ -503,5 +506,10 @@ class TransferService
         usort($replacements, fn($a, $b) => $b['predicted_points'] <=> $a['predicted_points']);
 
         return $replacements;
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

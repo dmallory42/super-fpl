@@ -10,7 +10,7 @@ use Maia\Core\Http\Request;
 use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
 use Maia\Core\Routing\Route;
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\TransferOptimizerService;
@@ -21,11 +21,11 @@ use SuperFPL\FplClient\FplClient;
 class TransferController extends LegacyController
 {
     public function __construct(
-        Database $db,
+        Connection $connection,
         Config $config,
         private readonly FplClient $fplClient
     ) {
-        parent::__construct($db, $config);
+        parent::__construct($connection, $config);
     }
 
     #[Route('/transfers/suggest', method: 'GET')]
@@ -38,7 +38,7 @@ class TransferController extends LegacyController
 
         $gameweek = $request->query('gw');
         $transfers = $request->query('transfers');
-        $service = new TransferService($this->db, $this->fplClient);
+        $service = new TransferService($this->connection, $this->fplClient);
 
         return Response::json($service->getSuggestions(
             (int) $managerId,
@@ -59,7 +59,7 @@ class TransferController extends LegacyController
         }
 
         $gameweek = $request->query('gw');
-        $service = new TransferService($this->db, $this->fplClient);
+        $service = new TransferService($this->connection, $this->fplClient);
 
         return Response::json($service->simulateTransfer(
             (int) $managerId,
@@ -76,7 +76,7 @@ class TransferController extends LegacyController
         $position = $request->query('position');
         $maxPrice = $request->query('max_price');
 
-        $service = new TransferService($this->db, $this->fplClient);
+        $service = new TransferService($this->connection, $this->fplClient);
         $targets = $service->getTopTargets(
             $gameweek !== null ? (int) $gameweek : $this->currentGameweek(),
             $position !== null ? (int) $position : null,
@@ -126,10 +126,10 @@ class TransferController extends LegacyController
         $chipCompare = (string) ($request->query('chip_compare') ?? '0') === '1';
         $chipMode = (string) ($request->query('chip_mode') ?? 'locked');
 
-        $predictionService = new PredictionService($this->db);
-        $gameweekService = new GameweekService($this->db);
+        $predictionService = new PredictionService($this->connection);
+        $gameweekService = new GameweekService($this->connection);
         $optimizer = new TransferOptimizerService(
-            $this->db,
+            $this->connection,
             $this->fplClient,
             $predictionService,
             $gameweekService
@@ -178,10 +178,10 @@ class TransferController extends LegacyController
             return Response::json(['error' => $exception->getMessage()], 400);
         }
 
-        $predictionService = new PredictionService($this->db);
-        $gameweekService = new GameweekService($this->db);
+        $predictionService = new PredictionService($this->connection);
+        $gameweekService = new GameweekService($this->connection);
         $optimizer = new TransferOptimizerService(
-            $this->db,
+            $this->connection,
             $this->fplClient,
             $predictionService,
             $gameweekService

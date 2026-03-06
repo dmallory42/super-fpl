@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\PredictionService;
 use SuperFPL\Api\Services\TransferOptimizerService;
@@ -34,7 +34,7 @@ class TransferOptimizerPicksTest extends TestCase
 
     public function testFetchesPreviousGwPicksWhenCurrentGwNotStarted(): void
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -61,7 +61,7 @@ class TransferOptimizerPicksTest extends TestCase
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
         // Stub remaining DB/prediction calls so getOptimalPlan doesn't blow up
-        $db->method('fetchAll')->willReturn([]);
+        $db->method('query')->willReturn([]);
         $db->method('fetchOne')->willReturn(null);
         $predictionService->method('getPredictions')->willReturn([]);
 
@@ -73,7 +73,7 @@ class TransferOptimizerPicksTest extends TestCase
 
     public function testFetchesCurrentGwPicksWhenGameweekStarted(): void
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -99,7 +99,7 @@ class TransferOptimizerPicksTest extends TestCase
 
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
-        $db->method('fetchAll')->willReturn([]);
+        $db->method('query')->willReturn([]);
         $db->method('fetchOne')->willReturn(null);
         $predictionService->method('getPredictions')->willReturn([]);
 
@@ -111,7 +111,7 @@ class TransferOptimizerPicksTest extends TestCase
 
     public function testGw1NotStartedFetchesPicks1NotPicks0(): void
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -137,7 +137,7 @@ class TransferOptimizerPicksTest extends TestCase
 
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
-        $db->method('fetchAll')->willReturn([]);
+        $db->method('query')->willReturn([]);
         $db->method('fetchOne')->willReturn(null);
         $predictionService->method('getPredictions')->willReturn([]);
 
@@ -149,7 +149,7 @@ class TransferOptimizerPicksTest extends TestCase
 
     public function testChipModeNoneClearsResolvedChipPlan(): void
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -168,7 +168,7 @@ class TransferOptimizerPicksTest extends TestCase
         $entryEndpoint->method('picks')->with(26)->willReturn($this->createMockPicks());
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
-        $db->method('fetchAll')->willReturn([]);
+        $db->method('query')->willReturn([]);
         $predictionService->method('getPredictions')->willReturn([]);
 
         $service = new TransferOptimizerService($db, $fplClient, $predictionService, $gameweekService);
@@ -185,7 +185,7 @@ class TransferOptimizerPicksTest extends TestCase
 
     public function testPlanningHorizonControlsUpcomingGameweeksWindow(): void
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -212,7 +212,7 @@ class TransferOptimizerPicksTest extends TestCase
         $entryEndpoint->method('picks')->with(26)->willReturn($this->createMockPicks());
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
-        $db->method('fetchAll')->willReturn([]);
+        $db->method('query')->willReturn([]);
         $predictionService->method('getPredictions')->willReturn([]);
 
         $service = new TransferOptimizerService($db, $fplClient, $predictionService, $gameweekService);
@@ -223,7 +223,7 @@ class TransferOptimizerPicksTest extends TestCase
 
     public function testSuggestChipPlanIncludesRankedSuggestions(): void
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -242,7 +242,7 @@ class TransferOptimizerPicksTest extends TestCase
         $entryEndpoint->method('picks')->with(26)->willReturn($this->createMockPicks());
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
-        $db->method('fetchAll')->willReturn([]);
+        $db->method('query')->willReturn([]);
         $predictionService->method('getPredictions')->willReturn([]);
 
         $service = new TransferOptimizerService($db, $fplClient, $predictionService, $gameweekService);
@@ -255,7 +255,7 @@ class TransferOptimizerPicksTest extends TestCase
 
     public function testInvalidOverlappingLockAndAvoidConstraintsThrows(): void
     {
-        $db = $this->createMock(Database::class);
+        $db = $this->createMock(TestDatabase::class);
         $fplClient = $this->createMock(FplClient::class);
         $predictionService = $this->createMock(PredictionService::class);
         $gameweekService = $this->createMock(GameweekService::class);
@@ -274,7 +274,7 @@ class TransferOptimizerPicksTest extends TestCase
         $entryEndpoint->method('picks')->with(26)->willReturn($this->createMockPicks());
         $fplClient->method('entry')->willReturn($entryEndpoint);
 
-        $db->method('fetchAll')->willReturn([]);
+        $db->method('query')->willReturn([]);
         $predictionService->method('getPredictions')->willReturn([]);
 
         $service = new TransferOptimizerService($db, $fplClient, $predictionService, $gameweekService);

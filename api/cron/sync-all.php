@@ -134,56 +134,56 @@ $syncManagers = function () use ($connection, $fplClient) {
     echo "  Synced: {$result['synced']}, Failed: {$result['failed']}\n";
 };
 
-$snapshotPrevGw = function () use ($db) {
-    $gwService = new GameweekService($db);
+$snapshotPrevGw = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
     if ($currentGw <= 1) {
         echo "  Skipped (GW1, no previous GW)\n";
         return;
     }
     $prevGw = $currentGw - 1;
-    $existing = $db->fetchOne(
+    $existing = $connection->query(
         "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ?",
         [$prevGw]
     );
-    if ((int) ($existing['cnt'] ?? 0) > 0) {
+    if ((int) (($existing[0]['cnt'] ?? 0)) > 0) {
         echo "  Skipped (GW{$prevGw} already snapshotted)\n";
         return;
     }
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $count = $service->snapshotPredictions($prevGw, false, 'sync_prev_gw');
     echo "  Snapshotted GW{$prevGw}: {$count} predictions\n";
 };
 
-$snapshotCurrentGwPreDeadline = function () use ($db) {
-    $gwService = new GameweekService($db);
+$snapshotCurrentGwPreDeadline = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $existing = $db->fetchOne(
+    $existing = $connection->query(
         "SELECT COUNT(*) as cnt FROM prediction_snapshots WHERE gameweek = ? AND is_pre_deadline = 1",
         [$currentGw]
     );
-    if ((int) ($existing['cnt'] ?? 0) > 0) {
+    if ((int) (($existing[0]['cnt'] ?? 0)) > 0) {
         echo "  Skipped (GW{$currentGw} pre-deadline snapshot already exists)\n";
         return;
     }
 
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $count = $service->snapshotPredictions($currentGw, true, 'sync_pre_deadline');
     echo "  Pre-deadline snapshot GW{$currentGw}: {$count} predictions\n";
 };
 
-$snapshotCurrentGw = function () use ($db) {
-    $gwService = new GameweekService($db);
+$snapshotCurrentGw = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $count = $service->snapshotPredictions($currentGw, false, 'sync_post_gameweek');
     echo "  Snapshotted GW{$currentGw}: {$count} predictions\n";
 };
 
-$generatePredictions = function () use ($db) {
-    $gwService = new GameweekService($db);
+$generatePredictions = function () use ($connection) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $service = new PredictionService($db);
+    $service = new PredictionService($connection);
     $endGw = min($currentGw + 5, 38);
     for ($gw = $currentGw; $gw <= $endGw; $gw++) {
         $predictions = $service->generatePredictions($gw);
@@ -216,10 +216,10 @@ $syncUnderstatHistory = function () use ($connection, $cacheDir) {
     echo "  Player records: {$result['player_records']}, Team records: {$result['team_records']}\n";
 };
 
-$syncSamples = function () use ($db, $fplClient, $cacheDir) {
-    $gwService = new GameweekService($db);
+$syncSamples = function () use ($connection, $fplClient, $cacheDir) {
+    $gwService = new GameweekService($connection);
     $currentGw = $gwService->getCurrentGameweek();
-    $sampleService = new SampleService($db, $fplClient, $cacheDir . '/samples');
+    $sampleService = new SampleService($connection, $fplClient, $cacheDir . '/samples');
     $results = $sampleService->sampleManagersForGameweek($currentGw);
     foreach ($results as $tier => $count) {
         echo "  {$tier}: {$count} managers\n";

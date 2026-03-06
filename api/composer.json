@@ -10,6 +10,11 @@
             "SuperFPL\\Api\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "SuperFPL\\Api\\Tests\\": "tests/"
+        }
+    },
     "repositories": [
         {
             "type": "path",

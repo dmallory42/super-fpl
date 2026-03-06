@@ -9,7 +9,7 @@ use Maia\Core\Http\Request;
 use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
 use Maia\Core\Routing\Route;
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Services\ComparisonService;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\LeagueSeasonAnalysisService;
@@ -21,18 +21,18 @@ use SuperFPL\FplClient\FplClient;
 class LeagueController extends LegacyController
 {
     public function __construct(
-        Database $db,
+        Connection $connection,
         Config $config,
         private readonly FplClient $fplClient
     ) {
-        parent::__construct($db, $config);
+        parent::__construct($connection, $config);
     }
 
     #[Route('/{id}', method: 'GET')]
     public function show(int $id, Request $request): Response
     {
         $page = $request->query('page');
-        $service = new LeagueService($this->db, $this->fplClient);
+        $service = new LeagueService($this->connection, $this->fplClient);
         $league = $service->getLeague($id, $page !== null ? (int) $page : 1);
 
         if ($league === null) {
@@ -45,7 +45,7 @@ class LeagueController extends LegacyController
     #[Route('/{id}/standings', method: 'GET')]
     public function standings(int $id): Response
     {
-        $service = new LeagueService($this->db, $this->fplClient);
+        $service = new LeagueService($this->connection, $this->fplClient);
         $standings = $service->getAllStandings($id);
 
         return Response::json([
@@ -59,12 +59,12 @@ class LeagueController extends LegacyController
     {
         $gameweek = $request->query('gw');
         if ($gameweek === null) {
-            $gameweek = (new GameweekService($this->db))->getCurrentGameweek();
+            $gameweek = (new GameweekService($this->connection))->getCurrentGameweek();
         } else {
             $gameweek = (int) $gameweek;
         }
 
-        $leagueService = new LeagueService($this->db, $this->fplClient);
+        $leagueService = new LeagueService($this->connection, $this->fplClient);
         $league = $leagueService->getLeague($id);
 
         if ($league === null) {
@@ -81,7 +81,7 @@ class LeagueController extends LegacyController
             return Response::json(['error' => 'League needs at least 2 managers'], 400);
         }
 
-        $comparisonService = new ComparisonService($this->db, $this->fplClient);
+        $comparisonService = new ComparisonService($this->connection, $this->fplClient);
         $comparison = $comparisonService->compare($managerIds, (int) $gameweek);
 
         return Response::json([
@@ -111,8 +111,8 @@ class LeagueController extends LegacyController
         $gwTo = $request->query('gw_to');
         $topN = $request->query('top_n');
 
-        $leagueService = new LeagueService($this->db, $this->fplClient);
-        $managerSeasonService = new ManagerSeasonAnalysisService($this->db, $this->fplClient);
+        $leagueService = new LeagueService($this->connection, $this->fplClient);
+        $managerSeasonService = new ManagerSeasonAnalysisService($this->connection, $this->fplClient);
         $service = new LeagueSeasonAnalysisService($leagueService, $managerSeasonService);
         $analysis = $service->analyze(
             $id,

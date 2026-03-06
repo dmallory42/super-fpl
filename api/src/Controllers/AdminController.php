@@ -13,7 +13,6 @@ use Maia\Core\Routing\Route;
 use Maia\Orm\Connection;
 use SuperFPL\Api\Clients\OddsApiClient;
 use SuperFPL\Api\Clients\UnderstatClient;
-use SuperFPL\Api\Database;
 use SuperFPL\Api\Middleware\AdminAuthMiddleware;
 use SuperFPL\Api\Services\SampleService;
 use SuperFPL\Api\Sync\FixtureSync;
@@ -27,12 +26,11 @@ use SuperFPL\FplClient\FplClient;
 class AdminController extends LegacyController
 {
     public function __construct(
-        Database $db,
+        Connection $connection,
         Config $config,
-        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
-        parent::__construct($db, $config);
+        parent::__construct($connection, $config);
     }
 
     #[Route('/admin/login', method: 'POST')]
@@ -241,7 +239,7 @@ class AdminController extends LegacyController
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
     public function adminSample(int $gw, Request $request): Response
     {
-        $service = new SampleService($this->db, $this->fplClient, $this->cachePath('/samples'));
+        $service = new SampleService($this->connection, $this->fplClient, $this->cachePath('/samples'));
         $full = (string) ($request->query('full') ?? '0') === '1';
 
         if ($full) {
@@ -265,7 +263,7 @@ class AdminController extends LegacyController
     #[Route('/penalty-takers', method: 'GET')]
     public function getPenaltyTakers(): Response
     {
-        $takers = $this->db->fetchAll(
+        $takers = $this->fetchAll(
             'SELECT p.id, p.web_name, p.club_id as team, p.position, p.penalty_order,
                     c.name as team_name, c.short_name as team_short
              FROM players p
@@ -294,7 +292,7 @@ class AdminController extends LegacyController
             ], 400);
         }
 
-        $this->db->query('UPDATE players SET penalty_order = NULL WHERE club_id = ?', [$id]);
+        $this->execute('UPDATE players SET penalty_order = NULL WHERE club_id = ?', [$id]);
 
         $updated = [];
         foreach ($takers as $taker) {
@@ -308,7 +306,7 @@ class AdminController extends LegacyController
                 continue;
             }
 
-            $this->db->query(
+            $this->execute(
                 'UPDATE players SET penalty_order = ? WHERE id = ? AND club_id = ?',
                 [$order, $playerId, $id]
             );

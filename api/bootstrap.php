@@ -19,7 +19,7 @@ use SuperFPL\Api\Controllers\ManagerController;
 use SuperFPL\Api\Controllers\PlayerController;
 use SuperFPL\Api\Controllers\PredictionController;
 use SuperFPL\Api\Controllers\TransferController;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\SchemaMigrator;
 use SuperFPL\FplClient\Cache\FileCache;
 use SuperFPL\FplClient\FplClient;
 
@@ -33,11 +33,6 @@ if (!is_array($config)) {
     throw new RuntimeException('Application config could not be loaded from api/config/config.php.');
 }
 
-// Keep the existing schema bootstrap in place until the Database class is removed later in the migration.
-$database = new Database($config['database']['path']);
-$database->init();
-$app->container()->instance(Database::class, $database);
-
 $connection = new Connection('sqlite:' . $config['database']['path']);
 $connection->execute('PRAGMA foreign_keys = ON');
 $connection->execute('PRAGMA busy_timeout = 5000');
@@ -49,6 +44,11 @@ try {
 }
 
 $connection->execute('PRAGMA synchronous = NORMAL');
+SchemaMigrator::initialize(
+    $connection,
+    __DIR__ . '/data/schema.sql',
+    __DIR__ . '/data/migrations/add-performance-indexes.sql'
+);
 
 Model::setConnection($connection);
 $app->container()->instance(Connection::class, $connection);

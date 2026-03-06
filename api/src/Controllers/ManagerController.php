@@ -8,7 +8,7 @@ use Maia\Core\Config\Config;
 use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
 use Maia\Core\Routing\Route;
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\Api\Services\ManagerService;
 use SuperFPL\FplClient\FplClient;
@@ -17,17 +17,17 @@ use SuperFPL\FplClient\FplClient;
 class ManagerController extends LegacyController
 {
     public function __construct(
-        Database $db,
+        Connection $connection,
         Config $config,
         private readonly FplClient $fplClient
     ) {
-        parent::__construct($db, $config);
+        parent::__construct($connection, $config);
     }
 
     #[Route('/{id}', method: 'GET')]
     public function show(int $id): Response
     {
-        $service = new ManagerService($this->db, $this->fplClient);
+        $service = new ManagerService($this->connection, $this->fplClient);
         $manager = $service->getById($id);
 
         if ($manager === null) {
@@ -40,7 +40,7 @@ class ManagerController extends LegacyController
     #[Route('/{id}/picks/{gw}', method: 'GET')]
     public function picks(int $id, int $gw): Response
     {
-        $service = new ManagerService($this->db, $this->fplClient);
+        $service = new ManagerService($this->connection, $this->fplClient);
         $picks = $service->getPicks($id, $gw);
 
         if ($picks === null) {
@@ -53,7 +53,7 @@ class ManagerController extends LegacyController
     #[Route('/{id}/history', method: 'GET')]
     public function history(int $id): Response
     {
-        $service = new ManagerService($this->db, $this->fplClient);
+        $service = new ManagerService($this->connection, $this->fplClient);
         $history = $service->getHistory($id);
 
         if ($history === null) {
@@ -66,7 +66,7 @@ class ManagerController extends LegacyController
     #[Route('/{id}/season-analysis', method: 'GET')]
     public function seasonAnalysis(int $id): Response
     {
-        $service = new ManagerSeasonAnalysisService($this->db, $this->fplClient);
+        $service = new ManagerSeasonAnalysisService($this->connection, $this->fplClient);
         $analysis = $service->analyze($id);
 
         if ($analysis === null) {

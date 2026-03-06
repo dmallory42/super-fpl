@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Services;
 
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Services\PredictionService;
 
 class PredictionServiceTest extends TestCase
 {
-    private Database $db;
+    private TestDatabase $db;
     private PredictionService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->db = new Database(':memory:');
+        $this->db = new TestDatabase(':memory:');
         $this->db->init();
         $this->service = new PredictionService($this->db);
     }

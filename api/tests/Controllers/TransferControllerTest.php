@@ -7,8 +7,9 @@ namespace SuperFPL\Api\Tests\Controllers;
 use Maia\Core\Http\Request;
 use Maia\Core\Testing\TestCase;
 use Maia\Core\Testing\TestResponse;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Controllers\TransferController;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Tests\Support\FakeFplClient;
 use SuperFPL\FplClient\FplClient;
 
@@ -16,7 +17,7 @@ require_once __DIR__ . '/../Support/FakeFplClient.php';
 
 class TransferControllerTest extends TestCase
 {
-    private Database $database;
+    private TestDatabase $database;
 
     protected function controllers(): array
     {
@@ -27,8 +28,8 @@ class TransferControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->database = new Database(':memory:');
-        $this->app->container()->instance(Database::class, $this->database);
+        $this->database = new TestDatabase(':memory:');
+        $this->app->container()->instance(Connection::class, $this->database);
         $this->app->container()->instance(FplClient::class, new FakeFplClient());
 
         $this->database->query('CREATE TABLE players (

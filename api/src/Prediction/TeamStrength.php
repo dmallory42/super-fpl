@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Prediction;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 
 /**
  * Derives team attacking/defensive strength from xG data.
@@ -19,6 +20,8 @@ use SuperFPL\Api\Database;
  */
 class TeamStrength
 {
+    use ConnectionSql;
+
     /** @var array<int, float> xGFor per game by club_id */
     private array $xgfPerGame = [];
 
@@ -38,13 +41,15 @@ class TeamStrength
     /** Half-season ramp for blending historical priors */
     private const HISTORY_RAMP_GAMES = 19;
 
-    public function __construct(Database $db)
+    public function __construct(
+        private readonly Connection $connection
+    )
     {
-        $this->loadTeamXGF($db);
-        $this->loadTeamXGA($db);
-        $this->blendWithHistoricalPriors($db);
+        $this->loadTeamXGF();
+        $this->loadTeamXGA();
+        $this->blendWithHistoricalPriors();
         $this->computeLeagueAverages();
-        $this->computeHomeAdvantage($db);
+        $this->computeHomeAdvantage();
     }
 
     /**
@@ -86,15 +91,15 @@ class TeamStrength
      * Load team xGF from outfield players (position != 1).
      * Divide by finished fixtures count for per-game rate.
      */
-    private function loadTeamXGF(Database $db): void
+    private function loadTeamXGF(): void
     {
-        $teamXG = $db->fetchAll(
+        $teamXG = $this->fetchAll(
             'SELECT club_id, SUM(expected_goals) as total_xg
              FROM players WHERE position != 1
              GROUP BY club_id'
         );
 
-        $teamGames = $this->getTeamGames($db);
+        $teamGames = $this->getTeamGames();
 
         foreach ($teamXG as $row) {
             $clubId = (int) $row['club_id'];
@@ -109,15 +114,15 @@ class TeamStrength
      * Load team xGA from GK expected_goals_conceded.
      * All GKs per team combined naturally handles rotation.
      */
-    private function loadTeamXGA(Database $db): void
+    private function loadTeamXGA(): void
     {
-        $teamXGC = $db->fetchAll(
+        $teamXGC = $this->fetchAll(
             'SELECT club_id, SUM(expected_goals_conceded) as total_xgc
              FROM players WHERE position = 1
              GROUP BY club_id'
         );
 
-        $teamGames = $this->getTeamGames($db);
+        $teamGames = $this->getTeamGames();
 
         foreach ($teamXGC as $row) {
             $clubId = (int) $row['club_id'];
@@ -131,9 +136,9 @@ class TeamStrength
     /**
      * Count finished fixtures per team.
      */
-    private function getTeamGames(Database $db): array
+    private function getTeamGames(): array
     {
-        $rows = $db->fetchAll(
+        $rows = $this->fetchAll(
             'SELECT club_id, COUNT(*) as games FROM (
                 SELECT home_club_id as club_id FROM fixtures WHERE finished = 1
                 UNION ALL
@@ -157,10 +162,10 @@ class TeamStrength
      * For teams with no PL Understat history (newly promoted),
      * use below-league-average defaults.
      */
-    private function blendWithHistoricalPriors(Database $db): void
+    private function blendWithHistoricalPriors(): void
     {
         // Load historical team data grouped by club_id
-        $rows = $db->fetchAll(
+        $rows = $this->fetchAll(
             'SELECT club_id, SUM(xgf) as total_xgf, SUM(xga) as total_xga, SUM(games) as total_games
              FROM understat_team_season
              WHERE club_id IS NOT NULL
@@ -182,7 +187,7 @@ class TeamStrength
             }
         }
 
-        $teamGames = $this->getTeamGames($db);
+        $teamGames = $this->getTeamGames();
 
         foreach ($this->xgfPerGame as $clubId => $currentXGF) {
             $gamesPlayed = $teamGames[$clubId] ?? 0;
@@ -233,9 +238,9 @@ class TeamStrength
     /**
      * Compute home/away advantage from player_gameweek_history xG.
      */
-    private function computeHomeAdvantage(Database $db): void
+    private function computeHomeAdvantage(): void
     {
-        $row = $db->fetchOne(
+        $row = $this->fetchOne(
             'SELECT
                 SUM(CASE WHEN was_home = 1 THEN expected_goals ELSE 0 END) as home_xg,
                 COUNT(DISTINCT CASE WHEN was_home = 1 THEN fixture_id END) as home_fixtures,
@@ -267,5 +272,10 @@ class TeamStrength
             $this->homeBoost = max(1.0, min(1.2, $this->homeBoost));
             $this->awayPenalty = max(0.8, min(1.0, $this->awayPenalty));
         }
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

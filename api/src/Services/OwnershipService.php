@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\FplClient\FplClient;
 
 /**
@@ -18,7 +18,7 @@ class OwnershipService
     private const CACHE_TTL = 3600; // 1 hour cache
 
     public function __construct(
-        private Database $db,
+        private Connection $connection,
         private FplClient $fplClient,
         private string $cacheDir
     ) {

@@ -6,8 +6,9 @@ namespace SuperFPL\Api\Tests\Controllers;
 
 use Maia\Core\Config\Config;
 use Maia\Core\Testing\TestCase;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Controllers\LiveController;
-use SuperFPL\Api\Database;
+use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Tests\Support\FakeFplClient;
 use SuperFPL\FplClient\FplClient;
 
@@ -15,7 +16,7 @@ require_once __DIR__ . '/../Support/FakeFplClient.php';
 
 class LiveControllerTest extends TestCase
 {
-    private Database $database;
+    private TestDatabase $database;
     private string $configDir;
     private string $cacheDir;
 
@@ -28,8 +29,8 @@ class LiveControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->database = new Database(':memory:');
-        $this->app->container()->instance(Database::class, $this->database);
+        $this->database = new TestDatabase(':memory:');
+        $this->app->container()->instance(Connection::class, $this->database);
 
         $this->configDir = sys_get_temp_dir() . '/superfpl-live-config-' . bin2hex(random_bytes(6));
         $this->cacheDir = $this->configDir . '/cache';

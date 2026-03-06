@@ -9,7 +9,7 @@ use Maia\Core\Http\Request;
 use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
 use Maia\Core\Routing\Route;
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Prediction\PredictionScaler;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\PredictionService;
@@ -18,10 +18,10 @@ use SuperFPL\Api\Services\PredictionService;
 class PredictionController extends LegacyController
 {
     public function __construct(
-        Database $db,
+        Connection $connection,
         Config $config
     ) {
-        parent::__construct($db, $config);
+        parent::__construct($connection, $config);
     }
 
     #[Route('/{gw}', method: 'GET')]
@@ -39,9 +39,9 @@ class PredictionController extends LegacyController
             return Response::json(['error' => 'Invalid gameweek'], 404);
         }
 
-        $gameweekService = new GameweekService($this->db);
+        $gameweekService = new GameweekService($this->connection);
         $currentGameweek = $gameweekService->getCurrentGameweek();
-        $service = new PredictionService($this->db);
+        $service = new PredictionService($this->connection);
 
         if ($gw < $currentGameweek) {
             $predictions = $service->getSnapshotPredictions($gw);
@@ -79,7 +79,7 @@ class PredictionController extends LegacyController
     #[Route('/{gw}/accuracy', method: 'GET')]
     public function accuracy(int $gw): Response
     {
-        $service = new PredictionService($this->db);
+        $service = new PredictionService($this->connection);
         $accuracy = $service->getAccuracy($gw);
 
         if ((int) (($accuracy['summary']['count'] ?? 0)) === 0) {
@@ -98,7 +98,7 @@ class PredictionController extends LegacyController
     #[Route('/{gw}/player/{id}', method: 'GET')]
     public function player(int $gw, int $id): Response
     {
-        $service = new PredictionService($this->db);
+        $service = new PredictionService($this->connection);
         $prediction = $service->getPlayerPrediction($id, $gw);
 
         if ($prediction === null) {
@@ -111,7 +111,7 @@ class PredictionController extends LegacyController
     #[Route('/range', method: 'GET')]
     public function range(Request $request): Response
     {
-        $gameweekService = new GameweekService($this->db);
+        $gameweekService = new GameweekService($this->connection);
         $actionableGameweek = $gameweekService->getNextActionableGameweek();
         $xMinsOverrides = $this->parseXMinsOverridesFromRequest($request);
 
@@ -125,7 +125,7 @@ class PredictionController extends LegacyController
         $gameweeks = range($startGameweek, $endGameweek);
         $placeholders = implode(',', array_fill(0, count($gameweeks), '?'));
 
-        $fixtureRows = $this->db->fetchAll(
+        $fixtureRows = $this->fetchAll(
             "SELECT
                 f.gameweek,
                 f.home_club_id,
@@ -153,7 +153,7 @@ class PredictionController extends LegacyController
             $fixtureCounts[$gw][$awayId] = ($fixtureCounts[$gw][$awayId] ?? 0) + 1;
         }
 
-        $predictions = $this->db->fetchAll(
+        $predictions = $this->fetchAll(
             "SELECT
                 pp.player_id,
                 pp.gameweek,

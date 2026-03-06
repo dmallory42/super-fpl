@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Prediction\PredictionScaler;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 
 class TransferOptimizerService
 {
+    use ConnectionSql;
+
     private const DEFAULT_PLANNING_HORIZON = 6; // Gameweeks to look ahead
     private const MIN_PLANNING_HORIZON = 1;
     private const MAX_PLANNING_HORIZON = 12;
@@ -36,7 +39,7 @@ class TransferOptimizerService
     ];
 
     public function __construct(
-        private Database $db,
+        private Connection $connection,
         private FplClient $fplClient,
         private PredictionService $predictionService,
         private GameweekService $gameweekService,
@@ -290,7 +293,7 @@ class TransferOptimizerService
         }
 
         // Get player data with predictions for all upcoming GWs
-        $players = $this->db->fetchAll("SELECT * FROM players");
+        $players = $this->fetchAll("SELECT * FROM players");
         $playerMap = [];
         foreach ($players as $p) {
             $playerMap[(int)$p['id']] = $p;
@@ -1291,5 +1294,10 @@ class TransferOptimizerService
         }
 
         return max(1, min(5, $ft));
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }

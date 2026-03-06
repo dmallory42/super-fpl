@@ -8,7 +8,7 @@ use Maia\Core\Config\Config;
 use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
 use Maia\Core\Routing\Route;
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\LiveService;
 use SuperFPL\Api\Services\OwnershipService;
@@ -19,20 +19,20 @@ use SuperFPL\FplClient\FplClient;
 class LiveController extends LegacyController
 {
     public function __construct(
-        Database $db,
+        Connection $connection,
         Config $config,
         private readonly FplClient $fplClient
     ) {
-        parent::__construct($db, $config);
+        parent::__construct($connection, $config);
     }
 
     #[Route('/current', method: 'GET')]
     public function current(): Response
     {
-        $gameweekService = new GameweekService($this->db);
+        $gameweekService = new GameweekService($this->connection);
         $currentGameweek = $gameweekService->getCurrentGameweek();
 
-        $service = new LiveService($this->db, $this->fplClient, $this->cachePath('/live'));
+        $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
         $data = $service->getLiveData($currentGameweek);
         $data['current_gameweek'] = $currentGameweek;
 
@@ -42,7 +42,7 @@ class LiveController extends LegacyController
     #[Route('/{gw}', method: 'GET')]
     public function gameweek(int $gw): Response
     {
-        $service = new LiveService($this->db, $this->fplClient, $this->cachePath('/live'));
+        $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
 
         return Response::json($service->getLiveData($gw));
     }
@@ -50,7 +50,7 @@ class LiveController extends LegacyController
     #[Route('/{gw}/manager/{id}', method: 'GET')]
     public function manager(int $gw, int $id): Response
     {
-        $service = new LiveService($this->db, $this->fplClient, $this->cachePath('/live'));
+        $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
 
         return Response::json($service->getManagerLivePoints($id, $gw));
     }
@@ -58,8 +58,8 @@ class LiveController extends LegacyController
     #[Route('/{gw}/manager/{id}/enhanced', method: 'GET')]
     public function managerEnhanced(int $gw, int $id): Response
     {
-        $liveService = new LiveService($this->db, $this->fplClient, $this->cachePath('/live'));
-        $ownershipService = new OwnershipService($this->db, $this->fplClient, $this->cachePath('/ownership'));
+        $liveService = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
+        $ownershipService = new OwnershipService($this->connection, $this->fplClient, $this->cachePath('/ownership'));
 
         $data = $liveService->getManagerLivePointsEnhanced($id, $gw, $ownershipService);
         if (isset($data['error'])) {
@@ -72,7 +72,7 @@ class LiveController extends LegacyController
     #[Route('/{gw}/bonus', method: 'GET')]
     public function bonus(int $gw): Response
     {
-        $service = new LiveService($this->db, $this->fplClient, $this->cachePath('/live'));
+        $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
 
         return Response::json([
             'gameweek' => $gw,
@@ -83,8 +83,8 @@ class LiveController extends LegacyController
     #[Route('/{gw}/samples', method: 'GET')]
     public function samples(int $gw): Response
     {
-        $liveService = new LiveService($this->db, $this->fplClient, $this->cachePath('/live'));
-        $sampleService = new SampleService($this->db, $this->fplClient, $this->cachePath('/samples'));
+        $liveService = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
+        $sampleService = new SampleService($this->connection, $this->fplClient, $this->cachePath('/samples'));
 
         $liveData = $liveService->getLiveData($gw);
         $elements = is_array($liveData['elements'] ?? null) ? $liveData['elements'] : [];

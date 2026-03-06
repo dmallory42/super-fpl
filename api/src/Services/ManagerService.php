@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 
 class ManagerService
 {
+    use ConnectionSql;
+
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -35,7 +38,7 @@ class ManagerService
             error_log("ManagerService: Failed to fetch manager {$id} from API: " . $e->getMessage());
             // Fall back to cached data if API fails.
             try {
-                $cached = $this->db->fetchOne(
+                $cached = $this->fetchOne(
                     'SELECT * FROM managers WHERE id = ?',
                     [$id]
                 );
@@ -141,7 +144,7 @@ class ManagerService
      */
     private function cacheManager(array $data): void
     {
-        $this->db->upsert('managers', [
+        $this->upsert('managers', [
             'id' => $data['id'],
             'name' => ($data['player_first_name'] ?? '') . ' ' . ($data['player_last_name'] ?? ''),
             'team_name' => $data['name'] ?? '',
@@ -159,13 +162,13 @@ class ManagerService
     private function cacheManagerPicks(int $managerId, int $gameweek, array $picksData): void
     {
         // Delete existing picks for this manager/gameweek
-        $this->db->query(
+        $this->execute(
             'DELETE FROM manager_picks WHERE manager_id = ? AND gameweek = ?',
             [$managerId, $gameweek]
         );
 
         foreach ($picksData['picks'] ?? [] as $pick) {
-            $this->db->insert('manager_picks', [
+            $this->insert('manager_picks', [
                 'manager_id' => $managerId,
                 'gameweek' => $gameweek,
                 'player_id' => $pick['element'],
@@ -179,7 +182,7 @@ class ManagerService
         // Cache entry history too
         if (isset($picksData['entry_history'])) {
             $history = $picksData['entry_history'];
-            $this->db->upsert('manager_history', [
+            $this->upsert('manager_history', [
                 'manager_id' => $managerId,
                 'gameweek' => $gameweek,
                 'points' => $history['points'] ?? 0,
@@ -201,7 +204,7 @@ class ManagerService
     private function cacheManagerHistory(int $managerId, array $historyData): void
     {
         foreach ($historyData['current'] ?? [] as $entry) {
-            $this->db->upsert('manager_history', [
+            $this->upsert('manager_history', [
                 'manager_id' => $managerId,
                 'gameweek' => $entry['event'],
                 'points' => $entry['points'],
@@ -222,7 +225,7 @@ class ManagerService
      */
     private function getCachedPicks(int $managerId, int $gameweek): array
     {
-        return $this->db->fetchAll(
+        return $this->fetchAll(
             'SELECT
                 player_id as element,
                 position,
@@ -243,7 +246,7 @@ class ManagerService
      */
     private function getCachedHistory(int $managerId): array
     {
-        return $this->db->fetchAll(
+        return $this->fetchAll(
             'SELECT
                 gameweek as event,
                 points,
@@ -269,5 +272,10 @@ class ManagerService
     private function formatManagerResponse(array $data): array
     {
         return $data;
+    }
+
+    protected function connection(): Connection
+    {
+        return $this->connection;
     }
 }
