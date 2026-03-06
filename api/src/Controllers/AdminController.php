@@ -83,7 +83,7 @@ class AdminController extends LegacyController
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
     public function syncPlayers(): Response
     {
-        $sync = new PlayerSync($this->db, $this->fplClient);
+        $sync = new PlayerSync($this->connection, $this->fplClient);
         $result = $sync->sync();
 
         return Response::json([
@@ -221,7 +221,7 @@ class AdminController extends LegacyController
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
     public function syncSeasonHistory(): Response
     {
-        $sync = new PlayerSync($this->db, $this->fplClient);
+        $sync = new PlayerSync($this->connection, $this->fplClient);
         $count = $sync->syncSeasonHistory();
 
         return Response::json([

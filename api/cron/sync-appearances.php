@@ -6,7 +6,7 @@ require __DIR__ . '/bootstrap.php';
 
 use SuperFPL\Api\Sync\PlayerSync;
 
-$playerSync = new PlayerSync($db, $fplClient);
+$playerSync = new PlayerSync($connection, $fplClient);
 
 echo "Syncing player appearances...\n";
 $start = microtime(true);

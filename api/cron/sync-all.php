@@ -78,8 +78,8 @@ $syncFixtures = function () use ($connection, $fplClient) {
     echo "  Fixtures synced: {$count}\n";
 };
 
-$syncPlayers = function () use ($db, $fplClient) {
-    $sync = new PlayerSync($db, $fplClient);
+$syncPlayers = function () use ($connection, $fplClient) {
+    $sync = new PlayerSync($connection, $fplClient);
     $result = $sync->sync();
     echo "  Teams: {$result['teams']}, Players: {$result['players']}\n";
 };
@@ -191,14 +191,14 @@ $generatePredictions = function () use ($db) {
     }
 };
 
-$syncAppearances = function () use ($db, $fplClient) {
-    $sync = new PlayerSync($db, $fplClient);
+$syncAppearances = function () use ($connection, $fplClient) {
+    $sync = new PlayerSync($connection, $fplClient);
     $count = $sync->syncAppearances();
     echo "  Players updated: {$count}\n";
 };
 
-$syncSeasonHistory = function () use ($db, $fplClient) {
-    $sync = new PlayerSync($db, $fplClient);
+$syncSeasonHistory = function () use ($connection, $fplClient) {
+    $sync = new PlayerSync($connection, $fplClient);
     $count = $sync->syncSeasonHistory();
     echo "  Records synced: {$count}\n";
 };
