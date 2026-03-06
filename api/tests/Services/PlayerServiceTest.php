@@ -16,7 +16,7 @@ class PlayerServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = new Connection('sqlite::memory:');
+        $this->connection = Connection::sqlite();
         Model::setConnection($this->connection);
         $this->createSchema();
         $this->insertTestData();

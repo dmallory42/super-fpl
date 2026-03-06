@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Sync;
 
 use Maia\Orm\Connection;
+use Maia\Orm\QueryBuilder;
 use SuperFPL\Api\Clients\OddsApiClient;
 
 /**
@@ -449,21 +450,6 @@ class OddsSync
      */
     private function upsert(string $table, array $data, array $conflictKeys): void
     {
-        $columns = array_keys($data);
-        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
-        $columnList = implode(', ', $columns);
-        $conflictList = implode(', ', $conflictKeys);
-
-        $updateColumns = array_diff($columns, $conflictKeys);
-        $updateList = implode(', ', array_map(
-            static fn(string $col): string => "{$col} = excluded.{$col}",
-            array_values($updateColumns)
-        ));
-
-        $this->connection->execute(
-            "INSERT INTO {$table} ({$columnList}) VALUES ({$placeholders})
-             ON CONFLICT ({$conflictList}) DO UPDATE SET {$updateList}",
-            array_values($data)
-        );
+        QueryBuilder::table($table, $this->connection)->upsert($data, $conflictKeys);
     }
 }

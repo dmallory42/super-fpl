@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Support;
 
+use Maia\Core\Cache\ResponseCacheStore;
 use Predis\Client;
 
 class RedisResponseCacheStore implements ResponseCacheStore

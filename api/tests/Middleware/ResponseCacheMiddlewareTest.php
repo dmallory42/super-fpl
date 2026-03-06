@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Tests\Middleware;
 
 use Maia\Core\Config\Config;
+use Maia\Core\Cache\ResponseCacheStore;
 use Maia\Core\Http\Request;
 use Maia\Core\Http\Response;
 use PHPUnit\Framework\TestCase;
 use SuperFPL\Api\Middleware\ResponseCacheMiddleware;
-use SuperFPL\Api\Support\ResponseCacheStore;
 
 class ResponseCacheMiddlewareTest extends TestCase
 {

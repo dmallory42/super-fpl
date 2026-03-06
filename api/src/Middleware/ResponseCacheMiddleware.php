@@ -5,20 +5,29 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Middleware;
 
 use Closure;
+use Maia\Core\Cache\ResponseCacheStore;
 use Maia\Core\Config\Config;
 use Maia\Core\Http\Request;
 use Maia\Core\Http\Response;
 use Maia\Core\Middleware\Middleware;
-use SuperFPL\Api\Support\ResponseCacheStore;
+use Maia\Core\Middleware\ResponseCacheMiddleware as MaiaResponseCacheMiddleware;
 
 class ResponseCacheMiddleware implements Middleware
 {
+    private MaiaResponseCacheMiddleware $delegate;
+
     public function __construct(
         private readonly ResponseCacheStore $cacheStore,
         private readonly Config $config,
         private readonly string $namespace = 'default',
         private readonly int $ttlSeconds = 60
     ) {
+        $this->delegate = new MaiaResponseCacheMiddleware(
+            $cacheStore,
+            $ttlSeconds,
+            $namespace,
+            fn(Request $request, string $namespace): string => $this->buildCacheKey($request, $namespace)
+        );
     }
 
     public function handle(Request $request, Closure $next): Response
@@ -32,27 +41,10 @@ class ResponseCacheMiddleware implements Middleware
             return $next($request)->withHeader('X-Response-Cache', 'BYPASS');
         }
 
-        $cacheKey = $this->buildCacheKey($request);
-        $cached = $this->cacheStore->get($cacheKey);
-
-        if (is_string($cached) && $cached !== '') {
-            $decoded = json_decode($cached, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                return Response::json($decoded)->withHeader('X-Response-Cache', 'HIT');
-            }
-        }
-
-        $response = $next($request);
-        if ($response->status() !== 200 || $response->body() === '') {
-            return $response->withHeader('X-Response-Cache', 'BYPASS');
-        }
-
-        $this->cacheStore->set($cacheKey, $this->ttlSeconds, $response->body());
-
-        return $response->withHeader('X-Response-Cache', 'MISS');
+        return $this->delegate->handle($request, $next);
     }
 
-    private function buildCacheKey(Request $request): string
+    private function buildCacheKey(Request $request, string $namespace): string
     {
         $databasePath = trim((string) $this->config->get('config.database.path', ''));
         $dbMtime = ($databasePath !== '' && file_exists($databasePath)) ? (string) filemtime($databasePath) : '0';
@@ -61,9 +53,16 @@ class ResponseCacheMiddleware implements Middleware
         $syncVersion = ($syncVersionPath !== '' && file_exists($syncVersionPath))
             ? trim((string) file_get_contents($syncVersionPath))
             : '0';
-        $queryString = (string) ($_SERVER['QUERY_STRING'] ?? '');
-        $requestUri = $request->path() . ($queryString !== '' ? '?' . $queryString : '');
+        $query = $request->queryParams();
+        if ($query !== []) {
+            ksort($query);
+        }
+        $requestUri = $request->path();
+        $queryString = http_build_query($query);
+        if ($queryString !== '') {
+            $requestUri .= '?' . $queryString;
+        }
 
-        return 'resp:v1:' . sha1($this->namespace . '|' . $requestUri . '|' . $dbMtime . '|' . $syncVersion);
+        return 'resp:v1:' . sha1($namespace . '|' . $requestUri . '|' . $dbMtime . '|' . $syncVersion);
     }
 }

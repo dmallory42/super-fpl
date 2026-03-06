@@ -37,9 +37,11 @@ class TestDatabase extends Connection
 
     public function __construct(string $path = ':memory:')
     {
-        parent::__construct('sqlite:' . $path);
-        $this->execute('PRAGMA foreign_keys = ON');
-        $this->execute('PRAGMA busy_timeout = 5000');
+        parent::__construct($path === ':memory:' ? 'sqlite::memory:' : 'sqlite:' . $path);
+        $this->configureSqlite([
+            'foreign_keys' => true,
+            'busy_timeout' => 5000,
+        ]);
     }
 
     public function init(): void
@@ -130,4 +132,3 @@ class TestDatabase extends Connection
         }
     }
 }
-

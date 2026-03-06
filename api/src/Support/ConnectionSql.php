@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Support;
 
 use Maia\Orm\Connection;
+use Maia\Orm\QueryBuilder;
 use PDO;
 
 trait ConnectionSql
@@ -46,20 +47,11 @@ trait ConnectionSql
     {
         $this->assertSafeIdentifier($table);
 
-        $columns = array_keys($data);
-        foreach ($columns as $column) {
+        foreach (array_keys($data) as $column) {
             $this->assertSafeIdentifier($column);
         }
 
-        $columnList = implode(', ', $columns);
-        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
-
-        $this->connection()->execute(
-            "INSERT INTO {$table} ({$columnList}) VALUES ({$placeholders})",
-            array_values($data)
-        );
-
-        return (int) $this->connection()->lastInsertId();
+        return QueryBuilder::table($table, $this->connection())->insert($data);
     }
 
     /**
@@ -70,40 +62,14 @@ trait ConnectionSql
     {
         $this->assertSafeIdentifier($table);
 
-        $columns = array_keys($data);
-        foreach ($columns as $column) {
+        foreach (array_keys($data) as $column) {
             $this->assertSafeIdentifier($column);
         }
         foreach ($conflictKeys as $key) {
             $this->assertSafeIdentifier($key);
         }
 
-        $columnList = implode(', ', $columns);
-        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
-        $conflictList = implode(', ', $conflictKeys);
-
-        $updateColumns = array_values(array_diff($columns, $conflictKeys));
-        if ($updateColumns === []) {
-            $this->connection()->execute(
-                "INSERT OR IGNORE INTO {$table} ({$columnList}) VALUES ({$placeholders})",
-                array_values($data)
-            );
-
-            return (int) $this->connection()->lastInsertId();
-        }
-
-        $updateList = implode(', ', array_map(
-            static fn(string $column): string => "{$column} = excluded.{$column}",
-            $updateColumns
-        ));
-
-        $this->connection()->execute(
-            "INSERT INTO {$table} ({$columnList}) VALUES ({$placeholders})
-             ON CONFLICT ({$conflictList}) DO UPDATE SET {$updateList}",
-            array_values($data)
-        );
-
-        return (int) $this->connection()->lastInsertId();
+        return QueryBuilder::table($table, $this->connection())->upsert($data, $conflictKeys);
     }
 
     protected function pdo(): PDO
@@ -118,4 +84,3 @@ trait ConnectionSql
         }
     }
 }
-

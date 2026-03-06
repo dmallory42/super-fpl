@@ -18,7 +18,7 @@ class TeamServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->connection = new Connection('sqlite::memory:');
+        $this->connection = Connection::sqlite();
         Model::setConnection($this->connection);
         $this->service = new TeamService($this->connection);
 

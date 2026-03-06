@@ -14,7 +14,11 @@ final class SchemaMigrator
 
     public static function createConnection(string $dbPath, string $schemaPath, string $performanceIndexPath): Connection
     {
-        $connection = new Connection('sqlite:' . $dbPath);
+        $connection = Connection::sqlite($dbPath, [
+            'foreign_keys' => true,
+            'busy_timeout' => 5000,
+            'synchronous' => 'NORMAL',
+        ]);
         self::configurePragmas($connection);
         self::initialize($connection, $schemaPath, $performanceIndexPath);
 
@@ -23,16 +27,11 @@ final class SchemaMigrator
 
     public static function configurePragmas(Connection $connection): void
     {
-        $connection->execute('PRAGMA foreign_keys = ON');
-        $connection->execute('PRAGMA busy_timeout = 5000');
-
         try {
-            $connection->execute('PRAGMA journal_mode = WAL');
+            $connection->configureSqlite(['journal_mode' => 'WAL']);
         } catch (\Throwable) {
             // Keep default journal mode when WAL is unavailable on the filesystem.
         }
-
-        $connection->execute('PRAGMA synchronous = NORMAL');
     }
 
     public static function initialize(Connection $connection, string $schemaPath, string $performanceIndexPath): void
