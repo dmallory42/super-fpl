@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Sync;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
 use SuperFPL\FplClient\FplClient;
 
 class ManagerSync
 {
     public function __construct(
-        private readonly Database $db,
+        private readonly Connection $connection,
         private readonly FplClient $fplClient
     ) {
     }
@@ -61,7 +61,7 @@ class ManagerSync
      */
     public function syncAll(): array
     {
-        $managers = $this->db->fetchAll('SELECT id FROM managers');
+        $managers = $this->connection->query('SELECT id FROM managers');
 
         $synced = 0;
         $failed = 0;
@@ -86,13 +86,13 @@ class ManagerSync
     private function syncPicks(int $managerId, int $gameweek, array $picksData): void
     {
         // Delete existing picks for this manager/gameweek
-        $this->db->query(
+        $this->connection->execute(
             'DELETE FROM manager_picks WHERE manager_id = ? AND gameweek = ?',
             [$managerId, $gameweek]
         );
 
         foreach ($picksData['picks'] ?? [] as $pick) {
-            $this->db->insert('manager_picks', [
+            $this->insert('manager_picks', [
                 'manager_id' => $managerId,
                 'gameweek' => $gameweek,
                 'player_id' => $pick['element'],
@@ -106,7 +106,7 @@ class ManagerSync
         // Also cache entry history
         if (isset($picksData['entry_history'])) {
             $history = $picksData['entry_history'];
-            $this->db->upsert('manager_history', [
+            $this->upsert('manager_history', [
                 'manager_id' => $managerId,
                 'gameweek' => $gameweek,
                 'points' => $history['points'] ?? 0,
@@ -116,7 +116,7 @@ class ManagerSync
                 'team_value' => $history['value'] ?? 0,
                 'transfers_cost' => $history['event_transfers_cost'] ?? 0,
                 'points_on_bench' => $history['points_on_bench'] ?? 0,
-            ], ['manager_id', 'gameweek']);
+            ]);
         }
     }
 
@@ -130,7 +130,7 @@ class ManagerSync
         $count = 0;
 
         foreach ($historyData['current'] ?? [] as $entry) {
-            $this->db->upsert('manager_history', [
+            $this->upsert('manager_history', [
                 'manager_id' => $managerId,
                 'gameweek' => $entry['event'],
                 'points' => $entry['points'],
@@ -140,7 +140,7 @@ class ManagerSync
                 'team_value' => $entry['value'],
                 'transfers_cost' => $entry['event_transfers_cost'],
                 'points_on_bench' => $entry['points_on_bench'],
-            ], ['manager_id', 'gameweek']);
+            ]);
             $count++;
         }
 
@@ -154,13 +154,43 @@ class ManagerSync
      */
     private function upsertManager(array $data): void
     {
-        $this->db->upsert('managers', [
+        $this->upsert('managers', [
             'id' => $data['id'],
             'name' => ($data['player_first_name'] ?? '') . ' ' . ($data['player_last_name'] ?? ''),
             'team_name' => $data['name'] ?? '',
             'overall_rank' => $data['summary_overall_rank'] ?? null,
             'overall_points' => $data['summary_overall_points'] ?? 0,
             'last_synced' => date('Y-m-d H:i:s'),
-        ], ['id']);
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function insert(string $table, array $data): void
+    {
+        $columns = array_keys($data);
+        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+        $columnList = implode(', ', $columns);
+
+        $this->connection->execute(
+            "INSERT INTO {$table} ({$columnList}) VALUES ({$placeholders})",
+            array_values($data)
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function upsert(string $table, array $data): void
+    {
+        $columns = array_keys($data);
+        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+        $columnList = implode(', ', $columns);
+
+        $this->connection->execute(
+            "INSERT OR REPLACE INTO {$table} ({$columnList}) VALUES ({$placeholders})",
+            array_values($data)
+        );
     }
 }

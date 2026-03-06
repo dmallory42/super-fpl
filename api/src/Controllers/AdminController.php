@@ -124,7 +124,7 @@ class AdminController extends LegacyController
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
     public function syncManagers(): Response
     {
-        $sync = new ManagerSync($this->db, $this->fplClient);
+        $sync = new ManagerSync($this->connection, $this->fplClient);
         $result = $sync->syncAll();
 
         return Response::json([

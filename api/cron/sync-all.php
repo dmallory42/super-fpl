@@ -128,8 +128,8 @@ $syncUnderstat = function () use ($db, $cacheDir) {
     }
 };
 
-$syncManagers = function () use ($db, $fplClient) {
-    $sync = new ManagerSync($db, $fplClient);
+$syncManagers = function () use ($connection, $fplClient) {
+    $sync = new ManagerSync($connection, $fplClient);
     $result = $sync->syncAll();
     echo "  Synced: {$result['synced']}, Failed: {$result['failed']}\n";
 };
