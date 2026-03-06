@@ -4,10 +4,21 @@ declare(strict_types=1);
 
 require __DIR__ . '/vendor/autoload.php';
 
+use Maia\Auth\CorsMiddleware;
+use Maia\Auth\SecurityHeadersMiddleware;
 use Maia\Core\App;
 use Maia\Core\Config\Config;
 use Maia\Orm\Connection;
 use Maia\Orm\Model;
+use SuperFPL\Api\Controllers\AdminController;
+use SuperFPL\Api\Controllers\FixtureController;
+use SuperFPL\Api\Controllers\HealthController;
+use SuperFPL\Api\Controllers\LeagueController;
+use SuperFPL\Api\Controllers\LiveController;
+use SuperFPL\Api\Controllers\ManagerController;
+use SuperFPL\Api\Controllers\PlayerController;
+use SuperFPL\Api\Controllers\PredictionController;
+use SuperFPL\Api\Controllers\TransferController;
 use SuperFPL\Api\Database;
 use SuperFPL\FplClient\Cache\FileCache;
 use SuperFPL\FplClient\FplClient;
@@ -57,5 +68,18 @@ $fplClient = new FplClient(
 );
 
 $app->container()->instance(FplClient::class, $fplClient);
+
+$app->addMiddleware(new CorsMiddleware((array) ($config['security']['cors_allowed_origins'] ?? [])));
+$app->addMiddleware(new SecurityHeadersMiddleware());
+
+$app->registerController(HealthController::class);
+$app->registerController(PlayerController::class);
+$app->registerController(FixtureController::class);
+$app->registerController(ManagerController::class);
+$app->registerController(LeagueController::class);
+$app->registerController(PredictionController::class);
+$app->registerController(LiveController::class);
+$app->registerController(TransferController::class);
+$app->registerController(AdminController::class);
 
 return $app;

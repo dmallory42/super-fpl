@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Services;
 
-use SuperFPL\Api\Database;
+use Maia\Orm\Connection;
+use SuperFPL\Api\Models\Club;
+use SuperFPL\Api\Models\Player;
 
 class PlayerService
 {
     public function __construct(
-        private readonly Database $db
+        private readonly Connection $connection
     ) {
+        Player::setConnection($this->connection);
+        Club::setConnection($this->connection);
     }
 
     /**
@@ -21,56 +25,50 @@ class PlayerService
      */
     public function getAll(array $filters = []): array
     {
-        $sql = 'SELECT
-            id,
-            code,
-            web_name,
-            first_name,
-            second_name,
-            club_id as team,
-            position as element_type,
-            now_cost,
-            total_points,
-            form,
-            selected_by_percent,
-            minutes,
-            goals_scored,
-            assists,
-            clean_sheets,
-            saves,
-            expected_goals,
-            expected_assists,
-            ict_index,
-            bps,
-            bonus,
-            starts,
-            appearances,
-            chance_of_playing as chance_of_playing_next_round,
-            news,
-            xmins_override,
-            penalty_order
-        FROM players';
-
-        $conditions = [];
-        $params = [];
+        $query = Player::query()->select(
+            'id',
+            'code',
+            'web_name',
+            'first_name',
+            'second_name',
+            'club_id',
+            'position',
+            'now_cost',
+            'total_points',
+            'form',
+            'selected_by_percent',
+            'minutes',
+            'goals_scored',
+            'assists',
+            'clean_sheets',
+            'saves',
+            'expected_goals',
+            'expected_assists',
+            'ict_index',
+            'bps',
+            'bonus',
+            'starts',
+            'appearances',
+            'chance_of_playing',
+            'news',
+            'xmins_override',
+            'penalty_order'
+        );
 
         if (isset($filters['position'])) {
-            $conditions[] = 'position = ?';
-            $params[] = $filters['position'];
+            $query->where('position', (int) $filters['position']);
         }
 
         if (isset($filters['team'])) {
-            $conditions[] = 'club_id = ?';
-            $params[] = $filters['team'];
+            $query->where('club_id', (int) $filters['team']);
         }
 
-        if (!empty($conditions)) {
-            $sql .= ' WHERE ' . implode(' AND ', $conditions);
-        }
+        $players = $query->orderBy('total_points', 'desc')->get();
 
-        $sql .= ' ORDER BY total_points DESC';
-
-        return $this->db->fetchAll($sql, $params);
+        return array_map(
+            fn(Player $player): array => $this->mapPlayer($player),
+            $players
+        );
     }
 
     /**
@@ -80,38 +78,13 @@ class PlayerService
      */
     public function getById(int $id): ?array
     {
-        return $this->db->fetchOne(
-            'SELECT
-                id,
-                code,
-                web_name,
-                first_name,
-                second_name,
-                club_id as team,
-                position as element_type,
-                now_cost,
-                total_points,
-                form,
-                selected_by_percent,
-                minutes,
-                goals_scored,
-                assists,
-                clean_sheets,
-                saves,
-                expected_goals,
-                expected_assists,
-                ict_index,
-                bps,
-                bonus,
-                starts,
-                appearances,
-                chance_of_playing as chance_of_playing_next_round,
-                news,
-                xmins_override,
-                penalty_order
-            FROM players WHERE id = ?',
-            [$id]
-        );
+        $player = Player::find($id);
+
+        if ($player === null) {
+            return null;
+        }
+
+        return $this->mapPlayer($player);
     }
 
     /**
@@ -138,8 +111,54 @@ class PlayerService
      */
     public function getAllTeams(): array
     {
-        return $this->db->fetchAll(
-            'SELECT id, name, short_name FROM clubs ORDER BY id'
+        $teams = Club::query()
+            ->select('id', 'name', 'short_name')
+            ->orderBy('id')
+            ->get();
+
+        return array_map(
+            static fn(Club $club): array => [
+                'id' => $club->id,
+                'name' => $club->name,
+                'short_name' => $club->short_name,
+            ],
+            $teams
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapPlayer(Player $player): array
+    {
+        return [
+            'id' => $player->id,
+            'code' => $player->code,
+            'web_name' => $player->web_name,
+            'first_name' => $player->first_name,
+            'second_name' => $player->second_name,
+            'team' => $player->club_id,
+            'element_type' => $player->position,
+            'now_cost' => $player->now_cost,
+            'total_points' => $player->total_points,
+            'form' => $player->form,
+            'selected_by_percent' => $player->selected_by_percent,
+            'minutes' => $player->minutes,
+            'goals_scored' => $player->goals_scored,
+            'assists' => $player->assists,
+            'clean_sheets' => $player->clean_sheets,
+            'saves' => $player->saves,
+            'expected_goals' => $player->expected_goals,
+            'expected_assists' => $player->expected_assists,
+            'ict_index' => $player->ict_index,
+            'bps' => $player->bps,
+            'bonus' => $player->bonus,
+            'starts' => $player->starts,
+            'appearances' => $player->appearances,
+            'chance_of_playing_next_round' => $player->chance_of_playing,
+            'news' => $player->news,
+            'xmins_override' => $player->xmins_override,
+            'penalty_order' => $player->penalty_order,
+        ];
     }
 }

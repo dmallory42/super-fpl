@@ -4,25 +4,27 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Tests\Services;
 
+use Maia\Orm\Connection;
+use Maia\Orm\Model;
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
 use SuperFPL\Api\Services\PlayerMetricsService;
 
 class PlayerMetricsServiceTest extends TestCase
 {
-    private Database $db;
+    private Connection $connection;
     private PlayerMetricsService $service;
 
     protected function setUp(): void
     {
-        $this->db = new Database(':memory:');
+        $this->connection = new Connection('sqlite::memory:');
+        Model::setConnection($this->connection);
         $this->createSchema();
-        $this->service = new PlayerMetricsService($this->db);
+        $this->service = new PlayerMetricsService($this->connection);
     }
 
     private function createSchema(): void
     {
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             CREATE TABLE clubs (
                 id INTEGER PRIMARY KEY,
                 name TEXT,
@@ -30,7 +32,7 @@ class PlayerMetricsServiceTest extends TestCase
             )
         ");
 
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             CREATE TABLE players (
                 id INTEGER PRIMARY KEY,
                 code INTEGER,
@@ -175,8 +177,8 @@ class PlayerMetricsServiceTest extends TestCase
     public function testGetAllWithMetrics(): void
     {
         // Insert test data
-        $this->db->getPdo()->exec("INSERT INTO clubs (id, name, short_name) VALUES (1, 'Arsenal', 'ARS')");
-        $this->db->getPdo()->exec("
+        $this->connection->execute("INSERT INTO clubs (id, name, short_name) VALUES (1, 'Arsenal', 'ARS')");
+        $this->connection->execute("
             INSERT INTO players (id, code, web_name, first_name, second_name, club_id, position, now_cost, total_points, form, selected_by_percent, minutes, goals_scored, assists, clean_sheets, expected_goals, expected_assists, ict_index, bps, bonus, starts, chance_of_playing, news)
             VALUES (1, 101, 'Saka', 'Bukayo', 'Saka', 1, 3, 90, 150, 8.5, 45.0, 2000, 10, 8, 0, 9.0, 7.0, 250.0, 500, 15, 22, 100, NULL)
         ");

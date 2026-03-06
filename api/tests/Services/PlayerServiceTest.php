@@ -4,26 +4,28 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Tests\Services;
 
+use Maia\Orm\Connection;
+use Maia\Orm\Model;
 use PHPUnit\Framework\TestCase;
-use SuperFPL\Api\Database;
 use SuperFPL\Api\Services\PlayerService;
 
 class PlayerServiceTest extends TestCase
 {
-    private Database $db;
+    private Connection $connection;
     private PlayerService $service;
 
     protected function setUp(): void
     {
-        $this->db = new Database(':memory:');
+        $this->connection = new Connection('sqlite::memory:');
+        Model::setConnection($this->connection);
         $this->createSchema();
         $this->insertTestData();
-        $this->service = new PlayerService($this->db);
+        $this->service = new PlayerService($this->connection);
     }
 
     private function createSchema(): void
     {
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             CREATE TABLE clubs (
                 id INTEGER PRIMARY KEY,
                 name TEXT,
@@ -31,7 +33,7 @@ class PlayerServiceTest extends TestCase
             )
         ");
 
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             CREATE TABLE players (
                 id INTEGER PRIMARY KEY,
                 code INTEGER,
@@ -67,7 +69,7 @@ class PlayerServiceTest extends TestCase
     private function insertTestData(): void
     {
         // Insert clubs
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             INSERT INTO clubs (id, name, short_name) VALUES
             (1, 'Arsenal', 'ARS'),
             (2, 'Chelsea', 'CHE')
@@ -75,7 +77,7 @@ class PlayerServiceTest extends TestCase
 
         // Insert players
         // Position: 1=GK, 2=DEF, 3=MID, 4=FWD
-        $this->db->getPdo()->exec("
+        $this->connection->execute("
             INSERT INTO players (id, code, web_name, first_name, second_name, club_id, position, now_cost, total_points, form, selected_by_percent, minutes, goals_scored, assists, clean_sheets, expected_goals, expected_assists, ict_index, bps, bonus, starts, chance_of_playing, news)
             VALUES
             (1, 101, 'Saka', 'Bukayo', 'Saka', 1, 3, 90, 150, 8.5, 45.2, 2000, 10, 8, 0, 9.0, 7.0, 250.0, 500, 15, 22, 100, NULL),
