@@ -155,7 +155,7 @@ class AdminController extends LegacyController
 
         $cachePath = $this->cachePath('/odds');
         $client = new OddsApiClient($apiKey, $cachePath);
-        $sync = new OddsSync($this->db, $client);
+        $sync = new OddsSync($this->connection, $client);
 
         $match = $sync->syncMatchOdds();
         $goalscorer = $sync->syncAllGoalscorerOdds();
@@ -197,7 +197,7 @@ class AdminController extends LegacyController
 
         $season = (int) date('n') >= 8 ? (int) date('Y') : ((int) date('Y') - 1);
         $client = new UnderstatClient($cacheDir);
-        $sync = new UnderstatSync($this->db, $client);
+        $sync = new UnderstatSync($this->connection, $client);
         $result = $sync->sync($season);
 
         return Response::json([

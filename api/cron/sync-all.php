@@ -84,7 +84,7 @@ $syncPlayers = function () use ($connection, $fplClient) {
     echo "  Teams: {$result['teams']}, Players: {$result['players']}\n";
 };
 
-$syncOdds = function () use ($db, $config, $cacheDir) {
+$syncOdds = function () use ($connection, $config, $cacheDir) {
     $apiKey = $config['odds_api']['api_key'] ?? '';
     if (empty($apiKey)) {
         echo "  Skipped (ODDS_API_KEY not set)\n";
@@ -95,7 +95,7 @@ $syncOdds = function () use ($db, $config, $cacheDir) {
         mkdir($oddsCacheDir, 0755, true);
     }
     $client = new OddsApiClient($apiKey, $oddsCacheDir);
-    $sync = new OddsSync($db, $client);
+    $sync = new OddsSync($connection, $client);
 
     $matchResult = $sync->syncMatchOdds();
     echo "  Match odds: {$matchResult['fixtures']} fixtures, {$matchResult['matched']} matched\n";
@@ -112,7 +112,7 @@ $syncOdds = function () use ($db, $config, $cacheDir) {
     }
 };
 
-$syncUnderstat = function () use ($db, $cacheDir) {
+$syncUnderstat = function () use ($connection, $cacheDir) {
     $understatCacheDir = $cacheDir . '/understat';
     if (!is_dir($understatCacheDir)) {
         mkdir($understatCacheDir, 0755, true);
@@ -120,7 +120,7 @@ $syncUnderstat = function () use ($db, $cacheDir) {
     // Current season: year of August start (2025 for 2025-26 season)
     $season = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
     $client = new UnderstatClient($understatCacheDir);
-    $sync = new UnderstatSync($db, $client);
+    $sync = new UnderstatSync($connection, $client);
     $result = $sync->sync($season);
     echo "  Matched: {$result['matched']}/{$result['total']}, Unmatched: {$result['unmatched']}\n";
     if (!empty($result['unmatched_players'])) {
@@ -203,14 +203,14 @@ $syncSeasonHistory = function () use ($connection, $fplClient) {
     echo "  Records synced: {$count}\n";
 };
 
-$syncUnderstatHistory = function () use ($db, $cacheDir) {
+$syncUnderstatHistory = function () use ($connection, $cacheDir) {
     $understatCacheDir = $cacheDir . '/understat';
     if (!is_dir($understatCacheDir)) {
         mkdir($understatCacheDir, 0755, true);
     }
     $season = (int) date('n') >= 8 ? (int) date('Y') : (int) date('Y') - 1;
     $client = new UnderstatClient($understatCacheDir);
-    $sync = new UnderstatSync($db, $client);
+    $sync = new UnderstatSync($connection, $client);
     $result = $sync->syncHistory($season);
     echo "  Seasons: " . implode(', ', $result['seasons']) . "\n";
     echo "  Player records: {$result['player_records']}, Team records: {$result['team_records']}\n";

@@ -25,7 +25,7 @@ if (!is_dir($oddsCacheDir)) {
 }
 
 $client = new OddsApiClient($apiKey, $oddsCacheDir);
-$sync = new OddsSync($db, $client);
+$sync = new OddsSync($connection, $client);
 
 echo "Syncing odds from The Odds API...\n";
 
