@@ -29,7 +29,7 @@ class LeagueController extends LegacyController
     }
 
     #[Route('/{id}', method: 'GET')]
-    public function show(int $id, Request $request): Response
+    public function get_league(int $id, Request $request): Response
     {
         $page = $request->query('page');
         $service = new LeagueService($this->connection, $this->fplClient);
@@ -43,7 +43,7 @@ class LeagueController extends LegacyController
     }
 
     #[Route('/{id}/standings', method: 'GET')]
-    public function standings(int $id): Response
+    public function get_league_standings(int $id): Response
     {
         $service = new LeagueService($this->connection, $this->fplClient);
         $standings = $service->getAllStandings($id);
@@ -55,7 +55,7 @@ class LeagueController extends LegacyController
     }
 
     #[Route('/{id}/analysis', method: 'GET')]
-    public function analysis(int $id, Request $request): Response
+    public function get_league_analysis(int $id, Request $request): Response
     {
         $gameweek = $request->query('gw');
         if ($gameweek === null) {
@@ -105,7 +105,7 @@ class LeagueController extends LegacyController
     }
 
     #[Route('/{id}/season-analysis', method: 'GET')]
-    public function seasonAnalysis(int $id, Request $request): Response
+    public function get_league_season_analysis(int $id, Request $request): Response
     {
         $gwFrom = $request->query('gw_from');
         $gwTo = $request->query('gw_to');

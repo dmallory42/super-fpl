@@ -25,7 +25,7 @@ class PredictionController extends LegacyController
     }
 
     #[Route('/range', method: 'GET')]
-    public function range(Request $request): Response
+    public function get_prediction_range(Request $request): Response
     {
         $gameweekService = new GameweekService($this->connection);
         $actionableGameweek = $gameweekService->getNextActionableGameweek();
@@ -172,13 +172,13 @@ class PredictionController extends LegacyController
     }
 
     #[Route('/methodology', method: 'GET')]
-    public function methodology(): Response
+    public function get_prediction_methodology(): Response
     {
         return Response::json(PredictionService::getMethodology());
     }
 
     #[Route('/{gw}', method: 'GET')]
-    public function index(int $gw, Request $request): Response
+    public function get_predictions_for_gameweek(int $gw, Request $request): Response
     {
         $gameweekService = new GameweekService($this->connection);
         $currentGameweek = $gameweekService->getCurrentGameweek();
@@ -218,7 +218,7 @@ class PredictionController extends LegacyController
     }
 
     #[Route('/{gw}/accuracy', method: 'GET')]
-    public function accuracy(int $gw): Response
+    public function get_prediction_accuracy(int $gw): Response
     {
         $service = new PredictionService($this->connection);
         $accuracy = $service->getAccuracy($gw);
@@ -237,7 +237,7 @@ class PredictionController extends LegacyController
     }
 
     #[Route('/{gw}/player/{id}', method: 'GET')]
-    public function player(int $gw, int $id): Response
+    public function get_player_prediction(int $gw, int $id): Response
     {
         $service = new PredictionService($this->connection);
         $prediction = $service->getPlayerPrediction($id, $gw);

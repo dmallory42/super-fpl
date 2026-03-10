@@ -18,7 +18,7 @@ class HealthController
     }
 
     #[Route('/health', method: 'GET')]
-    public function health(): Response
+    public function get_health(): Response
     {
         $dbStatus = 'ok';
         $message = null;

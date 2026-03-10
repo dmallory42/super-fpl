@@ -29,7 +29,7 @@ class TransferController extends LegacyController
     }
 
     #[Route('/transfers/suggest', method: 'GET')]
-    public function suggest(Request $request): Response
+    public function get_transfer_suggestions(Request $request): Response
     {
         $managerId = $request->query('manager');
         if ($managerId === null) {
@@ -48,7 +48,7 @@ class TransferController extends LegacyController
     }
 
     #[Route('/transfers/simulate', method: 'GET')]
-    public function simulate(Request $request): Response
+    public function get_transfer_simulation(Request $request): Response
     {
         $managerId = $request->query('manager');
         $out = $request->query('out');
@@ -70,7 +70,7 @@ class TransferController extends LegacyController
     }
 
     #[Route('/transfers/targets', method: 'GET')]
-    public function targets(Request $request): Response
+    public function get_transfer_targets(Request $request): Response
     {
         $gameweek = $request->query('gw');
         $position = $request->query('position');
@@ -90,7 +90,7 @@ class TransferController extends LegacyController
     }
 
     #[Route('/planner/optimize', method: 'GET')]
-    public function optimize(Request $request): Response
+    public function get_planner_optimization(Request $request): Response
     {
         $managerId = $request->query('manager');
         if ($managerId === null) {
@@ -163,7 +163,7 @@ class TransferController extends LegacyController
     }
 
     #[Route('/planner/chips/suggest', method: 'GET')]
-    public function chipSuggest(Request $request): Response
+    public function get_planner_chip_suggestions(Request $request): Response
     {
         $managerId = $request->query('manager');
         if ($managerId === null) {

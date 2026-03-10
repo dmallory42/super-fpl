@@ -27,7 +27,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/current', method: 'GET')]
-    public function current(): Response
+    public function get_current_live(): Response
     {
         $gameweekService = new GameweekService($this->connection);
         $currentGameweek = $gameweekService->getCurrentGameweek();
@@ -40,7 +40,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}', method: 'GET')]
-    public function gameweek(int $gw): Response
+    public function get_live_gameweek(int $gw): Response
     {
         $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
 
@@ -48,7 +48,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/manager/{id}', method: 'GET')]
-    public function manager(int $gw, int $id): Response
+    public function get_live_manager(int $gw, int $id): Response
     {
         $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
 
@@ -56,7 +56,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/manager/{id}/enhanced', method: 'GET')]
-    public function managerEnhanced(int $gw, int $id): Response
+    public function get_live_manager_enhanced(int $gw, int $id): Response
     {
         $liveService = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
         $ownershipService = new OwnershipService($this->connection, $this->fplClient, $this->cachePath('/ownership'));
@@ -70,7 +70,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/bonus', method: 'GET')]
-    public function bonus(int $gw): Response
+    public function get_live_bonus(int $gw): Response
     {
         $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
 
@@ -81,7 +81,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/samples', method: 'GET')]
-    public function samples(int $gw): Response
+    public function get_live_samples(int $gw): Response
     {
         $liveService = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
         $sampleService = new SampleService($this->connection, $this->fplClient, $this->cachePath('/samples'));

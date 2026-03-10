@@ -19,7 +19,7 @@ class FixtureController
     }
 
     #[Route('', method: 'GET')]
-    public function index(Request $request): Response
+    public function get_fixtures(Request $request): Response
     {
         $gameweek = $request->query('gameweek');
 
@@ -50,7 +50,7 @@ class FixtureController
     }
 
     #[Route('/status', method: 'GET')]
-    public function status(): Response
+    public function get_fixture_status(): Response
     {
         $fixtures = $this->connection->query(
             'SELECT

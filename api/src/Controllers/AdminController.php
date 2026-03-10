@@ -34,7 +34,7 @@ class AdminController extends LegacyController
     }
 
     #[Route('/admin/login', method: 'POST')]
-    public function login(Request $request): Response
+    public function post_admin_login(Request $request): Response
     {
         $expectedToken = $this->expectedAdminToken();
         if ($expectedToken === '') {
@@ -61,7 +61,7 @@ class AdminController extends LegacyController
     }
 
     #[Route('/admin/session', method: 'GET')]
-    public function session(Request $request): Response
+    public function get_admin_session(Request $request): Response
     {
         $expectedToken = $this->expectedAdminToken();
         if ($expectedToken === '') {
@@ -79,7 +79,7 @@ class AdminController extends LegacyController
 
     #[Route('/sync/players', method: 'GET')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncPlayers(): Response
+    public function get_sync_players(): Response
     {
         $sync = new PlayerSync($this->connection, $this->fplClient);
         $result = $sync->sync();
@@ -93,14 +93,14 @@ class AdminController extends LegacyController
 
     #[Route('/sync/players', method: 'POST')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncPlayersPost(): Response
+    public function post_sync_players(): Response
     {
-        return $this->syncPlayers();
+        return $this->get_sync_players();
     }
 
     #[Route('/sync/fixtures', method: 'GET')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncFixtures(): Response
+    public function get_sync_fixtures(): Response
     {
         $sync = new FixtureSync($this->connection, $this->fplClient);
         $count = $sync->sync();
@@ -113,14 +113,14 @@ class AdminController extends LegacyController
 
     #[Route('/sync/fixtures', method: 'POST')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncFixturesPost(): Response
+    public function post_sync_fixtures(): Response
     {
-        return $this->syncFixtures();
+        return $this->get_sync_fixtures();
     }
 
     #[Route('/sync/managers', method: 'GET')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncManagers(): Response
+    public function get_sync_managers(): Response
     {
         $sync = new ManagerSync($this->connection, $this->fplClient);
         $result = $sync->syncAll();
@@ -134,14 +134,14 @@ class AdminController extends LegacyController
 
     #[Route('/sync/managers', method: 'POST')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncManagersPost(): Response
+    public function post_sync_managers(): Response
     {
-        return $this->syncManagers();
+        return $this->get_sync_managers();
     }
 
     #[Route('/sync/odds', method: 'GET')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncOdds(): Response
+    public function get_sync_odds(): Response
     {
         $apiKey = (string) $this->config->get('config.odds_api.api_key', '');
         if ($apiKey === '') {
@@ -179,14 +179,14 @@ class AdminController extends LegacyController
 
     #[Route('/sync/odds', method: 'POST')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncOddsPost(): Response
+    public function post_sync_odds(): Response
     {
-        return $this->syncOdds();
+        return $this->get_sync_odds();
     }
 
     #[Route('/sync/understat', method: 'GET')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncUnderstat(): Response
+    public function get_sync_understat(): Response
     {
         $cacheDir = $this->cachePath('/understat');
         if (!is_dir($cacheDir)) {
@@ -210,14 +210,14 @@ class AdminController extends LegacyController
 
     #[Route('/sync/understat', method: 'POST')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncUnderstatPost(): Response
+    public function post_sync_understat(): Response
     {
-        return $this->syncUnderstat();
+        return $this->get_sync_understat();
     }
 
     #[Route('/sync/season-history', method: 'GET')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncSeasonHistory(): Response
+    public function get_sync_season_history(): Response
     {
         $sync = new PlayerSync($this->connection, $this->fplClient);
         $count = $sync->syncSeasonHistory();
@@ -230,14 +230,14 @@ class AdminController extends LegacyController
 
     #[Route('/sync/season-history', method: 'POST')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function syncSeasonHistoryPost(): Response
+    public function post_sync_season_history(): Response
     {
-        return $this->syncSeasonHistory();
+        return $this->get_sync_season_history();
     }
 
     #[Route('/admin/sample/{gw}', method: 'GET')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function adminSample(int $gw, Request $request): Response
+    public function get_admin_sample(int $gw, Request $request): Response
     {
         $service = new SampleService($this->connection, $this->fplClient, $this->cachePath('/samples'));
         $full = (string) ($request->query('full') ?? '0') === '1';
@@ -261,7 +261,7 @@ class AdminController extends LegacyController
     }
 
     #[Route('/penalty-takers', method: 'GET')]
-    public function getPenaltyTakers(): Response
+    public function get_penalty_takers(): Response
     {
         $takers = $this->fetchAll(
             'SELECT p.id, p.web_name, p.club_id as team, p.position, p.penalty_order,
@@ -277,7 +277,7 @@ class AdminController extends LegacyController
 
     #[Route('/teams/{id}/penalty-takers', method: 'PUT')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function setTeamPenaltyTakers(int $id, Request $request): Response
+    public function put_team_penalty_takers(int $id, Request $request): Response
     {
         $body = $request->body();
         if (!is_array($body)) {

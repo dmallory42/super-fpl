@@ -21,7 +21,7 @@ class PlayerController
     }
 
     #[Route('', method: 'GET')]
-    public function index(Request $request): Response
+    public function get_players(Request $request): Response
     {
         $filters = [];
         if ($request->query('position') !== null) {
@@ -38,7 +38,7 @@ class PlayerController
     }
 
     #[Route('/{id}', method: 'GET')]
-    public function show(int $id): Response
+    public function get_player(int $id): Response
     {
         $player = $this->connection->query(
             'SELECT
@@ -83,7 +83,7 @@ class PlayerController
 
     #[Route('/{id}/xmins', method: 'PUT')]
     #[MiddlewareAttribute(AdminAuthMiddleware::class)]
-    public function setXMins(int $id, Request $request): Response
+    public function put_player_xmins(int $id, Request $request): Response
     {
         $body = $request->body();
         if (!is_array($body)) {

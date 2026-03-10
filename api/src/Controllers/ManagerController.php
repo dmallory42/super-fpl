@@ -25,7 +25,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}', method: 'GET')]
-    public function show(int $id): Response
+    public function get_manager(int $id): Response
     {
         $service = new ManagerService($this->connection, $this->fplClient);
         $manager = $service->getById($id);
@@ -38,7 +38,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}/picks/{gw}', method: 'GET')]
-    public function picks(int $id, int $gw): Response
+    public function get_manager_picks(int $id, int $gw): Response
     {
         $service = new ManagerService($this->connection, $this->fplClient);
         $picks = $service->getPicks($id, $gw);
@@ -51,7 +51,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}/history', method: 'GET')]
-    public function history(int $id): Response
+    public function get_manager_history(int $id): Response
     {
         $service = new ManagerService($this->connection, $this->fplClient);
         $history = $service->getHistory($id);
@@ -64,7 +64,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}/season-analysis', method: 'GET')]
-    public function seasonAnalysis(int $id): Response
+    public function get_manager_season_analysis(int $id): Response
     {
         $service = new ManagerSeasonAnalysisService($this->connection, $this->fplClient);
         $analysis = $service->analyze($id);
