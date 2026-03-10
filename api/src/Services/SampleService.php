@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace SuperFPL\Api\Services;
 
 use Maia\Orm\Connection;
-use PDOStatement;
 use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
 use SuperFPL\FplClient\ParallelHttpClient;
@@ -193,16 +192,11 @@ class SampleService
         // Fetch all picks in parallel batches
         $responses = $this->parallelClient->getBatch(array_values($endpoints));
 
-        // Process responses and store picks in one transaction to reduce SQLite I/O churn.
-        $pdo = $this->pdo();
+        // Process responses inside one transaction to reduce SQLite I/O churn.
         $sampled = 0;
         $endpointToManager = array_flip($endpoints);
-        $insertStmt = $pdo->prepare(
-            'INSERT OR IGNORE INTO sample_picks (gameweek, tier, manager_id, player_id, multiplier)
-             VALUES (?, ?, ?, ?, ?)'
-        );
 
-        $pdo->beginTransaction();
+        $this->execute('BEGIN');
         try {
             // Clear existing samples for this tier/gameweek
             $this->execute(
@@ -220,15 +214,13 @@ class SampleService
                     continue;
                 }
 
-                $this->storeManagerPicks($insertStmt, $gameweek, $tier, (int) $managerId, $data['picks']);
+                $this->storeManagerPicks($gameweek, $tier, (int) $managerId, $data['picks']);
                 $sampled++;
             }
 
-            $pdo->commit();
+            $this->execute('COMMIT');
         } catch (\Throwable $e) {
-            if ($pdo->inTransaction()) {
-                $pdo->rollBack();
-            }
+            $this->execute('ROLLBACK');
             throw $e;
         }
 
@@ -307,7 +299,7 @@ class SampleService
     /**
      * Store manager picks for sampling.
      */
-    private function storeManagerPicks(PDOStatement $insertStmt, int $gameweek, string $tier, int $managerId, array $picks): void
+    private function storeManagerPicks(int $gameweek, string $tier, int $managerId, array $picks): void
     {
         foreach ($picks as $pick) {
             // Only store starting XI (position 1-11) for EO calculation
@@ -315,7 +307,9 @@ class SampleService
                 continue;
             }
 
-            $insertStmt->execute(
+            $this->execute(
+                'INSERT OR IGNORE INTO sample_picks (gameweek, tier, manager_id, player_id, multiplier)
+                 VALUES (?, ?, ?, ?, ?)',
                 [
                     $gameweek,
                     $tier,

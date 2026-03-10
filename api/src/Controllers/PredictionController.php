@@ -24,90 +24,6 @@ class PredictionController extends LegacyController
         parent::__construct($connection, $config);
     }
 
-    #[Route('/{gw}', method: 'GET')]
-    public function index(int $gw, Request $request): Response
-    {
-        if ($gw <= 0) {
-            $path = $request->path();
-            if (str_ends_with($path, '/range')) {
-                return $this->range($request);
-            }
-            if (str_ends_with($path, '/methodology')) {
-                return $this->methodology();
-            }
-
-            return Response::json(['error' => 'Invalid gameweek'], 404);
-        }
-
-        $gameweekService = new GameweekService($this->connection);
-        $currentGameweek = $gameweekService->getCurrentGameweek();
-        $service = new PredictionService($this->connection);
-
-        if ($gw < $currentGameweek) {
-            $predictions = $service->getSnapshotPredictions($gw);
-            if ($predictions === []) {
-                return Response::json([
-                    'error' => 'No prediction snapshot found for this gameweek',
-                    'requested_gameweek' => $gw,
-                    'current_gameweek' => $currentGameweek,
-                ], 404);
-            }
-
-            return Response::json([
-                'gameweek' => $gw,
-                'current_gameweek' => $currentGameweek,
-                'source' => 'snapshot',
-                'predictions' => $predictions,
-                'generated_at' => date('c'),
-            ]);
-        }
-
-        $response = [
-            'gameweek' => $gw,
-            'current_gameweek' => $currentGameweek,
-            'predictions' => $service->getPredictions($gw),
-            'generated_at' => date('c'),
-        ];
-
-        if ($request->query('include_methodology') !== null) {
-            $response['methodology'] = PredictionService::getMethodology();
-        }
-
-        return Response::json($response);
-    }
-
-    #[Route('/{gw}/accuracy', method: 'GET')]
-    public function accuracy(int $gw): Response
-    {
-        $service = new PredictionService($this->connection);
-        $accuracy = $service->getAccuracy($gw);
-
-        if ((int) (($accuracy['summary']['count'] ?? 0)) === 0) {
-            return Response::json([
-                'error' => 'No accuracy data available for this gameweek',
-                'gameweek' => $gw,
-            ], 404);
-        }
-
-        return Response::json([
-            'gameweek' => $gw,
-            'accuracy' => $accuracy,
-        ]);
-    }
-
-    #[Route('/{gw}/player/{id}', method: 'GET')]
-    public function player(int $gw, int $id): Response
-    {
-        $service = new PredictionService($this->connection);
-        $prediction = $service->getPlayerPrediction($id, $gw);
-
-        if ($prediction === null) {
-            return Response::json(['error' => 'Player not found'], 404);
-        }
-
-        return Response::json($prediction);
-    }
-
     #[Route('/range', method: 'GET')]
     public function range(Request $request): Response
     {
@@ -260,4 +176,77 @@ class PredictionController extends LegacyController
     {
         return Response::json(PredictionService::getMethodology());
     }
+
+    #[Route('/{gw}', method: 'GET')]
+    public function index(int $gw, Request $request): Response
+    {
+        $gameweekService = new GameweekService($this->connection);
+        $currentGameweek = $gameweekService->getCurrentGameweek();
+        $service = new PredictionService($this->connection);
+
+        if ($gw < $currentGameweek) {
+            $predictions = $service->getSnapshotPredictions($gw);
+            if ($predictions === []) {
+                return Response::json([
+                    'error' => 'No prediction snapshot found for this gameweek',
+                    'requested_gameweek' => $gw,
+                    'current_gameweek' => $currentGameweek,
+                ], 404);
+            }
+
+            return Response::json([
+                'gameweek' => $gw,
+                'current_gameweek' => $currentGameweek,
+                'source' => 'snapshot',
+                'predictions' => $predictions,
+                'generated_at' => date('c'),
+            ]);
+        }
+
+        $response = [
+            'gameweek' => $gw,
+            'current_gameweek' => $currentGameweek,
+            'predictions' => $service->getPredictions($gw),
+            'generated_at' => date('c'),
+        ];
+
+        if ($request->query('include_methodology') !== null) {
+            $response['methodology'] = PredictionService::getMethodology();
+        }
+
+        return Response::json($response);
+    }
+
+    #[Route('/{gw}/accuracy', method: 'GET')]
+    public function accuracy(int $gw): Response
+    {
+        $service = new PredictionService($this->connection);
+        $accuracy = $service->getAccuracy($gw);
+
+        if ((int) (($accuracy['summary']['count'] ?? 0)) === 0) {
+            return Response::json([
+                'error' => 'No accuracy data available for this gameweek',
+                'gameweek' => $gw,
+            ], 404);
+        }
+
+        return Response::json([
+            'gameweek' => $gw,
+            'accuracy' => $accuracy,
+        ]);
+    }
+
+    #[Route('/{gw}/player/{id}', method: 'GET')]
+    public function player(int $gw, int $id): Response
+    {
+        $service = new PredictionService($this->connection);
+        $prediction = $service->getPlayerPrediction($id, $gw);
+
+        if ($prediction === null) {
+            return Response::json(['error' => 'Player not found'], 404);
+        }
+
+        return Response::json($prediction);
+    }
+
 }

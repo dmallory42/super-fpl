@@ -3,19 +3,9 @@
     "description": "Fantasy Premier League Analytics Suite",
     "type": "project",
     "license": "MIT",
-    "minimum-stability": "dev",
-    "prefer-stable": true,
     "autoload": {
         "psr-4": {
             "SuperFPL\\Api\\": "api/src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "Maia\\Auth\\": "api/vendor/maia/framework/src/Auth/src/",
-            "Maia\\Cli\\": "api/vendor/maia/framework/src/Cli/src/",
-            "Maia\\Core\\": "api/vendor/maia/framework/src/Core/src/",
-            "Maia\\Orm\\": "api/vendor/maia/framework/src/Orm/src/"
         }
     },
     "repositories": [
@@ -26,7 +16,7 @@
     ],
     "require": {
         "php": ">=8.2",
-        "superfpl/fpl-client": "*"
+        "superfpl/fpl-client": "^0.1"
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0"

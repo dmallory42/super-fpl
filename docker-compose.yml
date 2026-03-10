@@ -14,7 +14,6 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.php
     volumes:
-      - ../maia:/var/www/maia
       - ./packages:/var/www/html/packages
       - ./api:/var/www/html/api
     working_dir: /var/www/html/api
@@ -29,7 +28,6 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.php
     volumes:
-      - ../maia:/var/www/maia
       - ./packages:/var/www/html/packages
       - ./api:/var/www/html/api
     working_dir: /var/www/html/api

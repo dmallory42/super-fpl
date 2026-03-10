@@ -31,6 +31,7 @@ npm run up:build
 
 This will:
 - Build/start Docker services on the API side
+- Install PHP dependencies for `api/` via Composer, including `maia/framework` from GitHub
 - Start frontend dev server
 
 App URLs:
@@ -121,6 +122,3 @@ Admin access now uses secure cookies (via `/api/admin/login`) rather than browse
 ## Caching
 
 - FPL client cache: file cache under `api/cache`
-- API response cache: Redis-backed (with fallback bypass), keying includes DB mtime and sync version
-- Cache status header for supported GET endpoints: `X-Response-Cache: HIT|MISS|BYPASS`
-- Bypass per request: append `?nocache=1`

@@ -6,6 +6,7 @@ namespace SuperFPL\Api\Tests\Support;
 
 use Maia\Orm\Connection;
 use PDO;
+use ReflectionClass;
 use SuperFPL\Api\SchemaMigrator;
 
 class TestDatabase extends Connection
@@ -122,7 +123,14 @@ class TestDatabase extends Connection
 
     public function getPdo(): PDO
     {
-        return $this->pdo();
+        $reflection = new ReflectionClass(Connection::class);
+        $property = $reflection->getProperty('pdo');
+        $property->setAccessible(true);
+
+        /** @var PDO $pdo */
+        $pdo = $property->getValue($this);
+
+        return $pdo;
     }
 
     private function assertValidMutationTable(string $table): void

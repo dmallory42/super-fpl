@@ -6,7 +6,6 @@ namespace SuperFPL\Api\Support;
 
 use Maia\Orm\Connection;
 use Maia\Orm\QueryBuilder;
-use PDO;
 
 trait ConnectionSql
 {
@@ -70,11 +69,6 @@ trait ConnectionSql
         }
 
         return QueryBuilder::table($table, $this->connection())->upsert($data, $conflictKeys);
-    }
-
-    protected function pdo(): PDO
-    {
-        return $this->connection()->pdo();
     }
 
     private function assertSafeIdentifier(string $value): void

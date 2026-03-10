@@ -1,28 +1,15 @@
 # Maia Framework Gaps
 
-Discovered during the Super FPL backend migration to Maia (February-March 2026).
+Original migration gaps were reassessed against `maia/framework v0.2.0` on March 10, 2026.
 
-## High Priority
+## Resolved Upstream
 
-- Query builder `upsert()` support is missing.
-  - Current workaround: manual `INSERT OR REPLACE` or `ON CONFLICT ... DO UPDATE`.
-  - Impact: sync jobs and prediction caching require repeated SQL boilerplate.
-- Query builder support for richer aggregation is limited (`GROUP BY` + `HAVING` workflows).
-  - Current workaround: raw SQL via `Connection::query()`.
-  - Impact: gameweek analytics and prediction accuracy/reporting queries stay SQL-heavy.
+- Query builder `upsert()` now exists.
+- Query builder now supports `join()`, `leftJoin()`, `groupBy()`, and `having()`.
+- SQLite bootstrap helpers now exist via `Connection::sqlite()` and `configureSqlite()`.
+- Framework response-cache middleware now exists in `Maia\Core\Middleware\ResponseCacheMiddleware`.
 
-## Medium Priority
+## Remaining App-Level Gaps
 
-- Query builder support for expressive joins and union-heavy reporting queries is still limited for this codebase.
-  - Current workaround: explicit SQL strings in service classes.
-- No framework-level schema migrator is used in this app path.
-  - Current workaround: project-local `SuperFPL\Api\SchemaMigrator`.
-  - Impact: migration logic is app-owned instead of framework-owned.
-- No first-class response cache middleware abstraction for app-specific keying/TTL behavior.
-  - Current workaround: custom `ResponseCacheMiddleware` and file-based live-data cache.
-
-## Low Priority
-
-- SQLite pragma bootstrap (foreign keys, busy timeout, WAL, synchronous) is manual at app boot.
-- Composite-key-heavy flows are workable, but still SQL-first (for example `manager_picks`, `league_members`, snapshot tables).
-
+- Super FPL still owns schema bootstrap and incremental DB migration logic in `SuperFPL\Api\SchemaMigrator`.
+- Several analytics and reporting paths remain raw-SQL-first by choice because they are clearer as explicit SQL in this codebase.

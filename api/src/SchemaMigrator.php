@@ -60,7 +60,7 @@ final class SchemaMigrator
             throw new RuntimeException("Failed to read schema file: {$schemaPath}");
         }
 
-        $connection->pdo()->exec($schema);
+        self::executeSqlScript($connection, $schema);
     }
 
     private static function applyIncrementalMigrations(Connection $connection, string $performanceIndexPath): void
@@ -165,7 +165,7 @@ final class SchemaMigrator
             return;
         }
 
-        $connection->pdo()->exec($sql);
+        self::executeSqlScript($connection, $sql);
     }
 
     private static function rebuildPredictionSnapshotsTableIfNeeded(Connection $connection): void
@@ -231,5 +231,53 @@ final class SchemaMigrator
             FROM prediction_snapshots_legacy
         ");
         $connection->execute('DROP TABLE prediction_snapshots_legacy');
+    }
+
+    private static function executeSqlScript(Connection $connection, string $sql): void
+    {
+        foreach (self::splitSqlStatements($sql) as $statement) {
+            $connection->execute($statement);
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function splitSqlStatements(string $sql): array
+    {
+        $statements = [];
+        $buffer = '';
+        $length = strlen($sql);
+        $inSingleQuote = false;
+        $inDoubleQuote = false;
+
+        for ($index = 0; $index < $length; $index++) {
+            $char = $sql[$index];
+            $previous = $index > 0 ? $sql[$index - 1] : '';
+
+            if ($char === "'" && !$inDoubleQuote && $previous !== '\\') {
+                $inSingleQuote = !$inSingleQuote;
+            } elseif ($char === '"' && !$inSingleQuote && $previous !== '\\') {
+                $inDoubleQuote = !$inDoubleQuote;
+            }
+
+            if ($char === ';' && !$inSingleQuote && !$inDoubleQuote) {
+                $statement = trim($buffer);
+                if ($statement !== '') {
+                    $statements[] = $statement;
+                }
+                $buffer = '';
+                continue;
+            }
+
+            $buffer .= $char;
+        }
+
+        $statement = trim($buffer);
+        if ($statement !== '') {
+            $statements[] = $statement;
+        }
+
+        return $statements;
     }
 }

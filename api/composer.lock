@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b52b90a885ba5cdf5d7ff33a3274cd49",
+    "content-hash": "86a67d9097f51b040f9283d76a2ae9bd",
     "packages": [
         {
             "name": "firebase/php-jwt",
@@ -70,90 +70,21 @@
             "time": "2026-02-25T22:16:40+00:00"
         },
         {
-            "name": "maia/auth",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "../../maia/src/Auth",
-                "reference": "578e25246bed9058e551dc31bcd1866df0f0e69a"
-            },
-            "require": {
-                "firebase/php-jwt": "^7.0",
-                "maia/core": "self.version",
-                "php": "^8.2"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Maia\\Auth\\": "src/"
-                }
-            },
-            "description": "Maia framework auth package",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "maia/cli",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "../../maia/src/Cli",
-                "reference": "9db419a0a0766f5e45712f001b4a5274e2c4182d"
-            },
-            "require": {
-                "maia/auth": "self.version",
-                "maia/core": "self.version",
-                "maia/orm": "self.version",
-                "php": "^8.2"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Maia\\Cli\\": "src/"
-                }
-            },
-            "description": "Maia framework CLI package",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "maia/core",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "../../maia/src/Core",
-                "reference": "8f1ab44494a7ac99f0bf7e0b2aa983ceddfc87f9"
-            },
-            "require": {
-                "php": "^8.2"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Maia\\Core\\": "src/"
-                }
-            },
-            "description": "Maia framework core: router, DI container, middleware, request/response",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
             "name": "maia/framework",
-            "version": "dev-main",
+            "version": "v0.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/dmallory42/maia.git",
+                "reference": "f9720dd7fd174cf9ba8ce1dac0d8681e36ff6f8c"
+            },
             "dist": {
-                "type": "path",
-                "url": "../../maia",
-                "reference": "29280abc6dcbbe022b681c87e906827354cf5633"
+                "type": "zip",
+                "url": "https://api.github.com/repos/dmallory42/maia/zipball/f9720dd7fd174cf9ba8ce1dac0d8681e36ff6f8c",
+                "reference": "f9720dd7fd174cf9ba8ce1dac0d8681e36ff6f8c",
+                "shasum": ""
             },
             "require": {
                 "firebase/php-jwt": "^7.0",
-                "maia/auth": "self.version",
-                "maia/cli": "self.version",
-                "maia/core": "self.version",
-                "maia/orm": "self.version",
                 "php": "^8.2"
             },
             "require-dev": {
@@ -188,6 +119,15 @@
                 "lint:fix": [
                     "phpcbf --standard=phpcs.xml"
                 ],
+                "changelog:check": [
+                    "php tools/check-changelog-entry.php"
+                ],
+                "changelog:new": [
+                    "php tools/new-changelog-entry.php"
+                ],
+                "worktree:new": [
+                    "php tools/new-worktree.php"
+                ],
                 "docs:coverage": [
                     "php tools/check-doc-coverage.php --min=95"
                 ],
@@ -199,35 +139,14 @@
                 ]
             },
             "license": [
-                "MIT"
+                "GPL-3.0-or-later"
             ],
             "description": "An opinionated, API-first PHP framework",
-            "transport-options": {
-                "relative": true
-            }
-        },
-        {
-            "name": "maia/orm",
-            "version": "dev-main",
-            "dist": {
-                "type": "path",
-                "url": "../../maia/src/Orm",
-                "reference": "91f5c3459f950b5fabf9fe486cdd3d47e7128805"
+            "support": {
+                "source": "https://github.com/dmallory42/maia/tree/v0.2.1",
+                "issues": "https://github.com/dmallory42/maia/issues"
             },
-            "require": {
-                "maia/core": "self.version",
-                "php": "^8.2"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Maia\\Orm\\": "src/"
-                }
-            },
-            "description": "Maia framework ORM package",
-            "transport-options": {
-                "relative": true
-            }
+            "time": "2026-03-10T07:45:31+00:00"
         },
         {
             "name": "predis/predis",
@@ -293,11 +212,11 @@
         },
         {
             "name": "superfpl/fpl-client",
-            "version": "dev-main",
+            "version": "0.1.0",
             "dist": {
                 "type": "path",
                 "url": "../packages/fpl-client",
-                "reference": "50196062f9625fd9d835ea40895bc5d0286bde70"
+                "reference": "3488b74641b38157b25effbd2fff35672a75ecb3"
             },
             "require": {
                 "php": ">=8.2"
@@ -2073,9 +1992,9 @@
         }
     ],
     "aliases": [],
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "stability-flags": {},
-    "prefer-stable": true,
+    "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
         "php": ">=8.2"
