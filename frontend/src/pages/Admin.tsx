@@ -12,7 +12,6 @@ import {
 } from '../api/client'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { FormInput, FormSelect, SearchResultButton, SearchResultsList } from '../components/ui/form'
-import { GradientText } from '../components/ui/GradientText'
 import type { Player } from '../types/player'
 import { getPositionName } from '../types/player'
 
@@ -159,8 +158,8 @@ export function Admin() {
   if (adminSessionLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-48 bg-surface rounded animate-shimmer" />
-        <div className="h-64 bg-surface rounded animate-shimmer" />
+        <div className="h-8 w-48 bg-surface animate-shimmer" />
+        <div className="h-64 bg-surface animate-shimmer" />
       </div>
     )
   }
@@ -168,16 +167,16 @@ export function Admin() {
   if (adminSessionError || adminSession?.authenticated !== true) {
     return (
       <div className="space-y-8">
-        <div className="animate-fade-in-up">
-          <h2 className="font-display text-2xl font-bold tracking-wider uppercase">
-            <GradientText>Admin</GradientText>
+        <div>
+          <h2 className="text-2xl font-bold tracking-wider uppercase">
+            <span className="text-tt-cyan">Admin</span>
           </h2>
           <p className="text-sm text-foreground-muted mt-1">
             Sign in with your admin token to manage protected settings.
           </p>
         </div>
 
-        <BroadcastCard title="Admin Sign In" animationDelay={100}>
+        <BroadcastCard title="Admin Sign In">
           <div className="flex flex-col gap-3 max-w-md">
             <FormInput
               type="password"
@@ -209,8 +208,8 @@ export function Admin() {
   if (playersLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-48 bg-surface rounded animate-shimmer" />
-        <div className="h-64 bg-surface rounded animate-shimmer" />
+        <div className="h-8 w-48 bg-surface animate-shimmer" />
+        <div className="h-64 bg-surface animate-shimmer" />
       </div>
     )
   }
@@ -218,9 +217,9 @@ export function Admin() {
   return (
     <div className="space-y-8">
       {/* Page header */}
-      <div className="animate-fade-in-up">
-        <h2 className="font-display text-2xl font-bold tracking-wider uppercase">
-          <GradientText>Admin</GradientText>
+      <div>
+        <h2 className="text-2xl font-bold tracking-wider uppercase">
+          <span className="text-tt-cyan">Admin</span>
         </h2>
         <p className="text-sm text-foreground-muted mt-1">
           Configure penalty takers and expected minutes overrides
@@ -231,11 +230,8 @@ export function Admin() {
       <BroadcastCard
         title="Penalty Takers"
         headerAction={
-          <span className="font-mono text-xs text-foreground-muted">
-            {configuredTeamCount}/20 teams
-          </span>
+          <span className="text-xs text-foreground-muted">{configuredTeamCount}/20 teams</span>
         }
-        animationDelay={100}
       >
         {/* Team selector */}
         <div className="mb-4">
@@ -259,13 +255,13 @@ export function Admin() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="pb-2 font-display text-xs uppercase tracking-wider text-foreground-muted">
+                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted">
                     Player
                   </th>
-                  <th className="pb-2 font-display text-xs uppercase tracking-wider text-foreground-muted w-16">
+                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-16">
                     Pos
                   </th>
-                  <th className="pb-2 font-display text-xs uppercase tracking-wider text-foreground-muted w-32">
+                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-32">
                     Penalty Order
                   </th>
                 </tr>
@@ -276,10 +272,10 @@ export function Admin() {
                   return (
                     <tr
                       key={player.id}
-                      className="border-b border-border/50 hover:bg-surface-hover transition-colors"
+                      className="border-b border-border/50 hover:bg-surface-hover"
                     >
                       <td className="py-2 font-medium">{player.web_name}</td>
-                      <td className="py-2 font-mono text-xs text-foreground-muted">
+                      <td className="py-2 text-xs text-foreground-muted">
                         {POSITION_LABELS[player.element_type]}
                       </td>
                       <td className="py-2">
@@ -316,11 +312,10 @@ export function Admin() {
       <BroadcastCard
         title="Expected Minutes Overrides"
         headerAction={
-          <span className="font-mono text-xs text-foreground-muted">
+          <span className="text-xs text-foreground-muted">
             {playersWithOverrides.length} active
           </span>
         }
-        animationDelay={200}
       >
         {/* Search to add new override */}
         <div className="mb-4">
@@ -341,7 +336,7 @@ export function Admin() {
               {xminsSearchResults.map((p) => (
                 <SearchResultButton
                   key={p.id}
-                  className="gap-2 transition-colors"
+                  className="gap-2"
                   onClick={() => {
                     setAddingPlayerId(p.id)
                     setXminsSearch(p.web_name)
@@ -354,7 +349,7 @@ export function Admin() {
                   }}
                 >
                   <span className="font-medium">{p.web_name}</span>
-                  <span className="font-mono text-xs text-foreground-muted">
+                  <span className="text-xs text-foreground-muted">
                     {teamMap.get(p.team)} &middot; {getPositionName(p.element_type)}
                   </span>
                 </SearchResultButton>
@@ -405,16 +400,16 @@ export function Admin() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="pb-2 font-display text-xs uppercase tracking-wider text-foreground-muted">
+                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted">
                     Player
                   </th>
-                  <th className="pb-2 font-display text-xs uppercase tracking-wider text-foreground-muted w-16">
+                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-16">
                     Team
                   </th>
-                  <th className="pb-2 font-display text-xs uppercase tracking-wider text-foreground-muted w-24">
+                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-24">
                     Avg Mins
                   </th>
-                  <th className="pb-2 font-display text-xs uppercase tracking-wider text-foreground-muted w-28">
+                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-28">
                     Override
                   </th>
                   <th className="pb-2 w-16"></th>
@@ -429,13 +424,13 @@ export function Admin() {
                   return (
                     <tr
                       key={player.id}
-                      className="border-b border-border/50 hover:bg-surface-hover transition-colors"
+                      className="border-b border-border/50 hover:bg-surface-hover"
                     >
                       <td className="py-2 font-medium">{player.web_name}</td>
-                      <td className="py-2 font-mono text-xs text-foreground-muted">
+                      <td className="py-2 text-xs text-foreground-muted">
                         {teamMap.get(player.team)}
                       </td>
-                      <td className="py-2 font-mono text-xs text-foreground-muted">{avgMins}</td>
+                      <td className="py-2 text-xs text-foreground-muted">{avgMins}</td>
                       <td className="py-2">
                         <FormInput
                           type="number"
@@ -456,7 +451,7 @@ export function Admin() {
                       </td>
                       <td className="py-2">
                         <button
-                          className="text-xs text-highlight hover:text-highlight/80 transition-colors"
+                          className="text-xs text-tt-red hover:text-tt-red/80"
                           onClick={() => xminsMutation.mutate({ playerId: player.id, mins: null })}
                         >
                           Clear

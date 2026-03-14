@@ -69,7 +69,7 @@ export function PredictionTable({ predictions, teams }: PredictionTableProps) {
       <div className="flex gap-2">
         <button
           onClick={() => setPositionFilter(null)}
-          className={`px-3 py-1 rounded ${positionFilter === null ? 'bg-green-600' : 'bg-gray-700'}`}
+          className={`px-3 py-1 ${positionFilter === null ? 'bg-tt-green text-black' : 'bg-gray-700'}`}
         >
           All
         </button>
@@ -77,14 +77,14 @@ export function PredictionTable({ predictions, teams }: PredictionTableProps) {
           <button
             key={pos}
             onClick={() => setPositionFilter(pos)}
-            className={`px-3 py-1 rounded ${positionFilter === pos ? 'bg-green-600' : 'bg-gray-700'}`}
+            className={`px-3 py-1 ${positionFilter === pos ? 'bg-tt-green text-black' : 'bg-gray-700'}`}
           >
             {getPositionName(pos)}
           </button>
         ))}
       </div>
 
-      <div className="bg-gray-800 rounded-lg overflow-hidden">
+      <div className="bg-gray-800-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="border-gray-700">
@@ -138,7 +138,7 @@ export function PredictionTable({ predictions, teams }: PredictionTableProps) {
                   {pred.fixture ? (
                     <div className="flex items-center gap-2">
                       <span
-                        className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${difficultyColors[pred.fixture.difficulty] || 'bg-gray-600'}`}
+                        className={`w-6 h-6 flex items-center justify-center text-xs font-bold ${difficultyColors[pred.fixture.difficulty] || 'bg-gray-600'}`}
                       >
                         {pred.fixture.difficulty}
                       </span>
@@ -157,7 +157,7 @@ export function PredictionTable({ predictions, teams }: PredictionTableProps) {
                 <TableCell className="text-gray-300 text-right">{pred.form}</TableCell>
                 <TableCell className="text-gray-300 text-right">{pred.total_points}</TableCell>
                 <TableCell className="text-right">
-                  <span className="text-green-400 font-bold">
+                  <span className="text-tt-green font-bold">
                     {pred.predicted_points.toFixed(1)}
                   </span>
                 </TableCell>

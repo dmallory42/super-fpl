@@ -16,9 +16,9 @@ export function PlayerCard({ player, teamName }: PlayerCardProps) {
   const position = getPositionName(player.element_type)
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-gray-800 rounded-lg">
+    <div className="flex items-center gap-3 p-3 bg-gray-800">
       <div
-        className={`w-10 h-10 rounded-full ${positionColors[position]} flex items-center justify-center text-white font-bold text-xs`}
+        className={`w-10 h-10 ${positionColors[position]} flex items-center justify-center text-white font-bold text-xs`}
       >
         {position}
       </div>
