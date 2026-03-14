@@ -25,7 +25,7 @@ export function TabNav({ tabs, activeTab, onTabChange, className = '' }: TabNavP
           className={`tab-nav-item ${activeTab === tab.id ? 'active' : ''}`}
         >
           <span className="flex items-center gap-2">
-            {tab.icon && <span className="opacity-70">{tab.icon}</span>}
+            {tab.icon && <span>{tab.icon}</span>}
             <span>{tab.label}</span>
             {tab.isLive && <LiveIndicator size="sm" showText={false} />}
           </span>
