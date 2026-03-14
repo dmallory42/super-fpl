@@ -14,7 +14,6 @@ import { TransferQualityScorecard } from '../components/team-analyzer/TransferQu
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, TrophyIcon } from '../components/ui/EmptyState'
 import { SkeletonStatGrid, SkeletonPitch, SkeletonCard } from '../components/ui/SkeletonLoader'
-import { GradientText } from '../components/ui/GradientText'
 import { buildSeasonBestSquad } from '../lib/seasonBestSquad'
 
 function getInitialManagerId(): number | null {
@@ -105,13 +104,11 @@ export function TeamAnalyzer() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="animate-fade-in-up">
-        <h2 className="font-display text-2xl font-bold tracking-wider text-foreground mb-2">
-          Season Review
-        </h2>
+      <div>
+        <h2 className="text-2xl font-bold uppercase text-foreground mb-2">Season Review</h2>
         <p className="text-foreground-muted text-sm mb-4">
           Enter your FPL Manager ID to review your season performance. Find it in your FPL URL:
-          <span className="font-mono text-fpl-green ml-1">
+          <span className="text-tt-green ml-1">
             fantasy.premierleague.com/entry/<strong>123456</strong>/event/1
           </span>
         </p>
@@ -120,7 +117,7 @@ export function TeamAnalyzer() {
 
       {/* Error State */}
       {error && (
-        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
+        <div className="p-4 bg-destructive/10 border border-destructive/30 text-destructive">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -146,25 +143,20 @@ export function TeamAnalyzer() {
 
       {/* Manager Card */}
       {manager && !isLoading && (
-        <BroadcastCard animationDelay={100}>
+        <BroadcastCard>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h3 className="font-display text-xl font-bold text-foreground tracking-wider">
-                {manager.name}
-              </h3>
+              <h3 className="text-xl font-bold uppercase text-foreground">{manager.name}</h3>
               <p className="text-foreground-muted">
                 {manager.player_first_name} {manager.player_last_name}
               </p>
             </div>
             <div className="text-right">
-              <div className="font-mono text-3xl font-bold">
-                <GradientText>{manager.summary_overall_points}</GradientText>
+              <div className="text-3xl font-bold">
+                <span className="text-tt-cyan">{manager.summary_overall_points}</span>
               </div>
               <div className="text-sm text-foreground-muted">
-                Rank:{' '}
-                <span className="font-mono">
-                  {manager.summary_overall_rank?.toLocaleString() ?? 'N/A'}
-                </span>
+                Rank: <span>{manager.summary_overall_rank?.toLocaleString() ?? 'N/A'}</span>
               </div>
             </div>
           </div>
@@ -192,13 +184,9 @@ export function TeamAnalyzer() {
 
           {/* Active Chip */}
           {picks.active_chip && (
-            <div className="p-4 bg-gradient-to-r from-fpl-purple/20 to-fpl-purple/5 border border-fpl-purple/30 rounded-lg text-center animate-fade-in-up">
-              <span className="text-fpl-purple font-display uppercase tracking-wider">
-                Active Chip:{' '}
-              </span>
-              <span className="text-foreground font-bold font-display uppercase tracking-wider">
-                {picks.active_chip}
-              </span>
+            <div className="p-4 bg-tt-magenta/20 border border-tt-magenta/30 text-center">
+              <span className="text-tt-magenta uppercase">Active Chip: </span>
+              <span className="text-foreground font-bold uppercase">{picks.active_chip}</span>
             </div>
           )}
         </>
@@ -211,7 +199,7 @@ export function TeamAnalyzer() {
 
       {/* Transfer Quality Scorecard */}
       {manager && seasonAnalysis && !isLoading && (
-        <BroadcastCard title="Transfer Quality" accentColor="purple" animationDelay={130}>
+        <BroadcastCard title="Transfer Quality" accentColor="magenta">
           <TransferQualityScorecard seasonAnalysis={seasonAnalysis} />
         </BroadcastCard>
       )}

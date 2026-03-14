@@ -142,8 +142,8 @@ describe('SeasonReview', () => {
       const history = createHistoryData()
       const { container } = render(<SeasonReview history={history} />)
 
-      // GW points should be visible in the table (class is text-fpl-green)
-      const pointsCells = container.querySelectorAll('td.text-fpl-green')
+      // GW points should be visible in the table (class is text-tt-green)
+      const pointsCells = container.querySelectorAll('td.text-tt-green')
       expect(pointsCells.length).toBeGreaterThanOrEqual(4)
     })
 

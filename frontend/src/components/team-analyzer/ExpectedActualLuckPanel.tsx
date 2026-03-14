@@ -131,14 +131,14 @@ function CumulativeChart({ rows }: { rows: RowData[] }) {
       <path
         d={luckPath}
         fill="none"
-        className="stroke-fpl-green"
+        className="stroke-tt-green"
         strokeWidth="2"
         strokeLinecap="round"
       />
       <path
         d={benchmarkPath}
         fill="none"
-        className="stroke-highlight"
+        className="stroke-tt-red"
         strokeWidth="2"
         strokeDasharray="6 4"
         strokeLinecap="round"
@@ -148,7 +148,7 @@ function CumulativeChart({ rows }: { rows: RowData[] }) {
         x={padding.left}
         y={height - 10}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs font-mono"
+        className="fill-foreground-muted text-xs"
       >
         GW{rows[0].gameweek}
       </text>
@@ -156,7 +156,7 @@ function CumulativeChart({ rows }: { rows: RowData[] }) {
         x={width - padding.right}
         y={height - 10}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs font-mono"
+        className="fill-foreground-muted text-xs"
       >
         GW{rows[rows.length - 1].gameweek}
       </text>
@@ -195,9 +195,7 @@ export function ExpectedActualLuckPanel({
     <div className="space-y-4" data-testid="expected-actual-luck-panel">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h4 className="font-display text-sm uppercase tracking-wider text-foreground">
-            Expected vs Actual
-          </h4>
+          <h4 className="text-sm uppercase text-foreground">Expected vs Actual</h4>
           <p className="text-xs text-foreground-dim">
             Compare per-GW points against expected model output and benchmark tiers.
           </p>
@@ -220,15 +218,13 @@ export function ExpectedActualLuckPanel({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="rounded-lg border border-fpl-green/30 bg-fpl-green/5 p-3">
+        <div className=" border border-tt-green/30 bg-tt-green/5 p-3">
           <div className="text-xs uppercase text-foreground-muted">Cumulative Luck</div>
-          <div className="font-mono text-2xl text-foreground">
-            {formatSigned(totals.cumulativeLuck, 1)}
-          </div>
+          <div className="text-2xl text-foreground">{formatSigned(totals.cumulativeLuck, 1)}</div>
         </div>
-        <div className="rounded-lg border border-highlight/30 bg-highlight/5 p-3">
+        <div className=" border border-tt-red/30 bg-tt-red/5 p-3">
           <div className="text-xs uppercase text-foreground-muted">Cumulative vs Benchmark</div>
-          <div className="font-mono text-2xl text-foreground">
+          <div className="text-2xl text-foreground">
             {formatSigned(totals.cumulativeBenchmarkDelta, 1)}
           </div>
         </div>
@@ -252,15 +248,15 @@ export function ExpectedActualLuckPanel({
           <tbody>
             {rows.map((row) => (
               <tr key={row.gameweek}>
-                <td className="font-mono text-foreground-muted">{row.gameweek}</td>
-                <td className="text-right font-mono">{row.actual.toFixed(1)}</td>
-                <td className="text-right font-mono">{row.expected.toFixed(1)}</td>
-                <td className="text-right font-mono">{formatSigned(row.luckDelta, 1)}</td>
-                <td className="text-right font-mono">
+                <td className="text-foreground-muted">{row.gameweek}</td>
+                <td className="text-right">{row.actual.toFixed(1)}</td>
+                <td className="text-right">{row.expected.toFixed(1)}</td>
+                <td className="text-right">{formatSigned(row.luckDelta, 1)}</td>
+                <td className="text-right">
                   {row.benchmarkPoints === null ? '—' : row.benchmarkPoints.toFixed(1)}
                 </td>
-                <td className="text-right font-mono">{formatSigned(row.benchmarkDelta, 1)}</td>
-                <td className="text-right font-mono">{formatSigned(row.cumulativeLuck, 1)}</td>
+                <td className="text-right">{formatSigned(row.benchmarkDelta, 1)}</td>
+                <td className="text-right">{formatSigned(row.cumulativeLuck, 1)}</td>
               </tr>
             ))}
           </tbody>

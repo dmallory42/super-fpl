@@ -43,7 +43,7 @@ export function ManagerSearch({ onSearch, isLoading }: ManagerSearchProps) {
           aria-label="Search for manager"
           disabled={isLoading}
         />
-        {error && <p className="text-destructive text-sm mt-1 animate-fade-in-up">{error}</p>}
+        {error && <p className="text-destructive text-sm mt-1">{error}</p>}
       </div>
       <button type="submit" disabled={isLoading} className="btn-primary">
         {isLoading ? (

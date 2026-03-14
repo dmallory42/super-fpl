@@ -96,10 +96,10 @@ describe('TransferQualityScorecard', () => {
     const secondExpectedCell = within(rows[1]).getByText('+2.0')
     const secondRealizedCell = within(rows[1]).getByText('+3.0')
 
-    expect(firstExpectedCell).toHaveClass('text-fpl-green')
+    expect(firstExpectedCell).toHaveClass('text-tt-green')
     expect(firstRealizedCell).toHaveClass('text-destructive')
-    expect(secondExpectedCell).toHaveClass('text-fpl-green')
-    expect(secondRealizedCell).toHaveClass('text-fpl-green')
+    expect(secondExpectedCell).toHaveClass('text-tt-green')
+    expect(secondRealizedCell).toHaveClass('text-tt-green')
   })
 
   it('shows N/A expected gain when snapshots are incomplete for a gameweek', () => {

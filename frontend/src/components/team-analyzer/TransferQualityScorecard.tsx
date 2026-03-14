@@ -11,7 +11,7 @@ function formatSigned(value: number, precision = 1): string {
 }
 
 function signedValueClass(value: number): string {
-  if (value > 0) return 'text-fpl-green'
+  if (value > 0) return 'text-tt-green'
   if (value < 0) return 'text-destructive'
   return 'text-foreground'
 }
@@ -46,7 +46,7 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
 
   if (rows.length === 0) {
     return (
-      <div className="rounded-lg border border-border p-4 text-sm text-foreground-muted">
+      <div className=" border border-border p-4 text-sm text-foreground-muted">
         No transfer weeks recorded yet.
       </div>
     )
@@ -55,21 +55,21 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
   return (
     <div className="space-y-4" data-testid="transfer-quality-scorecard">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-lg border border-border p-3" data-testid="transfer-quality-weeks">
+        <div className=" border border-border p-3" data-testid="transfer-quality-weeks">
           <div className="text-xs uppercase text-foreground-muted">Transfer Weeks</div>
-          <div className="font-mono text-xl text-foreground">{rows.length}</div>
+          <div className="text-xl text-foreground">{rows.length}</div>
         </div>
-        <div className="rounded-lg border border-border p-3" data-testid="transfer-quality-count">
+        <div className=" border border-border p-3" data-testid="transfer-quality-count">
           <div className="text-xs uppercase text-foreground-muted">Transfers</div>
-          <div className="font-mono text-xl text-foreground">{totals.transferCount}</div>
+          <div className="text-xl text-foreground">{totals.transferCount}</div>
         </div>
         <div
-          className="rounded-lg border border-fpl-green/30 bg-fpl-green/5 p-3"
+          className=" border border-tt-green/30 bg-tt-green/5 p-3"
           data-testid="transfer-quality-expected"
         >
           <div className="text-xs uppercase text-foreground-muted">Expected Gain (Snapshot)</div>
           <div
-            className={`font-mono text-xl ${
+            className={`text-xl ${
               totals.foresightWeeks > 0 ? signedValueClass(totals.foresightGain) : 'text-foreground'
             }`}
           >
@@ -80,11 +80,11 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
           </div>
         </div>
         <div
-          className="rounded-lg border border-highlight/30 bg-highlight/5 p-3"
+          className=" border border-tt-red/30 bg-tt-red/5 p-3"
           data-testid="transfer-quality-realized"
         >
           <div className="text-xs uppercase text-foreground-muted">Realized Gain</div>
-          <div className={`font-mono text-xl ${signedValueClass(totals.hindsightGain)}`}>
+          <div className={`text-xl ${signedValueClass(totals.hindsightGain)}`}>
             {formatSigned(totals.hindsightGain)}
           </div>
         </div>
@@ -106,18 +106,15 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
             {rows.map((row) => {
               return (
                 <tr key={row.gameweek}>
-                  <td className="font-mono text-foreground-muted">{row.gameweek}</td>
+                  <td className="text-foreground-muted">{row.gameweek}</td>
                   <td className="py-2">
                     {row.transfers && row.transfers.length > 0 ? (
                       <div className="space-y-1">
                         {row.transfers.map((move, idx) => (
-                          <div
-                            key={`${move.out_id}-${move.in_id}-${idx}`}
-                            className="text-xs font-mono"
-                          >
+                          <div key={`${move.out_id}-${move.in_id}-${idx}`} className="text-xs">
                             <span className="text-destructive">{move.out_name}</span>
                             <span className="text-foreground-dim"> → </span>
-                            <span className="text-fpl-green">{move.in_name}</span>
+                            <span className="text-tt-green">{move.in_name}</span>
                           </div>
                         ))}
                       </div>
@@ -125,10 +122,10 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
                       <span className="text-foreground-dim">—</span>
                     )}
                   </td>
-                  <td className="text-right font-mono">{row.transfer_count}</td>
-                  <td className="text-right font-mono">{row.transfer_cost}</td>
+                  <td className="text-right">{row.transfer_count}</td>
+                  <td className="text-right">{row.transfer_cost}</td>
                   <td
-                    className={`text-right font-mono ${
+                    className={`text-right ${
                       row.foresight_gain === null
                         ? 'text-foreground-dim'
                         : signedValueClass(row.foresight_gain)
@@ -136,7 +133,7 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
                   >
                     {row.foresight_gain === null ? 'N/A' : formatSigned(row.foresight_gain)}
                   </td>
-                  <td className={`text-right font-mono ${signedValueClass(row.hindsight_gain)}`}>
+                  <td className={`text-right ${signedValueClass(row.hindsight_gain)}`}>
                     {formatSigned(row.hindsight_gain)}
                   </td>
                 </tr>
