@@ -74,8 +74,7 @@ const XMinsInput = memo(function XMinsInput({
       value={localValue}
       placeholder={String(baseXMins)}
       onChange={handleChange}
-      className={`w-14 px-1 py-0.5 text-center text-xs font-mono rounded border bg-surface-elevated transition-colors
-        ${hasOverride ? 'border-fpl-green/60 text-fpl-green' : 'border-border/30 text-foreground-muted'}
+      className={`w-14 px-1 py-0.5 text-center text-xs border bg-surface-elevated        ${hasOverride ? 'border-tt-green/60 text-tt-green' : 'border-border/30 text-foreground-muted'}
       `}
     />
   )
@@ -91,10 +90,10 @@ type SortField =
 type SortDir = 'asc' | 'desc'
 
 function getHeatClass(pts: number): string {
-  if (pts >= 8) return 'text-fpl-green font-bold bg-fpl-green/30'
-  if (pts >= 6) return 'text-fpl-green bg-fpl-green/20'
-  if (pts >= 4) return 'text-fpl-green/80 bg-fpl-green/10'
-  if (pts >= 2) return 'text-foreground-muted bg-fpl-green/5'
+  if (pts >= 8) return 'text-tt-green font-bold bg-tt-green/30'
+  if (pts >= 6) return 'text-tt-green bg-tt-green/20'
+  if (pts >= 4) return 'text-tt-green/80 bg-tt-green/10'
+  if (pts >= 2) return 'text-foreground-muted bg-tt-green/5'
   return 'text-foreground-dim'
 }
 
@@ -141,16 +140,16 @@ const ExplorerRow = memo(
           <PositionBadge elementType={position} />
         </td>
         <td
-          className={`px-3 py-1.5 font-body font-medium text-foreground sticky left-12 bg-surface z-10 ${onPlayerClick ? 'cursor-pointer hover:text-fpl-green transition-colors' : ''}`}
+          className={`px-3 py-1.5 font-body font-medium text-foreground sticky left-12 bg-surface z-10 ${onPlayerClick ? 'cursor-pointer hover:text-tt-green transition-colors' : ''}`}
           onClick={onPlayerClick ? () => onPlayerClick(playerId) : undefined}
         >
           {webName}
         </td>
         <td className="px-2 py-1.5 font-body text-foreground-muted">{teamShort}</td>
-        <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
+        <td className="px-2 py-1.5 text-right text-foreground-muted">
           £{(nowCost / 10).toFixed(1)}m
         </td>
-        <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">
+        <td className="px-2 py-1.5 text-right text-foreground-muted">
           {effectiveOwnership != null ? `${effectiveOwnership.toFixed(0)}%` : '-'}
         </td>
         <td className="px-1 py-0.5 text-center">
@@ -161,17 +160,17 @@ const ExplorerRow = memo(
             onChange={onXMinsChange}
           />
         </td>
-        <td className="px-2 py-1.5 text-right font-mono text-foreground-muted">{totalPoints}</td>
+        <td className="px-2 py-1.5 text-right text-foreground-muted">{totalPoints}</td>
         {gwValues.map(({ gw, pts }) => (
           <td
             key={gw}
-            className={`px-2 py-1.5 text-right font-mono text-xs rounded-sm ${getHeatClass(pts)} ${hasOverride ? 'italic' : ''}`}
+            className={`px-2 py-1.5 text-right text-xs ${getHeatClass(pts)} ${hasOverride ? 'italic' : ''}`}
           >
             {pts.toFixed(1)}
           </td>
         ))}
         <td
-          className={`px-3 py-1.5 text-right font-mono font-bold text-fpl-green ${hasOverride ? 'italic' : ''}`}
+          className={`px-3 py-1.5 text-right font-bold text-tt-green ${hasOverride ? 'italic' : ''}`}
         >
           {totalPredicted.toFixed(1)}
         </td>
@@ -379,7 +378,7 @@ export function PlayerExplorer({
   }, [visibleOrderSignature])
 
   return (
-    <BroadcastCard accentColor="purple" animationDelay={500}>
+    <BroadcastCard accentColor="magenta">
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <FormInput
@@ -400,9 +399,9 @@ export function PlayerExplorer({
                 setPositionFilter(pos.value)
                 setVisibleCount(50)
               }}
-              className={`px-3 py-1.5 rounded text-xs font-display uppercase tracking-wider transition-colors ${
+              className={`px-3 py-1.5text-xs uppercase tracking-wider transition-colors ${
                 positionFilter === pos.value
-                  ? 'bg-fpl-green/20 text-fpl-green border border-fpl-green/40'
+                  ? 'bg-tt-green/20 text-tt-green border border-tt-green/40'
                   : 'bg-surface-elevated text-foreground-muted border border-transparent hover:bg-surface-hover'
               }`}
             >
@@ -422,38 +421,38 @@ export function PlayerExplorer({
         <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-border/50">
-              <th className="text-left px-3 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted sticky left-0 bg-surface z-10 w-12">
+              <th className="text-left px-3 py-2 text-xs uppercase tracking-wider text-foreground-muted sticky left-0 bg-surface z-10 w-12">
                 Pos
               </th>
               <th
-                className="text-left px-3 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground sticky left-12 bg-surface z-10 min-w-[120px]"
+                className="text-left px-3 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground sticky left-12 bg-surface z-10 min-w-[120px]"
                 onClick={() => handleSort('web_name')}
               >
                 Player
                 <SortIndicator field="web_name" />
               </th>
-              <th className="text-left px-2 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted w-14">
+              <th className="text-left px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted w-14">
                 Team
               </th>
               <th
-                className="text-right px-2 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-16"
+                className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-16"
                 onClick={() => handleSort('now_cost')}
               >
                 Price
                 <SortIndicator field="now_cost" />
               </th>
               <th
-                className="text-right px-2 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-14"
+                className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-14"
                 onClick={() => handleSort('eo')}
               >
                 EO%
                 <SortIndicator field="eo" />
               </th>
-              <th className="text-center px-2 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted w-16">
+              <th className="text-center px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted w-16">
                 xMins
               </th>
               <th
-                className="text-right px-2 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-12"
+                className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-12"
                 onClick={() => handleSort('total_points')}
               >
                 Pts
@@ -462,7 +461,7 @@ export function PlayerExplorer({
               {gameweeks.map((gw) => (
                 <th
                   key={gw}
-                  className="text-right px-2 py-2 font-display text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-13"
+                  className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-13"
                   onClick={() => handleSort(`gw_${gw}`)}
                 >
                   GW{gw}
@@ -470,7 +469,7 @@ export function PlayerExplorer({
                 </th>
               ))}
               <th
-                className="text-right px-3 py-2 font-display text-xs uppercase tracking-wider text-fpl-green cursor-pointer hover:text-fpl-green/80 w-16"
+                className="text-right px-3 py-2 text-xs uppercase tracking-wider text-tt-green cursor-pointer hover:text-tt-green/80 w-16"
                 onClick={() => handleSort('total_predicted')}
               >
                 Total

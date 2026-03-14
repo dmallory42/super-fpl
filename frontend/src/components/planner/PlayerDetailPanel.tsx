@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import type { PlayerMultiWeekPrediction, XMinsOverrides, FixtureOpponent } from '../../api/client'
 import { PositionBadge } from '../common/PositionBadge'
 import { FormInput } from '../ui/form'
-import { GradientText } from '../ui/GradientText'
 
 type SidebarTab = 'projections' | 'transfer'
 
@@ -104,8 +103,7 @@ const GwXMinsInput = memo(function GwXMinsInput({
       value={localValue}
       placeholder={String(baseValue)}
       onChange={handleChange}
-      className={`w-14 px-1 py-0.5 text-center text-xs font-mono rounded border bg-surface-elevated transition-colors
-        ${hasOverride ? 'border-fpl-green/60 text-fpl-green' : 'border-border/30 text-foreground-muted'}
+      className={`w-14 px-1 py-0.5 text-center text-xs border bg-surface-elevated        ${hasOverride ? 'border-tt-green/60 text-tt-green' : 'border-border/30 text-foreground-muted'}
       `}
     />
   )
@@ -179,22 +177,22 @@ export function PlayerDetailPanel({
   return (
     <div>
       {/* Hero Header */}
-      <div className="relative border-b border-fpl-green/20">
+      <div className="relative border-b border-tt-green/20">
         {/* Left accent bar */}
-        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-fpl-green" />
+        <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-tt-green" />
 
         {/* Background gradient */}
-        <div className="bg-gradient-to-r from-fpl-green/20 via-fpl-green/5 to-transparent">
+        <div className="bg-tt-green/10">
           {/* Top row: name, position, close */}
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-            <h3 className="font-display text-lg uppercase tracking-widest text-foreground font-bold">
+            <h3 className="text-lg uppercase tracking-widest text-foreground font-bold">
               {player.web_name}
             </h3>
             <div className="flex items-center gap-2">
               <PositionBadge elementType={player.element_type} />
               <button
                 onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+                className="w-7 h-7 flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-hover"
               >
                 {'\u2715'}
               </button>
@@ -233,17 +231,11 @@ export function PlayerDetailPanel({
               },
               { value: `${parseFloat(player.selected_by_percent).toFixed(0)}%`, label: 'OWN' },
             ].map((stat, i) => (
-              <div
-                key={stat.label}
-                className="bg-surface/60 rounded px-2 py-1.5 animate-fade-in-up opacity-0"
-                style={{ animationDelay: `${100 + i * 50}ms` }}
-              >
-                <div
-                  className={`font-mono text-base font-bold ${stat.gradient ? '' : 'text-foreground'}`}
-                >
-                  {stat.gradient ? <GradientText>{stat.value}</GradientText> : stat.value}
+              <div key={stat.label} className="bg-surface/60 px-2 py-1.5">
+                <div className={`text-base font-bold ${stat.gradient ? '' : 'text-foreground'}`}>
+                  {stat.gradient ? <span className="text-tt-cyan">{stat.value}</span> : stat.value}
                 </div>
-                <div className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                <div className="text-[10px] uppercase tracking-wider text-foreground-muted">
                   {stat.label}
                 </div>
               </div>
@@ -253,8 +245,8 @@ export function PlayerDetailPanel({
       </div>
 
       {/* Season stats strip */}
-      <div className="px-4 py-2 border-b border-border/30 animate-fade-in-up opacity-0 [animation-delay:250ms]">
-        <div className="flex items-center gap-1.5 text-xs font-mono text-foreground-dim flex-wrap">
+      <div className="px-4 py-2 border-b border-border/30">
+        <div className="flex items-center gap-1.5 text-xs text-foreground-dim flex-wrap">
           {isGkp ? (
             <>
               <span>
@@ -308,9 +300,9 @@ export function PlayerDetailPanel({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex-1 py-2 text-xs font-display uppercase tracking-wider transition-colors ${
+              className={`flex-1 py-2 text-xs uppercase tracking-wider ${
                 activeTab === tab.id
-                  ? 'text-fpl-green border-b-2 border-fpl-green'
+                  ? 'text-tt-green border-b-2 border-tt-green'
                   : 'text-foreground-muted hover:text-foreground'
               }`}
             >
@@ -324,16 +316,16 @@ export function PlayerDetailPanel({
           <div className="animate-fade-in-up">
             {/* Column headers */}
             <div className="flex items-center px-2 pb-2 border-b border-border/30">
-              <span className="w-12 font-display text-[10px] uppercase tracking-widest text-foreground-dim">
+              <span className="w-12 text-[10px] uppercase tracking-widest text-foreground-dim">
                 GW
               </span>
-              <span className="w-16 font-display text-[10px] uppercase tracking-widest text-foreground-dim text-center">
+              <span className="w-16 text-[10px] uppercase tracking-widest text-foreground-dim text-center">
                 Fix
               </span>
-              <span className="flex-1 font-display text-[10px] uppercase tracking-widest text-foreground-dim text-right pr-3">
+              <span className="flex-1 text-[10px] uppercase tracking-widest text-foreground-dim text-right pr-3">
                 xMins
               </span>
-              <span className="w-14 font-display text-[10px] uppercase tracking-widest text-foreground-dim text-right">
+              <span className="w-14 text-[10px] uppercase tracking-widest text-foreground-dim text-right">
                 xPts
               </span>
             </div>
@@ -348,22 +340,21 @@ export function PlayerDetailPanel({
                 return (
                   <div
                     key={gw}
-                    className={`relative flex items-center px-2 py-1.5 transition-colors animate-fade-in-up opacity-0 ${
-                      isCurrentGw ? 'bg-fpl-green/10' : 'hover:bg-surface-hover/50'
+                    className={`relative flex items-center px-2 py-1.5 ${
+                      isCurrentGw ? 'bg-tt-green/10' : 'hover:bg-surface-hover/50'
                     }`}
-                    style={{ animationDelay: `${idx * 30}ms` }}
                   >
                     {isCurrentGw && (
-                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-fpl-green rounded-r" />
+                      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-tt-green" />
                     )}
                     <span
-                      className={`w-12 text-xs font-display uppercase tracking-wider ${
-                        isCurrentGw ? 'text-fpl-green' : 'text-foreground-muted'
+                      className={`w-12 text-xs uppercase tracking-wider ${
+                        isCurrentGw ? 'text-tt-green' : 'text-foreground-muted'
                       }`}
                     >
                       GW{gw}
                     </span>
-                    <span className="w-16 text-center text-xs font-mono text-foreground-muted">
+                    <span className="w-16 text-center text-xs text-foreground-muted">
                       {formatGwFixture(gw)}
                     </span>
                     <div className="flex-1 flex justify-end pr-3">
@@ -376,11 +367,11 @@ export function PlayerDetailPanel({
                       />
                     </div>
                     <span
-                      className={`w-14 text-right text-sm font-mono ${
+                      className={`w-14 text-right text-sm ${
                         xPts == null
                           ? 'text-foreground-dim'
                           : xPts >= 6
-                            ? 'text-fpl-green font-semibold'
+                            ? 'text-tt-green font-semibold'
                             : xPts >= 4
                               ? 'text-foreground'
                               : 'text-foreground-muted'
@@ -394,19 +385,18 @@ export function PlayerDetailPanel({
             </div>
 
             {/* Summary row */}
-            <div
-              className="flex items-center px-2 py-2 mt-1 border-t border-border/40 animate-fade-in-up opacity-0"
-              style={{ animationDelay: `${gameweeks.length * 30 + 30}ms` }}
-            >
-              <span className="w-12 text-xs font-display uppercase tracking-wider text-foreground-muted">
+            <div className="flex items-center px-2 py-2 mt-1 border-t border-border/40">
+              <span className="w-12 text-xs uppercase tracking-wider text-foreground-muted">
                 Total
               </span>
               <span className="w-16" />
-              <span className="flex-1 text-right pr-3 text-sm font-mono font-bold text-foreground-muted">
+              <span className="flex-1 text-right pr-3 text-sm font-bold text-foreground-muted">
                 {totalXMins}
               </span>
-              <span className="w-14 text-right text-sm font-mono font-bold">
-                <GradientText>{playerPrediction ? totalScaledXPts.toFixed(1) : '-'}</GradientText>
+              <span className="w-14 text-right text-sm font-bold">
+                <span className="text-tt-cyan">
+                  {playerPrediction ? totalScaledXPts.toFixed(1) : '-'}
+                </span>
               </span>
             </div>
           </div>
@@ -414,7 +404,7 @@ export function PlayerDetailPanel({
 
         {/* Transfer tab */}
         {activeTab === 'transfer' && (
-          <div className="space-y-3 animate-fade-in-up">
+          <div className="space-y-3">
             <div className="text-xs text-foreground-muted">
               Budget:{' '}
               <span className="font-mono">
@@ -437,10 +427,9 @@ export function PlayerDetailPanel({
                   <button
                     key={rPlayer.player_id}
                     onClick={() => onSelectReplacement(rPlayer)}
-                    className="group w-full relative flex items-center gap-2 p-2 rounded hover:bg-surface-hover text-left transition-colors animate-fade-in-up opacity-0"
-                    style={{ animationDelay: `${idx * 20}ms` }}
+                    className="group w-full relative flex items-center gap-2 p-2 hover:bg-surface-hover text-left"
                   >
-                    <div className="absolute left-0 top-1 bottom-1 w-[2px] rounded bg-transparent group-hover:bg-fpl-green/40 transition-colors" />
+                    <div className="absolute left-0 top-1 bottom-1 w-[2px] bg-transparent group-hover:bg-tt-green/40" />
                     <div className="flex-1 min-w-0 pl-1">
                       <div className="text-foreground font-medium text-sm truncate">
                         {rPlayer.web_name}
@@ -451,11 +440,11 @@ export function PlayerDetailPanel({
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-fpl-green font-mono text-sm font-bold">
+                      <div className="text-tt-green text-sm font-bold">
                         {rPlayer.total_predicted.toFixed(1)}
                       </div>
                       <div
-                        className={`text-xs font-mono ${gain > 0 ? 'text-fpl-green' : gain < 0 ? 'text-destructive' : 'text-foreground-muted'}`}
+                        className={`text-xs ${gain > 0 ? 'text-tt-green' : gain < 0 ? 'text-destructive' : 'text-foreground-muted'}`}
                       >
                         {gain > 0 ? '+' : ''}
                         {gain.toFixed(1)}

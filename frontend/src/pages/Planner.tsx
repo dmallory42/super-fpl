@@ -1123,9 +1123,9 @@ export function Planner() {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div className="animate-fade-in-up flex items-start justify-between">
+        <div className="flex items-start justify-between">
           <div>
-            <h2 className="font-display text-2xl font-bold tracking-wider uppercase text-foreground mb-2">
+            <h2 className="text-2xl font-bold tracking-wider uppercase text-foreground mb-2">
               Transfer Planner
             </h2>
             <p className="font-body text-foreground-muted text-sm mb-4">
@@ -1134,9 +1134,9 @@ export function Planner() {
           </div>
           <button
             onClick={() => setShowHelp(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-display uppercase tracking-wider text-foreground-muted hover:text-foreground hover:bg-surface-hover transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase tracking-wider text-foreground-muted hover:text-foreground hover:bg-surface-hover"
           >
-            <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] font-bold">
+            <span className="w-5 h-5 border border-current flex items-center justify-center text-[10px] font-bold">
               ?
             </span>
             Help
@@ -1149,19 +1149,19 @@ export function Planner() {
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
             onClick={() => setShowHelp(false)}
           >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="absolute inset-0 bg-black/60" />
             <div
-              className="relative bg-surface border border-border rounded-lg max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl animate-fade-in-up"
+              className="relative bg-surface border border-border max-w-lg w-full max-h-[80vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-5 border-b border-border bg-gradient-to-r from-fpl-purple/10 to-transparent">
-                <h3 className="font-display text-lg font-bold tracking-wider uppercase text-foreground">
+              <div className="p-5 border-b border-border bg-tt-magenta/10">
+                <h3 className="text-lg font-bold tracking-wider uppercase text-foreground">
                   How to Use the Planner
                 </h3>
               </div>
               <div className="p-5 space-y-5">
                 <div>
-                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
                     1. Make Transfers
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1170,7 +1170,7 @@ export function Planner() {
                   </p>
                 </div>
                 <div>
-                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
                     2. Find Plans
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1179,7 +1179,7 @@ export function Planner() {
                   </p>
                 </div>
                 <div>
-                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
                     3. Select & Save
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1188,7 +1188,7 @@ export function Planner() {
                   </p>
                 </div>
                 <div>
-                  <h4 className="font-display text-sm uppercase tracking-wider text-fpl-green mb-2">
+                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
                     Solver Controls
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1210,7 +1210,7 @@ export function Planner() {
         )}
 
         {/* Controls */}
-        <div className="grid md:grid-cols-2 gap-4 animate-fade-in-up animation-delay-100">
+        <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="form-label">Manager ID</label>
             <div className="flex gap-2">
@@ -1244,7 +1244,7 @@ export function Planner() {
         </div>
 
         {(squadError || solveError) && (
-          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
+          <div className="p-4 bg-destructive/10 border border-destructive/30 text-destructive">
             {solveError?.message || squadError?.message || 'Failed to load optimization data'}
           </div>
         )}
@@ -1263,31 +1263,28 @@ export function Planner() {
               <StatPanel
                 label="Squad Value"
                 value={`\u00A3${optimizeData.current_squad.squad_value.toFixed(1)}m`}
-                animationDelay={0}
               />
               <StatPanel
                 label={selectedGameweek !== null ? `Bank (GW${selectedGameweek})` : 'Bank'}
                 value={`\u00A3${effectiveBank.toFixed(1)}m`}
-                animationDelay={50}
                 highlight={effectiveBank !== optimizeData.current_squad.bank}
               />
               <StatPanel
                 label={`Projected (${displayHorizonLength} GWs)`}
                 value={`${selectedPath ? selectedPath.total_score.toFixed(1) : (squadPredictions?.total ?? '...')} pts`}
                 highlight
-                animationDelay={100}
               />
             </StatPanelGrid>
 
             {/* Solver & Recommended Plans */}
-            <BroadcastCard title="Recommended Plans" accentColor="purple" animationDelay={175}>
+            <BroadcastCard title="Recommended Plans" accentColor="magenta">
               {/* Solver controls */}
               <div className="flex items-end gap-2 mb-4">
                 <div className="flex items-end gap-2 flex-1 min-w-0">
                   <button
                     onClick={handleFindPlans}
                     disabled={isSolveActive || !managerId || parsedConstraints.hasErrors}
-                    className={`btn-primary relative ${isStale ? 'ring-2 ring-yellow-400/50' : ''}`}
+                    className={`btn-primary relative ${isStale ? 'ring-2 ring-tt-yellow/50' : ''}`}
                   >
                     {isSolveActive ? (
                       <span className="inline-flex items-center gap-2">
@@ -1309,7 +1306,7 @@ export function Planner() {
               </div>
 
               {parsedConstraints.hasErrors && (
-                <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <div className="mb-4 border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   Invalid advanced settings. Open the Advanced Settings card to fix:
                   {' ' + parsedConstraints.errors.join(' | ')}
                 </div>
@@ -1320,13 +1317,13 @@ export function Planner() {
                 <div className="pt-3 border-t border-border/50">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[0, 1, 2].map((i) => (
-                      <div key={i} className="p-3 rounded-lg bg-surface-elevated animate-pulse">
-                        <div className="h-3 w-16 bg-foreground/10 rounded mb-3" />
-                        <div className="h-6 w-24 bg-fpl-purple/10 rounded mb-3" />
+                      <div key={i} className="p-3 bg-surface-elevated">
+                        <div className="h-3 w-16 bg-foreground/10 mb-3" />
+                        <div className="h-6 w-24 bg-tt-magenta/10 mb-3" />
                         <div className="space-y-1.5">
-                          <div className="h-2.5 w-full bg-foreground/5 rounded" />
-                          <div className="h-2.5 w-3/4 bg-foreground/5 rounded" />
-                          <div className="h-2.5 w-5/6 bg-foreground/5 rounded" />
+                          <div className="h-2.5 w-full bg-foreground/5" />
+                          <div className="h-2.5 w-3/4 bg-foreground/5" />
+                          <div className="h-2.5 w-5/6 bg-foreground/5" />
                         </div>
                       </div>
                     ))}
@@ -1344,15 +1341,14 @@ export function Planner() {
                       <button
                         key={path.id}
                         onClick={() => handleSelectPlan(idx)}
-                        className={`p-3 rounded-lg text-left transition-all animate-fade-in-up opacity-0 ${
+                        className={`p-3 text-left ${
                           isSelected
-                            ? 'bg-fpl-purple/20 border-2 border-fpl-purple ring-2 ring-fpl-purple/30'
+                            ? 'bg-tt-magenta/20 border-2 border-tt-magenta ring-2 ring-tt-magenta/30'
                             : 'bg-surface-elevated hover:bg-surface-hover border border-transparent'
                         }`}
-                        style={{ animationDelay: `${200 + idx * 50}ms` }}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-display text-xs uppercase tracking-wider text-foreground-muted">
+                          <span className="text-xs uppercase tracking-wider text-foreground-muted">
                             Plan {path.id}
                           </span>
                           {path.total_hits > 0 && (
@@ -1362,8 +1358,8 @@ export function Planner() {
                           )}
                         </div>
                         <div
-                          className={`font-mono text-lg font-bold ${
-                            path.score_vs_hold > 0 ? 'text-fpl-green' : 'text-foreground'
+                          className={`text-lg font-bold ${
+                            path.score_vs_hold > 0 ? 'text-tt-green' : 'text-foreground'
                           }`}
                         >
                           {path.score_vs_hold > 0 ? '+' : ''}
@@ -1377,7 +1373,7 @@ export function Planner() {
                               <div key={gw} className="text-xs text-foreground-muted truncate">
                                 <span className="text-foreground-dim">GW{gw}:</span>{' '}
                                 {gwData.chip_played && (
-                                  <span className="text-fpl-green/80">
+                                  <span className="text-tt-green/80">
                                     [{CHIP_SHORT_LABELS[gwData.chip_played as keyof ChipPlan]}]{' '}
                                   </span>
                                 )}
@@ -1392,7 +1388,7 @@ export function Planner() {
                                       {mi > 0 && ', '}
                                       <span className="text-destructive/70">{m.out_name}</span>
                                       <span className="text-foreground-dim">{' \u2192 '}</span>
-                                      <span className="text-fpl-green/70">{m.in_name}</span>
+                                      <span className="text-tt-green/70">{m.in_name}</span>
                                     </span>
                                   ))
                                 )}
@@ -1412,15 +1408,15 @@ export function Planner() {
               )}
             </BroadcastCard>
 
-            <div className="animate-fade-in-up">
+            <div>
               <button
                 type="button"
                 data-testid="planner-advanced-toggle"
                 onClick={() => setShowAdvancedSettings((prev) => !prev)}
-                className="w-full flex items-center justify-between p-4 bg-surface-elevated rounded-lg hover:bg-surface-hover transition-colors"
+                className="w-full flex items-center justify-between p-4 bg-surface-elevated hover:bg-surface-hover"
               >
                 <div className="flex items-center gap-3">
-                  <h3 className="font-display text-sm font-bold tracking-wider uppercase text-foreground">
+                  <h3 className="text-sm font-bold tracking-wider uppercase text-foreground">
                     Advanced Settings
                   </h3>
                   <span className="text-xs text-foreground-muted font-mono">
@@ -1435,7 +1431,7 @@ export function Planner() {
               </button>
               {showAdvancedSettings && (
                 <div className="mt-2">
-                  <BroadcastCard accentColor="purple" animate={false}>
+                  <BroadcastCard accentColor="magenta" animate={false}>
                     <div className="space-y-3">
                       <FormSectionCard
                         heading="Solver Settings"
@@ -1449,7 +1445,7 @@ export function Planner() {
                                   <button
                                     key={mode}
                                     onClick={() => setObjectiveMode(mode)}
-                                    className={`px-2 py-1 rounded text-[10px] font-display uppercase tracking-wider transition-colors ${
+                                    className={`px-2 py-1 text-[10px] uppercase tracking-wider ${
                                       objectiveMode === mode
                                         ? 'bg-highlight/20 text-highlight border border-highlight/30'
                                         : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
@@ -1470,9 +1466,9 @@ export function Planner() {
                                 step="0.5"
                                 value={ftValue}
                                 onChange={(e) => setFtValue(parseFloat(e.target.value))}
-                                className="flex-1 accent-fpl-purple"
+                                className="flex-1 accent-tt-magenta"
                               />
-                              <span className="font-mono text-sm text-foreground w-10 text-right">
+                              <span className="text-sm text-foreground w-10 text-right">
                                 {ftValue.toFixed(1)}
                               </span>
                             </div>
@@ -1560,7 +1556,7 @@ export function Planner() {
                                     title="Remove lock"
                                   >
                                     <span>{player?.web_name ?? `#${id}`}</span>
-                                    <span className="text-fpl-green/80">×</span>
+                                    <span className="text-tt-green/80">×</span>
                                   </SelectionPill>
                                 )
                               })}
@@ -1683,8 +1679,7 @@ export function Planner() {
             {/* Squad Formation */}
             <BroadcastCard
               title={`Your Squad \u2014 GW${selectedGameweek ?? '?'} Predictions`}
-              accentColor="green"
-              animationDelay={300}
+              accentColor="cyan"
             >
               <div className="mb-4 space-y-3">
                 <div className="flex gap-2 flex-wrap">
@@ -1700,35 +1695,33 @@ export function Planner() {
                         key={gw}
                         onClick={() => setSelectedGameweek(gw)}
                         className={`
-                          px-4 py-3 rounded-lg animate-fade-in-up opacity-0 transition-all
-                          ${
+                          px-4 py-3                          ${
                             isSelected
-                              ? 'bg-fpl-green/20 border-2 border-fpl-green ring-2 ring-fpl-green/30'
+                              ? 'bg-tt-green/20 border-2 border-tt-green ring-2 ring-tt-cyan/30'
                               : isFirst && hitsCost > 0 && !selectedPath
                                 ? 'bg-destructive/20 border border-destructive/30 hover:bg-destructive/30'
                                 : pathAction === 'transfer'
-                                  ? 'bg-fpl-purple/10 border border-fpl-purple/20 hover:bg-fpl-purple/20'
+                                  ? 'bg-tt-magenta/10 border border-tt-magenta/20 hover:bg-tt-magenta/20'
                                   : gwUserTransfers.length > 0
-                                    ? 'bg-fpl-green/10 border border-fpl-green/20 hover:bg-fpl-green/20'
+                                    ? 'bg-tt-green/10 border border-tt-green/20 hover:bg-tt-green/20'
                                     : 'bg-surface-elevated hover:bg-surface-hover border border-transparent'
                           }
                         `}
-                        style={{ animationDelay: `${250 + idx * 50}ms` }}
                       >
                         <div
-                          className={`text-xs font-display uppercase ${isSelected ? 'text-fpl-green' : 'text-foreground-muted'}`}
+                          className={`text-xs uppercase ${isSelected ? 'text-tt-green' : 'text-foreground-muted'}`}
                         >
                           GW{gw}
                           {!selectedPath && isFirst && hitsCost > 0 && ` (-${hitsCost})`}
                           {pathGw?.hit_cost ? ` (-${pathGw.hit_cost})` : ''}
                         </div>
                         <div
-                          className={`text-xl font-mono font-bold ${isSelected ? 'text-fpl-green' : 'text-foreground'}`}
+                          className={`text-xl font-bold ${isSelected ? 'text-tt-green' : 'text-foreground'}`}
                         >
                           {pts.toFixed(1)}
                         </div>
                         {pathAction && (
-                          <div className="text-[10px] text-fpl-purple mt-0.5">
+                          <div className="text-[10px] text-tt-magenta mt-0.5">
                             {pathGw?.chip_played
                               ? CHIP_LABELS[pathGw.chip_played as keyof ChipPlan]
                               : pathAction === 'bank'
@@ -1737,7 +1730,7 @@ export function Planner() {
                           </div>
                         )}
                         {!selectedPath && gwUserTransfers.length > 0 && (
-                          <div className="text-[10px] text-fpl-green mt-0.5">
+                          <div className="text-[10px] text-tt-green mt-0.5">
                             {gwUserTransfers.length} transfer
                             {gwUserTransfers.length > 1 ? 's' : ''}
                           </div>
@@ -1747,12 +1740,12 @@ export function Planner() {
                   })}
                 </div>
                 {selectedGameweek !== null && selectedGwTransferStatus && (
-                  <div className="rounded-lg border border-border/60 bg-surface-elevated/60 px-3 py-2 flex items-center justify-between">
+                  <div className="border border-border/60 bg-surface-elevated/60 px-3 py-2 flex items-center justify-between">
                     <span className="text-xs text-foreground-muted">
                       GW{selectedGameweek} transfer budget
                     </span>
                     <span
-                      className={`font-mono text-sm ${
+                      className={`text-sm ${
                         selectedGwTransferStatus.hits > 0 ? 'text-destructive' : 'text-foreground'
                       }`}
                     >
@@ -1773,7 +1766,7 @@ export function Planner() {
                     Total ({displayHorizonLength} GWs)
                     {selectedPath && ' \u2014 Plan ' + selectedPath.id}
                   </span>
-                  <span className="font-mono font-bold text-fpl-green text-lg">
+                  <span className="font-bold text-tt-green text-lg">
                     {selectedPath
                       ? `${selectedPath.total_score.toFixed(1)} pts`
                       : `${squadPredictions?.total.toFixed(1) ?? '...'} pts`}
@@ -1801,13 +1794,13 @@ export function Planner() {
 
             {/* Your Transfers — inline bar */}
             {userTransfers.length > 0 && (
-              <BroadcastCard title="Your Transfers" accentColor="green" animationDelay={200}>
+              <BroadcastCard title="Your Transfers" accentColor="cyan">
                 <div className="flex flex-wrap gap-2 items-center">
                   {Object.entries(transfersByGw)
                     .sort(([a], [b]) => Number(a) - Number(b))
                     .map(([gwStr, transfers]) => (
                       <div key={gwStr} className="flex items-center gap-2">
-                        <span className="font-display text-[10px] uppercase tracking-wider text-foreground-muted">
+                        <span className="text-[10px] uppercase tracking-wider text-foreground-muted">
                           GW{gwStr}:
                         </span>
                         {transfers.map((ft, idx) => {
@@ -1816,13 +1809,13 @@ export function Planner() {
                           return (
                             <div
                               key={idx}
-                              className="flex items-center gap-1.5 px-2 py-1 bg-surface-elevated rounded text-sm"
+                              className="flex items-center gap-1.5 px-2 py-1 bg-surface-elevated text-sm"
                             >
                               <span className="text-destructive truncate max-w-[80px]">
                                 {outPlayer?.web_name ?? `#${ft.out}`}
                               </span>
                               <span className="text-foreground-dim">{'\u2192'}</span>
-                              <span className="text-fpl-green truncate max-w-[80px]">
+                              <span className="text-tt-green truncate max-w-[80px]">
                                 {inPlayer?.web_name ?? `#${ft.in}`}
                               </span>
                               <button
@@ -1859,18 +1852,18 @@ export function Planner() {
 
             {/* Saved Plans — inline */}
             {savedPlans.length > 0 && (
-              <BroadcastCard title="Saved Plans" accentColor="purple" animationDelay={250}>
+              <BroadcastCard title="Saved Plans" accentColor="magenta">
                 <div className="flex flex-wrap gap-2">
                   {savedPlans.map((plan) => (
                     <div
                       key={plan.id}
                       className="flex items-center gap-3 px-3 py-2 bg-surface-elevated rounded-lg"
                     >
-                      <span className="font-display text-xs uppercase tracking-wider text-foreground">
+                      <span className="text-xs uppercase tracking-wider text-foreground">
                         {plan.name}
                       </span>
                       <span
-                        className={`font-mono text-sm font-bold ${plan.scoreVsHold > 0 ? 'text-fpl-green' : 'text-foreground'}`}
+                        className={`text-sm font-bold ${plan.scoreVsHold > 0 ? 'text-tt-green' : 'text-foreground'}`}
                       >
                         {plan.scoreVsHold > 0 ? '+' : ''}
                         {plan.scoreVsHold.toFixed(1)}
@@ -1880,13 +1873,13 @@ export function Planner() {
                       </span>
                       <button
                         onClick={() => handleLoadSavedPlan(plan)}
-                        className="text-xs text-fpl-green hover:text-fpl-green/80 transition-colors"
+                        className="text-xs text-tt-green hover:text-tt-green/80"
                       >
                         Load
                       </button>
                       <button
                         onClick={() => handleDeleteSavedPlan(plan.id)}
-                        className="text-xs text-foreground-muted hover:text-destructive transition-colors"
+                        className="text-xs text-foreground-muted hover:text-destructive"
                       >
                         Delete
                       </button>
@@ -1900,13 +1893,13 @@ export function Planner() {
 
         {/* Player Explorer - collapsible */}
         {predictionsRange && (
-          <div className="animate-fade-in-up">
+          <div>
             <button
               onClick={() => setIsExplorerExpanded((prev) => !prev)}
-              className="w-full flex items-center justify-between p-4 bg-surface-elevated rounded-lg hover:bg-surface-hover transition-colors"
+              className="w-full flex items-center justify-between p-4 bg-surface-elevated hover:bg-surface-hover"
             >
               <div className="flex items-center gap-3">
-                <h3 className="font-display text-sm font-bold tracking-wider uppercase text-foreground">
+                <h3 className="text-sm font-bold tracking-wider uppercase text-foreground">
                   Player Explorer
                 </h3>
                 <span className="text-xs text-foreground-muted font-mono">
@@ -1951,7 +1944,7 @@ export function Planner() {
         <div className="fixed inset-0 z-50">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/40 animate-fade-in"
+            className="absolute inset-0 bg-black/40"
             onClick={() => {
               setSelectedPlayer(null)
               setReplacementSearch('')
@@ -1959,7 +1952,7 @@ export function Planner() {
           />
 
           {/* Drawer panel */}
-          <div className="absolute top-0 right-0 h-full w-full max-w-sm bg-surface border-l border-fpl-green/20 shadow-2xl shadow-black/50 flex flex-col animate-drawer-slide-in">
+          <div className="absolute top-0 right-0 h-full w-full max-w-sm bg-surface border-l border-tt-green/20 flex flex-col animate-drawer-slide-in">
             <div className="flex-1 overflow-y-auto">
               <PlayerDetailPanel
                 player={selectedPlayerData}
