@@ -23,7 +23,7 @@ describe('StatPanel', () => {
     )
 
     expect(screen.getByText('Up 1.2K')).toBeInTheDocument()
-    expect(screen.getByText('▲')).toBeInTheDocument()
+    expect(screen.getByText('+')).toBeInTheDocument()
     expect(container.querySelector('.custom-panel')).toBeInTheDocument()
   })
 
