@@ -203,7 +203,7 @@ export function PlayerDetailPanel({
           <div className="px-4 pb-2 flex items-center gap-2">
             <span className="text-xs text-foreground-muted">{teamName}</span>
             <span className="text-xs text-foreground-dim">{'\u00B7'}</span>
-            <span className="text-xs text-foreground-muted font-mono">
+            <span className="text-xs text-foreground-muted">
               {'\u00A3'}
               {(player.now_cost / 10).toFixed(1)}m
             </span>
@@ -407,7 +407,7 @@ export function PlayerDetailPanel({
           <div className="space-y-3">
             <div className="text-xs text-foreground-muted">
               Budget:{' '}
-              <span className="font-mono">
+              <span>
                 {'\u00A3'}
                 {budget.toFixed(1)}m
               </span>

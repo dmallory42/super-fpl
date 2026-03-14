@@ -1352,7 +1352,7 @@ export function Planner() {
                             Plan {path.id}
                           </span>
                           {path.total_hits > 0 && (
-                            <span className="text-xs text-destructive font-mono">
+                            <span className="text-xs text-destructive">
                               {path.total_hits} hit{path.total_hits > 1 ? 's' : ''}
                             </span>
                           )}
@@ -1419,7 +1419,7 @@ export function Planner() {
                   <h3 className="text-sm font-bold tracking-wider uppercase text-foreground">
                     Advanced Settings
                   </h3>
-                  <span className="text-xs text-foreground-muted font-mono">
+                  <span className="text-xs text-foreground-muted">
                     solver + chips + constraints
                   </span>
                 </div>
@@ -1902,7 +1902,7 @@ export function Planner() {
                 <h3 className="text-sm font-bold tracking-wider uppercase text-foreground">
                   Player Explorer
                 </h3>
-                <span className="text-xs text-foreground-muted font-mono">
+                <span className="text-xs text-foreground-muted">
                   {predictionsRange.players.length} players
                 </span>
               </div>
