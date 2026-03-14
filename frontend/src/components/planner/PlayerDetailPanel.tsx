@@ -313,7 +313,7 @@ export function PlayerDetailPanel({
 
         {/* Projections tab */}
         {activeTab === 'projections' && (
-          <div className="animate-fade-in-up">
+          <div>
             {/* Column headers */}
             <div className="flex items-center px-2 pb-2 border-b border-border/30">
               <span className="w-12 text-[10px] uppercase tracking-widest text-foreground-dim">
