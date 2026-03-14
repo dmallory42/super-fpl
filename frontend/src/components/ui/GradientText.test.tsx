@@ -1,27 +1,26 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '../../test/utils'
-import { GradientText } from './GradientText'
+import { GradientText, TeletextText } from './GradientText'
 
-describe('GradientText', () => {
-  it('renders with default variant', () => {
-    render(<GradientText>Headline</GradientText>)
-
+describe('TeletextText', () => {
+  it('renders with default cyan color', () => {
+    render(<TeletextText>Headline</TeletextText>)
     expect(screen.getByText('Headline')).toBeInTheDocument()
   })
 
-  it('supports optional variant, element and className', () => {
+  it('supports color, element and className', () => {
     const { container } = render(
-      <GradientText
-        variant="custom"
-        customGradient="from-red-500 to-blue-500"
-        as="h2"
-        className="hero-text"
-      >
+      <TeletextText color="yellow" as="h2" className="hero-text">
         Custom
-      </GradientText>
+      </TeletextText>
     )
 
     expect(screen.getByText('Custom')).toBeInTheDocument()
     expect(container.querySelector('h2.hero-text')).toBeInTheDocument()
+  })
+
+  it('exports GradientText as backwards-compat alias', () => {
+    render(<GradientText>Legacy</GradientText>)
+    expect(screen.getByText('Legacy')).toBeInTheDocument()
   })
 })

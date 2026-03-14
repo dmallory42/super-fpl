@@ -1,35 +1,32 @@
 import { ReactNode } from 'react'
 
-interface GradientTextProps {
+type TeletextColor = 'cyan' | 'green' | 'yellow' | 'red' | 'blue' | 'magenta' | 'white'
+
+interface TeletextTextProps {
   children: ReactNode
-  variant?: 'primary' | 'accent' | 'custom'
+  color?: TeletextColor
   className?: string
   as?: 'span' | 'h1' | 'h2' | 'h3' | 'p' | 'div'
-  customGradient?: string
 }
 
-export function GradientText({
+const colorMap: Record<TeletextColor, string> = {
+  cyan: 'text-tt-cyan',
+  green: 'text-tt-green',
+  yellow: 'text-tt-yellow',
+  red: 'text-tt-red',
+  blue: 'text-tt-blue',
+  magenta: 'text-tt-magenta',
+  white: 'text-tt-white',
+}
+
+export function TeletextText({
   children,
-  variant = 'primary',
+  color = 'cyan',
   className = '',
   as: Component = 'span',
-  customGradient,
-}: GradientTextProps) {
-  const gradients = {
-    primary: 'from-fpl-green via-emerald-400 to-fpl-green',
-    accent: 'from-fpl-purple via-pink-400 to-highlight',
-    custom: customGradient || 'from-fpl-green to-fpl-purple',
-  }
-
-  return (
-    <Component
-      className={`
-        bg-gradient-to-r ${gradients[variant]}
-        bg-clip-text text-transparent
-        ${className}
-      `}
-    >
-      {children}
-    </Component>
-  )
+}: TeletextTextProps) {
+  return <Component className={`${colorMap[color]} ${className}`}>{children}</Component>
 }
+
+// Backwards compatibility alias
+export const GradientText = TeletextText
