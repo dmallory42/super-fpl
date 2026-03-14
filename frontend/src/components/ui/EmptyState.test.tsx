@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '../../test/utils'
-import { EmptyState, SearchIcon } from './EmptyState'
+import { EmptyState } from './EmptyState'
 
 describe('EmptyState', () => {
   it('renders required props', () => {
@@ -15,7 +15,6 @@ describe('EmptyState', () => {
       <EmptyState
         title="Nothing here"
         description="Try adjusting filters"
-        icon={<SearchIcon size={16} />}
         action={{ label: 'Retry', onClick }}
         className="empty-extra"
       />

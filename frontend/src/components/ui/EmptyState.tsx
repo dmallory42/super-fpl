@@ -11,30 +11,25 @@ interface EmptyStateProps {
   className?: string
 }
 
-export function EmptyState({ icon, title, description, action, className = '' }: EmptyStateProps) {
+export function EmptyState({ title, description, action, className = '' }: EmptyStateProps) {
   return (
     <div
-      className={`
-        flex flex-col items-center justify-center py-12 px-4 text-center
-        animate-fade-in-up
-        ${className}
-      `}
+      className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}
     >
-      {icon && <div className="mb-4 text-foreground-dim opacity-50">{icon}</div>}
-      <h3 className="font-display text-lg uppercase tracking-wider text-foreground mb-2">
-        {title}
-      </h3>
+      <div className="text-tt-dim mb-2">{'─'.repeat(20)}</div>
+      <h3 className="text-lg uppercase text-tt-cyan mb-2">{title}</h3>
       {description && <p className="text-foreground-muted text-sm max-w-md">{description}</p>}
       {action && (
         <button onClick={action.onClick} className="btn-primary mt-4">
           {action.label}
         </button>
       )}
+      <div className="text-tt-dim mt-2">{'─'.repeat(20)}</div>
     </div>
   )
 }
 
-// Common icon components for empty states
+// Keep icon exports for backwards compatibility (callers may still import them)
 export function SearchIcon({ size = 48 }: { size?: number }) {
   return (
     <svg
