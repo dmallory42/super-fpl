@@ -52,76 +52,85 @@ super-fpl/
 
 ## Visual Identity
 
-The frontend uses a **sports broadcast aesthetic** inspired by Sky Sports MNF and ESPN analysis graphics. Maintain this identity in all UI work.
+The frontend uses a **BBC Ceefax / Teletext aesthetic** — black background, pixel font, strict 8-color palette, block graphics, square corners, no gradients, no shadows. The site should feel like navigating Ceefax pages on a CRT television.
 
 ### Design Principles
-- **Bold & Athletic**: Condensed uppercase typography, angular elements, confident layouts
-- **Vibrant & Dynamic**: FPL green accents, gradient highlights, animated reveals
-- **Broadcast-Style**: Cards with accent bars, stat panels, layered depth
+- **Authentic Teletext**: Block characters, 1px solid borders, flat colors only
+- **Information-Dense**: Data-first layouts, no decorative elements
+- **Retro-Digital**: Square corners everywhere, no rounded edges, no shadows
 
 ### Typography
 ```css
---font-display: 'Oswald'      /* Headlines, labels - UPPERCASE, tracking-wider */
---font-body: 'Source Sans 3'  /* Body text, descriptions */
---font-mono: 'JetBrains Mono' /* Stats, numbers, prices */
+--font-teletext: 'VT323'           /* Primary — pixel font for everything */
+/* Alt: 'JetBrains Mono' via font toggle (html.font-mono-mode class) */
 ```
+Font toggle stored in `localStorage` key `superfpl-font`. Toggle component in App footer.
 
-### Color Palette
-| Variable | Value | Usage |
-|----------|-------|-------|
-| `--fpl-green` | `#00FF87` | Primary accent, highlights, success states, player cards |
-| `--fpl-purple` | Purple 280° | Secondary accent, chips, special features |
-| `--highlight` | Hot pink 340° | Emphasis, warnings |
-| `yellow-400` | Yellow | Captain badges |
-
-**Note:** All player cards use unified FPL green styling regardless of position. This creates a cohesive brand look rather than position-based color coding.
+### Color Palette (Teletext 8-Color)
+| Token | Value | Usage |
+|-------|-------|-------|
+| `tt-black` | `#000000` | Background |
+| `tt-white` | `#FFFFFF` | Primary text |
+| `tt-cyan` | `#00FFFF` | Headers, labels, links |
+| `tt-green` | `#00FF00` | Success, positive values |
+| `tt-yellow` | `#FFFF00` | Points, captain badges, highlights |
+| `tt-red` | `#FF0000` | Live indicators, negative values, warnings |
+| `tt-blue` | `#0000FF` | Secondary accent, info |
+| `tt-magenta` | `#FF00FF` | Chips, special features |
+| `tt-dim` | `#666666` | Muted/disabled text (only non-palette exception) |
 
 ### UI Components (`frontend/src/components/ui/`)
-- `StatPanel` - Angular stat display with accent bar, use for key metrics
-- `BroadcastCard` - Card with gradient header bar, use for sections
-- `GradientText` - Gradient-filled text for headlines
-- `LiveIndicator` - Animated red dot for live features
-- `TabNav` - Broadcast-style navigation tabs
-- `EmptyState` - Illustrated empty states with icons
-- `SkeletonLoader` - Shimmer loading placeholders
+- `StatPanel` - Cyan labels, yellow/white values, no accent bar
+- `BroadcastCard` - Solid color header blocks (cyan/yellow/red/blue/magenta), 1px borders
+- `TeletextText` / `GradientText` - Flat colored text (no gradients), color prop maps to tt-* tokens
+- `LiveIndicator` - Blinking red `●` with `animate-blink` (step-end timing)
+- `TabNav` - Colored-key navigation (CSS nth-child assigns teletext colors)
+- `EmptyState` - `─` dividers, cyan title, text-only
+- `SkeletonLoader` - Blinking `█` block characters instead of shimmer gradients
+
+### Pitch Components (`frontend/src/components/pitch/`)
+- `PitchLayout` - Black bg, dim green (`#006600`) field lines, `─── BENCH ───` label
+- `PitchPlayerCard` - Text blocks with 1px borders, no shirt graphics
 
 ### Animation Guidelines
-- Entry animations: `animate-fade-in-up` with staggered `animation-delay-*` classes
-- Captain badges: `animate-pulse-glow` for emphasis
-- Live elements: `animate-pulse-dot` for indicators
-- Loading: `animate-shimmer` for skeleton states
-- Use 50-100ms delays between staggered elements
+- **No entry animations** — no `animate-fade-in-up`, no staggered delays
+- Live elements: `animate-blink` with `step-end` timing function (authentic CRT blink)
+- Loading: blinking `█` characters
+- Keep animations minimal — teletext didn't animate
 
 ### Styling Patterns
 ```tsx
-// Headlines - always uppercase with tracking
-<h2 className="font-display text-2xl font-bold tracking-wider uppercase">
+// Headlines — uppercase, cyan
+<h2 className="text-tt-cyan text-2xl font-bold uppercase tracking-wider">
 
-// Stats - mono font, gradient for highlights
-<span className="font-mono text-2xl font-bold">
-<GradientText>{value}</GradientText>
+// Stats — yellow for values
+<span className="text-tt-yellow text-2xl font-bold">
 
 // Inputs
-<input className="input-broadcast" />
+<input className="input-broadcast" />  /* black bg, 1px cyan border */
 
 // Buttons
-<button className="btn-primary">  // Green gradient, uppercase
-<button className="btn-secondary"> // Surface with border
+<button className="btn-primary">   /* tt-cyan bg, black text */
+<button className="btn-secondary"> /* 1px border, tt-cyan text */
 
 // Cards with sections
-<BroadcastCard title="Section Title" accentColor="green">
+<BroadcastCard title="Section Title" accentColor="cyan">
 
-// Player cards - unified green styling
-<div className="bg-gradient-to-b from-fpl-green to-emerald-600">
-// Captain badges use yellow-400
+// Player cards — bordered text blocks
+<div className="border border-tt-cyan bg-black px-2 py-1">
+// Captain badges: text-tt-yellow (C), Vice: text-tt-cyan (V)
 ```
 
+### Ceefax Page Header
+The app header shows page numbers (P101, P201, P301, P401) per tab and a live clock — mimicking Ceefax page navigation.
+
 ### Don'ts
-- Don't use rounded-full for cards (use rounded-lg)
-- Don't use muted grays for primary actions
-- Don't skip entry animations on data-heavy sections
-- Don't mix font families within a single element
-- Don't use generic green (#22c55e) - use `fpl-green` for brand consistency
+- Don't use rounded corners (all borderRadius forced to 0px in Tailwind config)
+- Don't use gradients or shadows
+- Don't use entry/reveal animations
+- Don't use colors outside the 8-color teletext palette (+ tt-dim)
+- Don't use `font-display`, `font-body`, or `font-mono` — everything uses `font-teletext`
+- Don't use opacity for hover states — use color changes instead
 
 ## Workflow
 
