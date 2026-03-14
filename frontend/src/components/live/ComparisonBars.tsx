@@ -109,17 +109,14 @@ export function ComparisonBars({
   const trackPaddingBottomPx = 26
 
   return (
-    <div
-      className="space-y-3 md:space-y-4 animate-fade-in-up opacity-0"
-      style={{ animationDelay: `${animationDelay}ms` }}
-    >
+    <div className="space-y-3 md:space-y-4">
       {/* Race Track */}
       <div
         className="relative pt-10 md:pt-12"
         style={{ paddingBottom: `${trackPaddingBottomPx}px` }}
       >
         {/* The track line */}
-        <div className="absolute left-0 right-0 top-1/2 h-1 bg-gradient-to-r from-surface via-foreground-dim/30 to-surface rounded-full" />
+        <div className="absolute left-0 right-0 top-1/2 h-1 bg-foreground-dim/30" />
 
         {/* Track segments/notches */}
         <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 flex justify-between px-2">
@@ -137,7 +134,7 @@ export function ComparisonBars({
         </div>
 
         {/* Tier markers on the track */}
-        {comparisons.map((comp, idx) => {
+        {comparisons.map((comp) => {
           const config = TIER_CONFIG[comp.tier as Tier] || {
             abbrev: comp.tier,
             color: 'bg-slate-500',
@@ -148,22 +145,19 @@ export function ComparisonBars({
           return (
             <div
               key={comp.tier}
-              className="group absolute top-1/2 -translate-y-1/2 -translate-x-1/2 animate-fade-in-up opacity-0"
+              className="group absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
               data-testid={`tier-marker-${comp.tier}`}
               title={`${comp.tierLabel}: ${comp.avgPoints.toFixed(0)} pts`}
               aria-label={`${comp.tierLabel} average ${comp.avgPoints.toFixed(0)} points`}
               style={{
                 left: `${position}%`,
                 marginLeft: `${layout?.markerOffsetPx ?? 0}px`,
-                animationDelay: `${animationDelay + 200 + idx * 80}ms`,
               }}
             >
               {/* Marker */}
+              <div className={`w-3 h-3 ${config.color} ring-2 ring-background`} />
               <div
-                className={`w-3 h-3 rounded-full ${config.color} ring-2 ring-background shadow-md`}
-              />
-              <div
-                className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-mono text-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-background/90 px-1.5 py-0.5 text-[10px] text-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                 data-testid={`tier-tooltip-${comp.tier}`}
               >
                 {comp.tierLabel} {comp.avgPoints.toFixed(0)}
@@ -174,35 +168,32 @@ export function ComparisonBars({
 
         {/* User marker - the "car" in the race */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 animate-fade-in-up opacity-0"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
           style={{
             left: `${pointsToPercent(userPoints)}%`,
-            animationDelay: `${animationDelay + 100}ms`,
           }}
         >
           {/* Glow effect */}
-          <div className="absolute inset-0 w-6 h-6 -m-1.5 bg-fpl-green/20 rounded-full animate-pulse" />
+          <div className="absolute inset-0 w-6 h-6 -m-1.5 bg-tt-green/20" />
           {/* Marker */}
-          <div className="relative w-4 h-4 bg-fpl-green rounded-full ring-2 ring-background shadow-lg shadow-fpl-green/40" />
+          <div className="relative w-4 h-4 bg-tt-green ring-2 ring-background" />
           {/* Label above */}
           <div className="absolute bottom-full mb-1.5 md:mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-            <div className="font-display text-[11px] md:text-xs font-bold uppercase tracking-wide text-fpl-green">
+            <div className="text-[11px] md:text-xs font-bold uppercase tracking-wide text-tt-green">
               YOU
             </div>
-            <div className="font-mono text-[11px] md:text-xs font-bold text-fpl-green">
-              {userPoints}
-            </div>
+            <div className="text-[11px] md:text-xs font-bold text-tt-green">{userPoints}</div>
           </div>
         </div>
       </div>
 
       {/* Comparison summary */}
       <div className="grid grid-cols-2 gap-1.5 md:gap-2">
-        {comparisons.map((comp, idx) => {
+        {comparisons.map((comp) => {
           const isAhead = comp.difference > 0
           const isBehind = comp.difference < 0
           const deltaColorClass = isAhead
-            ? 'text-fpl-green'
+            ? 'text-tt-green'
             : isBehind
               ? 'text-destructive'
               : 'text-foreground-dim'
@@ -215,16 +206,15 @@ export function ComparisonBars({
             <div
               key={comp.tier}
               data-testid={`tier-summary-${comp.tier}`}
-              className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated animate-fade-in-up opacity-0"
-              style={{ animationDelay: `${animationDelay + 400 + idx * 50}ms` }}
+              className="flex items-center justify-between p-2 bg-surface-elevated"
             >
               <div className="flex items-center gap-1.5 md:gap-2">
-                <div className={`w-2 h-2 rounded-full ${config.color}`} />
-                <span className="font-display text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
+                <div className={`w-2 h-2 ${config.color}`} />
+                <span className="text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
                   {comp.tierLabel}
                 </span>
               </div>
-              <div className="font-mono text-sm md:text-base font-bold whitespace-nowrap">
+              <div className="text-sm md:text-base font-bold whitespace-nowrap">
                 <span className="text-foreground">{comp.avgPoints.toFixed(0)}</span>
                 <span className={deltaColorClass}> (</span>
                 <span className={deltaColorClass}>
@@ -249,7 +239,7 @@ export function ComparisonBars({
             <div className="pt-3 border-t border-border/50">
               {/* Header with tier selector */}
               <div className="flex items-center justify-between mb-3">
-                <div className="font-display text-xs uppercase tracking-wide text-foreground-muted">
+                <div className="text-xs uppercase tracking-wide text-foreground-muted">
                   Biggest Swings
                 </div>
                 {showTierSelector && (
@@ -259,9 +249,9 @@ export function ComparisonBars({
                       <button
                         key={tier.value}
                         onClick={() => onTierChange(tier.value)}
-                        className={`px-2 py-0.5 text-xs font-display uppercase tracking-wide rounded transition-colors ${
+                        className={`px-2 py-0.5 text-xs uppercase tracking-wide ${
                           selectedTier === tier.value
-                            ? 'bg-fpl-green/20 text-fpl-green'
+                            ? 'bg-tt-green/20 text-tt-green'
                             : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
                         }`}
                       >
@@ -275,23 +265,22 @@ export function ComparisonBars({
               <div key={selectedTier} className="grid grid-cols-2 gap-4">
                 {/* Gainers column */}
                 <div className="space-y-1.5">
-                  <div className="text-xs text-fpl-green font-display uppercase tracking-wide mb-1">
+                  <div className="text-xs text-tt-green uppercase tracking-wide mb-1">
                     ▲ Helping You
                   </div>
                   {gainers.length > 0 ? (
-                    gainers.map((player, idx) => (
+                    gainers.map((player) => (
                       <div
                         key={player.playerId}
-                        className="flex items-center justify-between text-xs animate-fade-in-up-fast opacity-0"
-                        style={{ animationDelay: `${idx * 20}ms` }}
+                        className="flex items-center justify-between text-xs"
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="text-foreground truncate">{player.name}</span>
-                          <span className="text-xs font-mono shrink-0 text-fpl-green">
+                          <span className="text-xs shrink-0 text-tt-green">
                             +{player.relativeEO.toFixed(0)}%
                           </span>
                         </div>
-                        <span className="font-mono font-bold text-fpl-green shrink-0 ml-2">
+                        <span className="font-bold text-tt-green shrink-0 ml-2">
                           +{player.impact.toFixed(1)}
                         </span>
                       </div>
@@ -303,15 +292,14 @@ export function ComparisonBars({
 
                 {/* Losers column */}
                 <div className="space-y-1.5">
-                  <div className="text-xs text-destructive font-display uppercase tracking-wide mb-1">
+                  <div className="text-xs text-destructive uppercase tracking-wide mb-1">
                     ▼ Hurting You
                   </div>
                   {losers.length > 0 ? (
-                    losers.map((player, idx) => (
+                    losers.map((player) => (
                       <div
                         key={player.playerId}
-                        className="flex items-center justify-between text-xs animate-fade-in-up-fast opacity-0"
-                        style={{ animationDelay: `${idx * 20}ms` }}
+                        className="flex items-center justify-between text-xs"
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span
@@ -319,11 +307,11 @@ export function ComparisonBars({
                           >
                             {player.name}
                           </span>
-                          <span className="text-xs font-mono shrink-0 text-destructive">
+                          <span className="text-xs shrink-0 text-destructive">
                             {player.relativeEO.toFixed(0)}%
                           </span>
                         </div>
-                        <span className="font-mono font-bold text-destructive shrink-0 ml-2">
+                        <span className="font-bold text-destructive shrink-0 ml-2">
                           {player.impact.toFixed(1)}
                         </span>
                       </div>
@@ -354,9 +342,7 @@ export function RankMovement({ currentRank, startingRank }: RankMovementProps) {
   if (!startingRank) {
     return (
       <div className="text-center">
-        <div className="font-mono text-2xl font-bold text-foreground">
-          ~{formatRank(currentRank)}
-        </div>
+        <div className="text-2xl font-bold text-foreground">~{formatRank(currentRank)}</div>
         <div className="text-xs text-foreground-dim">Est. Rank</div>
       </div>
     )
@@ -369,8 +355,8 @@ export function RankMovement({ currentRank, startingRank }: RankMovementProps) {
   return (
     <div className="text-center">
       <div
-        className={`font-mono text-2xl font-bold flex items-center justify-center gap-1 ${
-          isUp ? 'text-fpl-green' : isDown ? 'text-destructive' : 'text-foreground'
+        className={`text-2xl font-bold flex items-center justify-center gap-1 ${
+          isUp ? 'text-tt-green' : isDown ? 'text-destructive' : 'text-foreground'
         }`}
       >
         {isUp && '↑'}

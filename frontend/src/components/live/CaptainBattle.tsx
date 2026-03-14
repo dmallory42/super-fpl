@@ -28,9 +28,9 @@ interface CaptainOption {
 
 // Rank badge styles (1st, 2nd, 3rd get special treatment)
 const rankBadgeStyles: Record<number, string> = {
-  1: 'bg-gradient-to-br from-amber-400 to-amber-600 text-amber-950',
-  2: 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-800',
-  3: 'bg-gradient-to-br from-orange-400 to-orange-600 text-orange-950',
+  1: 'bg-amber-400 text-amber-950',
+  2: 'bg-slate-300 text-slate-800',
+  3: 'bg-orange-400 text-orange-950',
 }
 
 export function CaptainBattle({
@@ -115,7 +115,7 @@ export function CaptainBattle({
       {/* Tier selector */}
       <div className="flex items-center justify-between">
         {isDifferential && (
-          <span className="text-xs font-display uppercase tracking-wide text-fpl-green">
+          <span className="text-xs uppercase tracking-wide text-tt-green">
             Captain differential
           </span>
         )}
@@ -127,9 +127,9 @@ export function CaptainBattle({
                 <button
                   key={tier.value}
                   onClick={() => handleTierChange(tier.value)}
-                  className={`px-2 py-0.5 text-xs font-display uppercase tracking-wide rounded transition-colors ${
+                  className={`px-2 py-0.5 text-xs uppercase tracking-wide ${
                     activeTier === tier.value
-                      ? 'bg-fpl-purple/20 text-fpl-purple'
+                      ? 'bg-tt-magenta/20 text-tt-magenta'
                       : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
                   }`}
                 >
@@ -138,7 +138,7 @@ export function CaptainBattle({
               ))}
             </>
           ) : (
-            <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
+            <span className="text-xs uppercase tracking-wide text-foreground-muted">
               vs {activeTierLabel}
             </span>
           )}
@@ -148,32 +148,26 @@ export function CaptainBattle({
       {/* Captain list */}
       <div key={activeTier} className="space-y-1.5">
         {captainOptions.length > 0 &&
-          captainOptions.map((captain, idx) => {
+          captainOptions.map((captain) => {
             const barWidth = maxCaptaincy > 0 ? (captain.captainPct / maxCaptaincy) * 100 : 0
 
             return (
               <div
                 key={captain.playerId}
                 className={`
-                  relative p-2 rounded-lg text-sm overflow-hidden
-                  animate-fade-in-up-fast opacity-0
+                  relative p-2 text-sm overflow-hidden
                   ${
                     captain.isUserCaptain
-                      ? 'bg-fpl-green/10 ring-1 ring-fpl-green/30'
+                      ? 'bg-tt-green/10 ring-1 ring-tt-green/30'
                       : 'bg-surface-elevated'
                   }
                 `}
-                style={{ animationDelay: `${idx * 40}ms` }}
               >
-                {/* Captaincy bar with gradient */}
+                {/* Captaincy bar */}
                 <div
                   className={`
-                    absolute inset-y-0 left-0 transition-all duration-500 ease-out
-                    ${
-                      captain.isUserCaptain
-                        ? 'bg-gradient-to-r from-fpl-green/30 to-fpl-green/10'
-                        : 'bg-gradient-to-r from-fpl-purple/25 to-fpl-purple/5'
-                    }
+                    absolute inset-y-0 left-0
+                    ${captain.isUserCaptain ? 'bg-tt-green/20' : 'bg-tt-magenta/15'}
                   `}
                   style={{ width: `${barWidth}%` }}
                 />
@@ -183,7 +177,7 @@ export function CaptainBattle({
                   {/* Rank badge */}
                   <span
                     className={`
-                    inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-mono font-bold shrink-0
+                    inline-flex items-center justify-center w-5 h-5 text-[9px] font-bold shrink-0
                     ${rankBadgeStyles[captain.rank] || 'bg-foreground/10 text-foreground-muted'}
                   `}
                   >
@@ -192,9 +186,9 @@ export function CaptainBattle({
 
                   {/* Name */}
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    {captain.isUserCaptain && <span className="text-yellow-400 text-xs">©</span>}
+                    {captain.isUserCaptain && <span className="text-tt-yellow text-xs">©</span>}
                     <span
-                      className={`truncate ${captain.isUserCaptain ? 'text-fpl-green font-medium' : 'text-foreground'}`}
+                      className={`truncate ${captain.isUserCaptain ? 'text-tt-green font-medium' : 'text-foreground'}`}
                     >
                       {captain.name}
                     </span>
@@ -202,7 +196,7 @@ export function CaptainBattle({
 
                   {/* Percentage */}
                   <span
-                    className={`font-mono font-bold text-base shrink-0 ${captain.isUserCaptain ? 'text-fpl-green' : 'text-fpl-purple'}`}
+                    className={`font-bold text-base shrink-0 ${captain.isUserCaptain ? 'text-tt-green' : 'text-tt-magenta'}`}
                   >
                     {captain.captainPct.toFixed(0)}%
                   </span>

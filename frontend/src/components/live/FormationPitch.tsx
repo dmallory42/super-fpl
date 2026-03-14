@@ -100,14 +100,14 @@ export function FormationPitch({
         if (customXMins !== undefined) {
           extraLines.push({
             text: `${customXMins}m`,
-            className: 'text-fpl-green text-xs font-mono mt-0.5',
+            className: 'text-tt-green text-xs mt-0.5',
           })
         }
         if (showEffectiveOwnership && player.effective_ownership) {
           extraLines.push({
             text: `EO: ${player.effective_ownership.effective_ownership.toFixed(0)}%`,
-            className: `text-xs mt-0.5 font-mono font-medium ${
-              player.effective_ownership.points_swing > 0 ? 'text-destructive' : 'text-fpl-green'
+            className: `text-xs mt-0.5 font-medium ${
+              player.effective_ownership.points_swing > 0 ? 'text-destructive' : 'text-tt-green'
             }`,
           })
         }
@@ -117,7 +117,7 @@ export function FormationPitch({
           teamName,
           displayPoints:
             typeof displayPoints === 'number' ? displayPoints.toFixed(1) : String(displayPoints),
-          pointsClassName: hasOverride ? 'text-fpl-green' : '',
+          pointsClassName: hasOverride ? 'text-tt-green' : '',
           extraLines,
           isSelected: selectedPlayer === player.player_id,
           showSelectionOutline:

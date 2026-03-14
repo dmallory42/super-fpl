@@ -449,11 +449,9 @@ export function Live() {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="animate-fade-in-up">
+      <div>
         <div className="flex items-center gap-3 mb-2">
-          <h2 className="font-display text-2xl font-bold tracking-wider text-foreground">
-            Live Gameweek
-          </h2>
+          <h2 className="text-2xl font-bold tracking-wider text-foreground">Live Gameweek</h2>
           {gwData?.isLive && <LiveIndicator size="lg" />}
           {managerId && (
             <button onClick={handleClearManager} className="ml-auto btn-primary">
@@ -479,7 +477,7 @@ export function Live() {
         )}
         {gwData && gwData.totalMatches > 0 && (
           <div
-            className="flex h-1.5 mt-2 rounded-full overflow-hidden bg-surface-elevated max-w-xs"
+            className="flex h-1.5 mt-2 overflow-hidden bg-surface-elevated max-w-xs"
             title={`${gwData.matchesPlayed} finished, ${gwData.matchesInProgress} live, ${gwData.totalMatches - gwData.matchesPlayed - gwData.matchesInProgress} upcoming`}
           >
             {gwData.matchesPlayed > 0 && (
@@ -490,7 +488,7 @@ export function Live() {
             )}
             {gwData.matchesInProgress > 0 && (
               <div
-                className="bg-fpl-green animate-pulse"
+                className="bg-tt-green animate-blink"
                 style={{ width: `${(gwData.matchesInProgress / gwData.totalMatches) * 100}%` }}
               />
             )}
@@ -500,7 +498,7 @@ export function Live() {
 
       {/* Manager Input - Collapsible when loaded */}
       {!managerId && (
-        <div className="animate-fade-in-up animation-delay-100">
+        <div>
           <div className="flex gap-2 max-w-md">
             <FormInput
               type="text"
@@ -528,7 +526,7 @@ export function Live() {
 
       {/* Error State */}
       {managerError && (
-        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
+        <div className="p-4 bg-destructive/10 border border-destructive/30 text-destructive">
           {managerError.message || 'Failed to load live data'}
         </div>
       )}
@@ -605,8 +603,8 @@ export function Live() {
 
           {/* Auto-subs indicator */}
           {processedSquad.autoSubs.length > 0 && (
-            <div className="flex items-center gap-2 text-sm text-foreground-muted animate-fade-in-up">
-              <span className="text-fpl-green">↓↑</span>
+            <div className="flex items-center gap-2 text-sm text-foreground-muted">
+              <span className="text-tt-green">↓↑</span>
               <span>
                 {processedSquad.autoSubs.length} auto-sub
                 {processedSquad.autoSubs.length > 1 ? 's' : ''} applied
@@ -626,8 +624,8 @@ export function Live() {
           </BroadcastCard>
 
           {/* Global tier context */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-surface-elevated/70">
-            <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 bg-surface-elevated/70">
+            <span className="text-xs uppercase tracking-wide text-foreground-muted">
               Compare Against
             </span>
             <div className="flex items-center gap-1 flex-wrap">
@@ -635,9 +633,9 @@ export function Live() {
                 <button
                   key={tier.value}
                   onClick={() => setComparisonTier(tier.value)}
-                  className={`px-2 py-0.5 text-xs font-display uppercase tracking-wide rounded transition-colors ${
+                  className={`px-2 py-0.5 text-xs uppercase tracking-wide ${
                     comparisonTier === tier.value
-                      ? 'bg-fpl-green/25 text-fpl-green ring-1 ring-fpl-green/30'
+                      ? 'bg-tt-green/25 text-tt-green ring-1 ring-tt-cyan/30'
                       : 'text-foreground-dim hover:text-foreground hover:bg-surface'
                   }`}
                 >
@@ -673,21 +671,21 @@ export function Live() {
               />
               {effectivePlayersPlayed && (
                 <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
-                  <div className="font-display text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted mb-2">
+                  <div className="text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted mb-2">
                     Effective Players Played
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 md:gap-2">
                     <div
                       data-testid="effective-players-you"
-                      className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated"
+                      className="flex items-center justify-between p-2 bg-surface-elevated"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-fpl-green" />
-                        <span className="font-display text-[11px] md:text-xs uppercase tracking-wide text-fpl-green">
+                        <div className="w-2 h-2 bg-tt-green" />
+                        <span className="text-[11px] md:text-xs uppercase tracking-wide text-tt-green">
                           You
                         </span>
                       </div>
-                      <div className="font-mono text-sm md:text-base text-foreground">
+                      <div className="text-sm md:text-base text-foreground">
                         {effectivePlayersPlayed.you.played.toFixed(1)}/
                         {effectivePlayersPlayed.you.total.toFixed(1)}
                       </div>
@@ -696,17 +694,15 @@ export function Live() {
                       <div
                         key={tierData.tier}
                         data-testid={`effective-players-${tierData.tier}`}
-                        className="flex items-center justify-between p-2 rounded-lg bg-surface-elevated"
+                        className="flex items-center justify-between p-2 bg-surface-elevated"
                       >
                         <div className="flex items-center gap-2">
-                          <div
-                            className={`w-2 h-2 rounded-full ${TIER_CONFIG[tierData.tier].color}`}
-                          />
-                          <span className="font-display text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
+                          <div className={`w-2 h-2 ${TIER_CONFIG[tierData.tier].color}`} />
+                          <span className="text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
                             {tierData.label}
                           </span>
                         </div>
-                        <div className="font-mono text-sm md:text-base text-foreground">
+                        <div className="text-sm md:text-base text-foreground">
                           {tierData.played.toFixed(1)}/{tierData.total.toFixed(1)}
                         </div>
                       </div>
@@ -717,7 +713,7 @@ export function Live() {
             </BroadcastCard>
 
             {/* Key Swings */}
-            <BroadcastCard title="Key Swings" accentColor="purple" animationDelay={350}>
+            <BroadcastCard title="Key Swings" accentColor="magenta" animationDelay={350}>
               <CaptainBattle
                 userCaptainId={userCaptain?.playerId}
                 samples={samplesData?.samples}
@@ -753,7 +749,7 @@ export function Live() {
             </BroadcastCard>
 
             {/* Fixtures */}
-            <BroadcastCard title="Fixtures" accentColor="purple" animationDelay={450}>
+            <BroadcastCard title="Fixtures" accentColor="magenta" animationDelay={450}>
               <FixtureScores
                 fixtureData={gameweekData}
                 teamsMap={teamsMap}
@@ -766,8 +762,8 @@ export function Live() {
 
           {/* Advanced */}
           {varianceData && (
-            <details className="rounded-lg border border-border/40 bg-surface-elevated/30">
-              <summary className="cursor-pointer px-3 md:px-4 py-2.5 md:py-3 font-display text-xs md:text-sm uppercase tracking-wider text-foreground-muted">
+            <details className="border border-border/40 bg-surface-elevated/30">
+              <summary className="cursor-pointer px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm uppercase tracking-wider text-foreground-muted">
                 Variance
               </summary>
               <div className="px-3 md:px-4 pb-3 md:pb-4 pt-1">

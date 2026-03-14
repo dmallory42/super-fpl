@@ -162,7 +162,7 @@ describe('FormationPitch', () => {
         <FormationPitch players={players} teams={mockTeams} selectedPlayer={1} />
       )
 
-      expect(container.querySelector('.border-fpl-green\\/60')).toBeInTheDocument()
+      expect(container.querySelector('.border-tt-green\\/60')).toBeInTheDocument()
     })
   })
 

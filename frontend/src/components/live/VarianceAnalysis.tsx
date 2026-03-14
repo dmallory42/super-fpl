@@ -33,27 +33,25 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
       <div className="flex items-center justify-between">
         {/* Expected */}
         <div className="text-center">
-          <div className="font-mono text-2xl font-bold text-foreground-muted">
+          <div className="text-2xl font-bold text-foreground-muted">
             {totalPredicted.toFixed(1)}
           </div>
-          <div className="text-xs font-display uppercase tracking-wide text-foreground-dim">
-            Expected
-          </div>
+          <div className="text-xs uppercase tracking-wide text-foreground-dim">Expected</div>
         </div>
 
         {/* Variance indicator */}
         <div className="text-center px-4">
           <div
-            className={`font-mono text-xl font-bold ${
-              isLucky ? 'text-fpl-green' : isUnlucky ? 'text-destructive' : 'text-foreground-muted'
+            className={`text-xl font-bold ${
+              isLucky ? 'text-tt-green' : isUnlucky ? 'text-destructive' : 'text-foreground-muted'
             }`}
           >
             {totalVariance > 0 ? '+' : ''}
             {totalVariance.toFixed(1)}
           </div>
           <div
-            className={`text-xs font-display uppercase tracking-wide ${
-              isLucky ? 'text-fpl-green' : isUnlucky ? 'text-destructive' : 'text-foreground-dim'
+            className={`text-xs uppercase tracking-wide ${
+              isLucky ? 'text-tt-green' : isUnlucky ? 'text-destructive' : 'text-foreground-dim'
             }`}
           >
             {varianceLabel}
@@ -63,24 +61,22 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
         {/* Actual */}
         <div className="text-center">
           <div
-            className={`font-mono text-2xl font-bold ${
-              isLucky ? 'text-fpl-green' : isUnlucky ? 'text-destructive' : 'text-foreground'
+            className={`text-2xl font-bold ${
+              isLucky ? 'text-tt-green' : isUnlucky ? 'text-destructive' : 'text-foreground'
             }`}
           >
             {totalActual}
           </div>
-          <div className="text-xs font-display uppercase tracking-wide text-foreground-dim">
-            Actual
-          </div>
+          <div className="text-xs uppercase tracking-wide text-foreground-dim">Actual</div>
         </div>
       </div>
 
       {/* Variance meter bar */}
-      <div className="relative h-2 bg-surface-elevated rounded-full overflow-hidden">
+      <div className="relative h-2 bg-surface-elevated overflow-hidden">
         <div
-          className={`absolute inset-y-0 transition-all duration-500 ${
+          className={`absolute inset-y-0 ${
             isLucky
-              ? 'bg-fpl-green left-1/2'
+              ? 'bg-tt-green left-1/2'
               : isUnlucky
                 ? 'bg-destructive right-1/2'
                 : 'bg-foreground-dim'
@@ -98,34 +94,28 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
       {/* Player breakdown */}
       {sortedPlayers.length > 0 && (
         <div className="pt-3 border-t border-border/50">
-          <div className="text-xs text-foreground-dim font-display uppercase tracking-wide mb-2">
+          <div className="text-xs text-foreground-dim uppercase tracking-wide mb-2">
             Player Breakdown
           </div>
           <div className="space-y-1.5">
-            {sortedPlayers.map((player, idx) => {
+            {sortedPlayers.map((player) => {
               const variance = Math.round((player.actual - player.predicted) * 10) / 10
               const isPositive = variance > 0
               const isNegative = variance < 0
 
               return (
-                <div
-                  key={player.playerId}
-                  className="flex items-center justify-between text-sm animate-fade-in-up-fast opacity-0"
-                  style={{ animationDelay: `${idx * 30}ms` }}
-                >
+                <div key={player.playerId} className="flex items-center justify-between text-sm">
                   <span className="text-foreground truncate flex-1">{player.name}</span>
                   <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono text-foreground-muted w-8 text-right">
+                    <span className="text-foreground-muted w-8 text-right">
                       {player.predicted.toFixed(1)}
                     </span>
                     <span className="text-foreground-dim">→</span>
-                    <span className="font-mono text-foreground w-6 text-right">
-                      {player.actual}
-                    </span>
+                    <span className="text-foreground w-6 text-right">{player.actual}</span>
                     <span
-                      className={`font-mono font-bold w-10 text-right ${
+                      className={`font-bold w-10 text-right ${
                         isPositive
-                          ? 'text-fpl-green'
+                          ? 'text-tt-green'
                           : isNegative
                             ? 'text-destructive'
                             : 'text-foreground-muted'

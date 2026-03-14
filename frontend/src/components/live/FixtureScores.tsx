@@ -27,9 +27,9 @@ interface PlayerEvent {
 
 // Medal colors by bonus points value (3 = gold, 2 = silver, 1 = bronze)
 const bonusMedalStyles: Record<number, string> = {
-  3: 'bg-gradient-to-br from-amber-400 to-amber-600 text-amber-950 shadow-amber-500/30', // Gold
-  2: 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-800 shadow-slate-400/30', // Silver
-  1: 'bg-gradient-to-br from-orange-400 to-orange-600 text-orange-950 shadow-orange-500/30', // Bronze
+  3: 'bg-amber-400 text-amber-950', // Gold
+  2: 'bg-slate-300 text-slate-800', // Silver
+  1: 'bg-orange-400 text-orange-950', // Bronze
 }
 
 export function FixtureScores({
@@ -183,8 +183,6 @@ export function FixtureScores({
     return result
   })()
 
-  let fixtureIdx = 0
-
   return (
     <div className="space-y-3">
       <div className="text-xs text-foreground-dim px-1">
@@ -194,14 +192,13 @@ export function FixtureScores({
         <div key={group.label} className="space-y-1.5">
           <div className="flex items-center gap-2 px-1">
             {group.isLiveGroup && (
-              <span className="w-1.5 h-1.5 rounded-full bg-fpl-green animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-tt-green animate-blink" />
             )}
-            <span className="text-xs font-display uppercase tracking-wide text-foreground-dim">
+            <span className="text-xs uppercase tracking-wide text-foreground-dim">
               {group.label}
             </span>
           </div>
           {group.fixtures.map((fixture) => {
-            const idx = fixtureIdx++
             const homeTeam = teamsMap.get(fixture.home_club_id) || '???'
             const awayTeam = teamsMap.get(fixture.away_club_id) || '???'
             const isLive = hasLiveClock(fixture)
@@ -236,21 +233,19 @@ export function FixtureScores({
                   onClick={() => hasDetails && setExpandedFixture(isExpanded ? null : fixture.id)}
                   disabled={!hasDetails}
                   className={`
-                w-full flex items-center justify-between p-2 rounded-lg text-xs transition-all duration-200
-                animate-fade-in-up-fast opacity-0
+                w-full flex items-center justify-between p-2 text-xs
                 ${
                   isLive
-                    ? 'bg-gradient-to-r from-fpl-green/5 via-fpl-green/10 to-fpl-green/5 ring-1 ring-fpl-green/40'
+                    ? 'bg-tt-green/10 ring-1 ring-tt-green/40'
                     : 'bg-surface-elevated hover:bg-surface-elevated/80'
                 }
                 ${hasDetails ? 'cursor-pointer' : 'cursor-default'}
               `}
-                  style={{ animationDelay: `${idx * 30}ms` }}
                 >
                   {/* Home team */}
                   <div className="flex-1 text-right pr-2">
                     <span
-                      className={`font-display text-sm uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
+                      className={`text-sm uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
                     >
                       {homeTeam}
                     </span>
@@ -259,40 +254,40 @@ export function FixtureScores({
                   {/* Score block */}
                   <div
                     className={`
-                flex items-center gap-1 px-3 py-1 min-w-[90px] justify-center rounded
-                ${isLive ? 'bg-fpl-green/10' : isFinished ? 'bg-surface/50' : ''}
+                flex items-center gap-1 px-3 py-1 min-w-[90px] justify-center
+                ${isLive ? 'bg-tt-green/10' : isFinished ? 'bg-surface/50' : ''}
               `}
                   >
                     {isUpcoming ? (
-                      <span className="font-mono text-sm text-foreground-dim">
+                      <span className="text-sm text-foreground-dim">
                         {formatKickoffTime(fixture.kickoff_time)}
                       </span>
                     ) : (
                       <>
                         <span
-                          className={`font-mono text-base font-bold ${isLive ? 'text-fpl-green' : 'text-foreground'}`}
+                          className={`text-base font-bold ${isLive ? 'text-tt-green' : 'text-foreground'}`}
                         >
                           {fixture.home_score ?? 0}
                         </span>
                         <span
-                          className={`text-xs ${isLive ? 'text-fpl-green/60' : 'text-foreground-dim'}`}
+                          className={`text-xs ${isLive ? 'text-tt-green/60' : 'text-foreground-dim'}`}
                         >
                           –
                         </span>
                         <span
-                          className={`font-mono text-base font-bold ${isLive ? 'text-fpl-green' : 'text-foreground'}`}
+                          className={`text-base font-bold ${isLive ? 'text-tt-green' : 'text-foreground'}`}
                         >
                           {fixture.away_score ?? 0}
                         </span>
                       </>
                     )}
                     {isLive ? (
-                      <span className="text-xs text-fpl-green font-mono ml-1 animate-pulse font-medium">
+                      <span className="text-xs text-tt-green ml-1 animate-blink font-medium">
                         {fixture.minutes}'
                       </span>
                     ) : null}
                     {isFinished ? (
-                      <span className="text-xs text-foreground-dim font-display uppercase ml-1 tracking-wide">
+                      <span className="text-xs text-foreground-dim uppercase ml-1 tracking-wide">
                         FT
                       </span>
                     ) : null}
@@ -301,13 +296,13 @@ export function FixtureScores({
                   {/* Away team */}
                   <div className="flex-1 text-left pl-2 flex items-center gap-1.5">
                     <span
-                      className={`font-display text-sm uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
+                      className={`text-sm uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
                     >
                       {awayTeam}
                     </span>
                     {hasDetails && (
                       <span
-                        className={`text-xs text-foreground-dim/60 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`text-xs text-foreground-dim/60 ${isExpanded ? 'rotate-180' : ''}`}
                       >
                         ▼
                       </span>
@@ -317,7 +312,7 @@ export function FixtureScores({
 
                 {/* Expanded details */}
                 {isExpanded && hasDetails && (
-                  <div className="mt-1 mx-1 p-3 bg-gradient-to-b from-surface to-surface/50 rounded-lg text-xs space-y-3 animate-fade-in-up-fast border border-border/20">
+                  <div className="mt-1 mx-1 p-3 bg-surface text-xs space-y-3 border border-border/20">
                     {/* Scorers and events */}
                     {(homeEvents.length > 0 || awayEvents.length > 0) && (
                       <div className="grid grid-cols-2 gap-4">
@@ -368,7 +363,7 @@ export function FixtureScores({
                                   </span>
                                 )}
                                 {isLive && (
-                                  <span className="text-[10px] font-mono text-foreground-dim ml-1">
+                                  <span className="text-[10px] text-foreground-dim ml-1">
                                     BPS {event.bps}
                                   </span>
                                 )}
@@ -424,7 +419,7 @@ export function FixtureScores({
                                   </span>
                                 )}
                                 {isLive && (
-                                  <span className="text-[10px] font-mono text-foreground-dim ml-1">
+                                  <span className="text-[10px] text-foreground-dim ml-1">
                                     BPS {event.bps}
                                   </span>
                                 )}
@@ -438,7 +433,7 @@ export function FixtureScores({
                     {/* Bonus predictions with medal badges */}
                     {bonusPlayers.length > 0 && (
                       <div className="pt-2 border-t border-border/30">
-                        <div className="text-xs text-foreground-dim font-display uppercase tracking-wide mb-2">
+                        <div className="text-xs text-foreground-dim uppercase tracking-wide mb-2">
                           Bonus Points
                         </div>
                         <div className="flex flex-wrap gap-3">
@@ -448,7 +443,7 @@ export function FixtureScores({
                               <div key={bp.player_id} className="flex items-center gap-1.5">
                                 <span
                                   className={`
-                              inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-mono font-bold shadow-md
+                              inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold
                               ${bonusMedalStyles[bp.predicted_bonus] || 'bg-foreground/10 text-foreground-muted'}
                             `}
                                 >

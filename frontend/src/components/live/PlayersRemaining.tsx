@@ -98,49 +98,37 @@ export function PlayersRemaining({
               strokeWidth="3"
               strokeLinecap="round"
               strokeDasharray={`${progress} 100`}
-              className="text-fpl-green transition-all duration-500"
+              className="text-tt-green"
             />
           </svg>
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span
-              className={`font-mono text-xl font-bold ${yourPlayersLeft > 0 ? 'text-fpl-green' : 'text-foreground-muted'}`}
+              className={`text-xl font-bold ${yourPlayersLeft > 0 ? 'text-tt-green' : 'text-foreground-muted'}`}
             >
               {yourPlayersLeft}
             </span>
-            <span className="text-[11px] text-foreground-dim font-display uppercase tracking-wide">
-              Left
-            </span>
+            <span className="text-[11px] text-foreground-dim uppercase tracking-wide">Left</span>
           </div>
         </div>
 
         {/* Stats */}
         <div className="space-y-2">
           <div className="flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold text-foreground">
-              {playersFinished.length}
-            </span>
-            <span className="text-xs text-foreground-dim font-display uppercase tracking-wide">
-              Finished
-            </span>
+            <span className="text-2xl font-bold text-foreground">{playersFinished.length}</span>
+            <span className="text-xs text-foreground-dim uppercase tracking-wide">Finished</span>
           </div>
 
           {avgPlayersLeft !== null && (
             <div className="flex items-baseline gap-2">
-              <span className="font-mono text-lg text-foreground-muted">
-                {avgPlayersLeft.toFixed(1)}
-              </span>
-              <span className="text-xs text-foreground-dim font-display uppercase tracking-wide">
-                10K Avg
-              </span>
+              <span className="text-lg text-foreground-muted">{avgPlayersLeft.toFixed(1)}</span>
+              <span className="text-xs text-foreground-dim uppercase tracking-wide">10K Avg</span>
             </div>
           )}
 
           {/* Advantage indicator */}
           {diff !== null && Math.abs(diff) >= 0.5 && (
-            <div
-              className={`text-xs font-mono ${diff > 0 ? 'text-fpl-green' : 'text-destructive'}`}
-            >
+            <div className={`text-xs ${diff > 0 ? 'text-tt-green' : 'text-destructive'}`}>
               {diff > 0 ? '▲' : '▼'} {Math.abs(diff).toFixed(1)} vs avg
             </div>
           )}
@@ -150,31 +138,32 @@ export function PlayersRemaining({
       {/* Players left to play */}
       {playersLeft.length > 0 && (
         <div className="pt-3 border-t border-border/50">
-          <div className="text-xs text-foreground-dim font-display uppercase tracking-wide mb-2">
+          <div className="text-xs text-foreground-dim uppercase tracking-wide mb-2">
             Still to play
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {playersLeft.map((player, idx) => {
+            {playersLeft.map((player) => {
               const info = playersMap.get(player.player_id)
-              const isPlaying = info ? getTeamFixtureStatus(fixtureData, info.team) === 'playing' : false
+              const isPlaying = info
+                ? getTeamFixtureStatus(fixtureData, info.team) === 'playing'
+                : false
               const position = info?.element_type ? positionNames[info.element_type] : ''
 
               return (
                 <div
                   key={player.player_id}
                   className={`
-                    flex items-center gap-1 px-2 py-1 rounded text-xs animate-fade-in-up-fast opacity-0
+                    flex items-center gap-1 px-2 py-1 text-xs
                     ${
                       isPlaying
-                        ? 'bg-gradient-to-r from-fpl-green/20 to-fpl-green/10 text-fpl-green ring-1 ring-fpl-green/30'
+                        ? 'bg-tt-green/15 text-tt-green ring-1 ring-tt-green/30'
                         : 'bg-surface-elevated text-foreground-muted'
                     }
                   `}
-                  style={{ animationDelay: `${idx * 30}ms` }}
                 >
                   {position && (
                     <span
-                      className={`text-xs font-display uppercase ${isPlaying ? 'text-fpl-green/70' : 'text-foreground-dim'}`}
+                      className={`text-xs uppercase ${isPlaying ? 'text-tt-green/70' : 'text-foreground-dim'}`}
                     >
                       {position}
                     </span>
@@ -182,9 +171,9 @@ export function PlayersRemaining({
                   <span className={isPlaying ? 'font-medium' : ''}>
                     {info?.web_name || 'Unknown'}
                   </span>
-                  {player.is_captain && <span className="text-yellow-400">©</span>}
+                  {player.is_captain && <span className="text-tt-yellow">©</span>}
                   {isPlaying && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-fpl-green animate-pulse" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-tt-green animate-blink" />
                   )}
                 </div>
               )

@@ -17,24 +17,18 @@ export function GoodWeekBanner({ margin, rankMovement }: GoodWeekBannerProps) {
   const { message, sub } = getTier(margin)
 
   return (
-    <div className="animate-fade-in-up relative overflow-hidden rounded-lg border border-fpl-green/40 animate-pulse-glow">
-      <div className="bg-gradient-to-r from-fpl-green/20 via-fpl-green/10 to-fpl-green/20 px-4 py-3 flex items-center justify-between">
+    <div className="relative overflow-hidden border border-tt-green/40">
+      <div className="bg-tt-green/15 px-4 py-3 flex items-center justify-between">
         <div>
-          <h3 className="font-display text-lg font-bold tracking-wider uppercase text-fpl-green">
-            {message}
-          </h3>
+          <h3 className="text-lg font-bold tracking-wider uppercase text-tt-green">{message}</h3>
           <p className="text-xs text-foreground-muted mt-0.5">
-            {sub} —{' '}
-            <span className="font-mono font-bold text-fpl-green">+{Math.round(margin)}</span> pts
-            ahead
+            {sub} — <span className="font-bold text-tt-green">+{Math.round(margin)}</span> pts ahead
           </p>
         </div>
         {rankMovement != null && rankMovement > 0 && (
           <div className="text-right">
-            <span className="font-mono text-lg font-bold text-fpl-green">
-              {formatRank(rankMovement)}
-            </span>
-            <p className="text-[10px] text-foreground-muted font-display uppercase tracking-wider">
+            <span className="text-lg font-bold text-tt-green">{formatRank(rankMovement)}</span>
+            <p className="text-[10px] text-foreground-muted uppercase tracking-wider">
               places gained
             </p>
           </div>

@@ -26,7 +26,7 @@ function categorizePlayer(eo: number): Category {
 }
 
 const categoryConfig: Record<Category, { label: string; color: string }> = {
-  differential: { label: 'Differential', color: 'text-fpl-purple' },
+  differential: { label: 'Differential', color: 'text-tt-magenta' },
   template: { label: 'Template', color: 'text-foreground-muted' },
   moderate: { label: 'Moderate', color: 'text-foreground' },
 }
@@ -52,7 +52,7 @@ export function DifferentialAnalysis({
       {/* Header */}
       <div className="flex items-center justify-between">
         {showTierLabel ? (
-          <span className="text-xs font-display uppercase tracking-wide text-foreground-muted">
+          <span className="text-xs uppercase tracking-wide text-foreground-muted">
             vs {tierLabel}
           </span>
         ) : (
@@ -62,7 +62,7 @@ export function DifferentialAnalysis({
 
       {/* Player list */}
       <div className="space-y-1.5">
-        {sortedPlayers.map((player, idx) => {
+        {sortedPlayers.map((player) => {
           const category = categorizePlayer(player.eo)
           const config = categoryConfig[category]
           const roi = player.points > 0 ? player.impact / player.points : 0
@@ -73,20 +73,17 @@ export function DifferentialAnalysis({
             <div
               key={player.playerId}
               className={`
-                p-2 rounded-lg text-xs animate-fade-in-up-fast opacity-0
-                ${category === 'differential' ? 'bg-fpl-purple/10 ring-1 ring-fpl-purple/30' : 'bg-surface-elevated'}
+                p-2 text-xs
+                ${category === 'differential' ? 'bg-tt-magenta/10 ring-1 ring-tt-magenta/30' : 'bg-surface-elevated'}
               `}
-              style={{ animationDelay: `${idx * 30}ms` }}
             >
               {/* Row 1: Name and category */}
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  {isCaptain && <span className="text-yellow-400 text-sm">©</span>}
+                  {isCaptain && <span className="text-tt-yellow text-sm">©</span>}
                   <span className="text-foreground font-medium truncate">{player.name}</span>
                 </div>
-                <span
-                  className={`text-xs font-display uppercase tracking-wide shrink-0 ${config.color}`}
-                >
+                <span className={`text-xs uppercase tracking-wide shrink-0 ${config.color}`}>
                   {config.label}
                 </span>
               </div>
@@ -94,26 +91,26 @@ export function DifferentialAnalysis({
               {/* Row 2: Metrics */}
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-foreground-muted">{player.points} pts</span>
+                  <span className="text-foreground-muted">{player.points} pts</span>
                   <span
-                    className={`font-mono ${category === 'differential' ? 'text-fpl-purple' : 'text-foreground-dim'}`}
+                    className={`${category === 'differential' ? 'text-tt-magenta' : 'text-foreground-dim'}`}
                   >
                     {player.eo.toFixed(0)}% EO
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span
-                    className={`font-mono font-bold ${
-                      isPositiveImpact ? 'text-fpl-green' : 'text-destructive'
+                    className={`font-bold ${
+                      isPositiveImpact ? 'text-tt-green' : 'text-destructive'
                     }`}
                   >
                     {player.impact > 0 ? '+' : ''}
                     {player.impact.toFixed(1)}
                   </span>
                   <span
-                    className={`font-mono ${
+                    className={`${
                       roi > 0.5
-                        ? 'text-fpl-green'
+                        ? 'text-tt-green'
                         : roi < -0.5
                           ? 'text-destructive'
                           : 'text-foreground-dim'
@@ -131,15 +128,15 @@ export function DifferentialAnalysis({
 
       {/* Legend */}
       <div className="pt-2 border-t border-border/50">
-        <div className="flex items-center justify-center gap-4 text-xs font-display uppercase tracking-wide">
+        <div className="flex items-center justify-center gap-4 text-xs uppercase tracking-wide">
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-fpl-purple" />
+            <div className="w-2 h-2 bg-tt-magenta" />
             <span className="text-foreground-dim">
               Differential (&lt;{DIFFERENTIAL_THRESHOLD}%)
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-foreground/30" />
+            <div className="w-2 h-2 bg-foreground/30" />
             <span className="text-foreground-dim">Template (&gt;{TEMPLATE_THRESHOLD}%)</span>
           </div>
         </div>

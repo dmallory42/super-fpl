@@ -33,26 +33,24 @@ export function RankProjection({
         <div className="flex items-center gap-3">
           <div className="text-center">
             <div
-              className={`font-mono ${compact ? 'text-2xl' : 'text-3xl'} font-bold ${
-                isGaining ? 'text-fpl-green' : isLosing ? 'text-destructive' : 'text-foreground'
+              className={`${compact ? 'text-2xl' : 'text-3xl'} font-bold ${
+                isGaining ? 'text-tt-green' : isLosing ? 'text-destructive' : 'text-foreground'
               }`}
             >
               {formatRank(currentRank)}
             </div>
-            <div className="text-xs font-display uppercase tracking-wide text-foreground-dim">
-              Current Rank
-            </div>
+            <div className="text-xs uppercase tracking-wide text-foreground-dim">Current Rank</div>
           </div>
 
           {/* Movement indicator */}
           {!isSteady && (
             <div
               className={`flex items-center gap-1 ${compact ? 'text-xs' : 'text-sm'} ${
-                isGaining ? 'text-fpl-green' : 'text-destructive'
+                isGaining ? 'text-tt-green' : 'text-destructive'
               }`}
             >
               <span>{isGaining ? '↑' : '↓'}</span>
-              <span className="font-mono font-bold">{formatRank(Math.abs(rankMovement))}</span>
+              <span className="font-bold">{formatRank(Math.abs(rankMovement))}</span>
             </div>
           )}
         </div>
@@ -80,19 +78,15 @@ export function RankProjection({
               strokeWidth="3"
               strokeLinecap="round"
               strokeDasharray={`${progressPercent} 100`}
-              className="text-fpl-green transition-all duration-500"
+              className="text-tt-green"
             />
           </svg>
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span
-              className={`font-mono font-bold text-fpl-green ${compact ? 'text-xs' : 'text-sm'}`}
-            >
+            <span className={`font-bold text-tt-green ${compact ? 'text-xs' : 'text-sm'}`}>
               {fixturesFinished}/{fixturesTotal}
             </span>
-            <span className="text-[9px] text-foreground-dim font-display uppercase tracking-wide">
-              Matches
-            </span>
+            <span className="text-[9px] text-foreground-dim uppercase tracking-wide">Matches</span>
           </div>
         </div>
       </div>
