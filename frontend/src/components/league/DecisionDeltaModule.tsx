@@ -126,7 +126,7 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
     <div className="space-y-4" data-testid="decision-delta-module">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h4 className="font-display text-sm uppercase tracking-wider text-foreground">
+          <h4 className="text-sm uppercase tracking-wider text-foreground">
             Decision Delta vs League Median
           </h4>
           <p className="text-xs text-foreground-dim">{metricConfig.description}</p>
@@ -159,7 +159,7 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
 
       <div className="text-xs text-foreground-muted">
         League median ({metricConfig.label}):
-        <span className="ml-1 font-mono text-foreground">{metricConfig.formatValue(median)}</span>
+        <span className="ml-1 text-foreground">{metricConfig.formatValue(median)}</span>
       </div>
 
       <div className="overflow-x-auto -mx-4">
@@ -179,16 +179,16 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
               const delta = value === null ? null : value - median
               return (
                 <tr key={manager.manager_id}>
-                  <td className="font-mono text-foreground-muted">{idx + 1}</td>
+                  <td className="text-foreground-muted">{idx + 1}</td>
                   <td className="font-medium text-foreground">{manager.manager_name}</td>
                   <td className="text-foreground-muted">{manager.team_name}</td>
-                  <td className="text-right font-mono">{metricConfig.formatValue(value)}</td>
+                  <td className="text-right">{metricConfig.formatValue(value)}</td>
                   <td
-                    className={`text-right font-mono ${
+                    className={`text-right ${
                       delta === null
                         ? 'text-foreground-muted'
                         : delta > 0
-                          ? 'text-fpl-green'
+                          ? 'text-tt-green'
                           : delta < 0
                             ? 'text-destructive'
                             : 'text-foreground-muted'

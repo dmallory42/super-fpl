@@ -6,7 +6,6 @@ import { OwnershipMatrix } from '../components/comparator/OwnershipMatrix'
 import { BroadcastCard } from '../components/ui/BroadcastCard'
 import { EmptyState, UsersIcon } from '../components/ui/EmptyState'
 import { SkeletonCard, SkeletonTable } from '../components/ui/SkeletonLoader'
-import { GradientText } from '../components/ui/GradientText'
 import { DecisionDeltaModule } from '../components/league/DecisionDeltaModule'
 import { FormInput, FormSelect } from '../components/ui/form'
 import { getPositionName } from '../types'
@@ -146,20 +145,15 @@ export function LeagueAnalyzer() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="animate-fade-in-up">
-        <h2 className="font-display text-2xl font-bold tracking-wider text-foreground mb-2">
-          League Analyzer
-        </h2>
+      <div>
+        <h2 className="text-2xl font-bold tracking-wider text-foreground mb-2">League Analyzer</h2>
         <p className="text-foreground-muted text-sm">
           Analyze your mini-league to find differentials, compare ownership, and assess risk.
         </p>
       </div>
 
       {/* League Search */}
-      <form
-        onSubmit={handleSubmit}
-        className="flex gap-2 max-w-md animate-fade-in-up animation-delay-100"
-      >
+      <form onSubmit={handleSubmit} className="flex gap-2 max-w-md">
         <FormInput
           type="text"
           value={leagueInput}
@@ -175,7 +169,7 @@ export function LeagueAnalyzer() {
 
       {/* Gameweek Selector */}
       {leagueId && (
-        <div className="flex items-center gap-4 animate-fade-in-up animation-delay-200">
+        <div className="flex items-center gap-4">
           <label htmlFor="gameweek-select" className="form-label text-sm">
             Gameweek:
           </label>
@@ -196,19 +190,16 @@ export function LeagueAnalyzer() {
       )}
 
       {leagueId && (
-        <div
-          className="flex items-center gap-2 flex-wrap animate-fade-in-up animation-delay-200"
-          data-testid="league-view-tabs"
-        >
+        <div className="flex items-center gap-2 flex-wrap" data-testid="league-view-tabs">
           {LEAGUE_VIEW_TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setView(tab.id)}
               data-testid={`league-view-tab-${tab.id}`}
-              className={`px-3 py-1.5 rounded text-xs font-display uppercase tracking-wider transition-colors ${
+              className={`px-3 py-1.5 text-xs uppercase tracking-wider ${
                 view === tab.id
-                  ? 'bg-fpl-green/20 text-fpl-green border border-fpl-green/30'
+                  ? 'bg-tt-green/20 text-tt-green border border-tt-green/30'
                   : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated border border-border/50'
               }`}
             >
@@ -228,7 +219,7 @@ export function LeagueAnalyzer() {
 
       {/* Error State */}
       {error && (
-        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive animate-fade-in-up">
+        <div className="p-4 bg-destructive/10 border border-destructive/30 text-destructive">
           {error.message || 'Failed to load league data'}
         </div>
       )}
@@ -240,8 +231,8 @@ export function LeagueAnalyzer() {
           <BroadcastCard animationDelay={0}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <h3 className="font-display text-2xl font-bold tracking-wider">
-                  <GradientText>{activeData.league.name}</GradientText>
+                <h3 className="text-2xl font-bold tracking-wider">
+                  <span className="text-tt-cyan">{activeData.league.name}</span>
                 </h3>
                 <p className="text-foreground-muted text-sm">
                   {isThisGwView
@@ -251,12 +242,12 @@ export function LeagueAnalyzer() {
               </div>
               <div className="text-right">
                 {isThisGwView && analysisData && (
-                  <div className="font-display text-xl font-bold text-foreground tracking-wider">
+                  <div className="text-xl font-bold text-foreground tracking-wider">
                     GW{analysisData.gameweek}
                   </div>
                 )}
                 {!isThisGwView && seasonData && (
-                  <div className="font-display text-sm font-bold text-foreground tracking-wider">
+                  <div className="text-sm font-bold text-foreground tracking-wider">
                     GW{seasonData.gw_from}–GW{seasonData.gw_to}
                   </div>
                 )}
@@ -281,22 +272,16 @@ export function LeagueAnalyzer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {analysisData.managers.map((manager, idx) => {
+                      {analysisData.managers.map((manager) => {
                         const risk = analysisData.comparison.risk_scores[manager.id]
                         const diffs = analysisData.comparison.differentials[manager.id] || []
 
                         return (
-                          <tr
-                            key={manager.id}
-                            className="animate-fade-in-up opacity-0"
-                            style={{ animationDelay: `${150 + idx * 50}ms` }}
-                          >
-                            <td className="font-mono text-foreground-muted">{manager.rank}</td>
+                          <tr key={manager.id}>
+                            <td className="text-foreground-muted">{manager.rank}</td>
                             <td className="font-medium text-foreground">{manager.name}</td>
                             <td className="text-foreground-muted">{manager.team_name}</td>
-                            <td className="text-right font-mono font-bold text-fpl-green">
-                              {manager.total}
-                            </td>
+                            <td className="text-right font-bold text-tt-green">{manager.total}</td>
                             <td>
                               {risk && (
                                 <div className="flex justify-center">
@@ -311,7 +296,7 @@ export function LeagueAnalyzer() {
                                   return (
                                     <span
                                       key={d.player_id}
-                                      className="px-2 py-0.5 rounded text-xs font-medium border bg-fpl-green/20 text-fpl-green border-fpl-green/30"
+                                      className="px-2 py-0.5 text-xs font-medium border bg-tt-green/20 text-tt-green border-tt-green/30"
                                     >
                                       {player?.web_name || d.player_id}
                                     </span>
@@ -328,10 +313,10 @@ export function LeagueAnalyzer() {
               </BroadcastCard>
 
               {/* Risk Analysis Grid */}
-              <BroadcastCard title="Risk Analysis" accentColor="highlight" animationDelay={200}>
+              <BroadcastCard title="Risk Analysis" accentColor="red" animationDelay={200}>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                  {analysisData.managers.slice(0, 10).map((manager, idx) => (
-                    <div key={manager.id} style={{ animationDelay: `${250 + idx * 50}ms` }}>
+                  {analysisData.managers.slice(0, 10).map((manager) => (
+                    <div key={manager.id}>
                       <RiskMeter
                         managerName={manager.team_name}
                         riskScore={analysisData.comparison.risk_scores[manager.id]}
@@ -342,17 +327,13 @@ export function LeagueAnalyzer() {
               </BroadcastCard>
 
               {/* Differentials Detail */}
-              <BroadcastCard title="Key Differentials" accentColor="purple" animationDelay={300}>
+              <BroadcastCard title="Key Differentials" accentColor="magenta" animationDelay={300}>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {analysisData.managers.slice(0, 6).map((manager, idx) => {
+                  {analysisData.managers.slice(0, 6).map((manager) => {
                     const diffs = analysisData.comparison.differentials[manager.id] || []
                     return (
-                      <div
-                        key={manager.id}
-                        className="p-4 bg-surface-elevated rounded-lg animate-fade-in-up opacity-0"
-                        style={{ animationDelay: `${350 + idx * 50}ms` }}
-                      >
-                        <div className="font-display text-sm uppercase tracking-wider text-foreground mb-3 truncate">
+                      <div key={manager.id} className="p-4 bg-surface-elevated">
+                        <div className="text-sm uppercase tracking-wider text-foreground mb-3 truncate">
                           {manager.team_name}
                         </div>
                         {diffs.length === 0 ? (
@@ -366,17 +347,17 @@ export function LeagueAnalyzer() {
                                   key={diff.player_id}
                                   className="flex items-center gap-2 text-sm"
                                 >
-                                  <span className="font-mono text-xs w-8 text-foreground-muted">
+                                  <span className="text-xs w-8 text-foreground-muted">
                                     {player ? getPositionName(player.position) : ''}
                                   </span>
                                   <span className="text-foreground flex-1 truncate">
                                     {player?.web_name || diff.player_id}
                                   </span>
-                                  <span className="text-fpl-green text-xs font-mono">
+                                  <span className="text-tt-green text-xs">
                                     {diff.eo.toFixed(0)}%
                                   </span>
                                   {diff.is_captain && (
-                                    <span className="text-yellow-400 text-xs font-bold">C</span>
+                                    <span className="text-tt-yellow text-xs font-bold">C</span>
                                   )}
                                 </li>
                               )
@@ -418,21 +399,17 @@ export function LeagueAnalyzer() {
                     </tr>
                   </thead>
                   <tbody>
-                    {seasonSummaries.map((manager, idx) => (
-                      <tr
-                        key={manager.managerId}
-                        className="animate-fade-in-up opacity-0"
-                        style={{ animationDelay: `${130 + idx * 30}ms` }}
-                      >
-                        <td className="font-mono text-foreground-muted">{manager.rank}</td>
+                    {seasonSummaries.map((manager) => (
+                      <tr key={manager.managerId}>
+                        <td className="text-foreground-muted">{manager.rank}</td>
                         <td className="font-medium text-foreground">{manager.managerName}</td>
                         <td className="text-foreground-muted">{manager.teamName}</td>
-                        <td className="text-right font-mono">{manager.actual.toFixed(1)}</td>
-                        <td className="text-right font-mono">{manager.expected.toFixed(1)}</td>
+                        <td className="text-right">{manager.actual.toFixed(1)}</td>
+                        <td className="text-right">{manager.expected.toFixed(1)}</td>
                         <td
-                          className={`text-right font-mono font-bold ${
+                          className={`text-right font-bold ${
                             manager.luck > 0
-                              ? 'text-fpl-green'
+                              ? 'text-tt-green'
                               : manager.luck < 0
                                 ? 'text-destructive'
                                 : 'text-foreground-muted'
@@ -451,11 +428,11 @@ export function LeagueAnalyzer() {
 
           {isDecisionsView && seasonData && (
             <>
-              <BroadcastCard title="Decision Delta" accentColor="highlight" animationDelay={100}>
+              <BroadcastCard title="Decision Delta" accentColor="red" animationDelay={100}>
                 <DecisionDeltaModule managers={seasonData.managers} />
               </BroadcastCard>
 
-              <BroadcastCard title="Decision Quality" accentColor="purple" animationDelay={160}>
+              <BroadcastCard title="Decision Quality" accentColor="magenta" animationDelay={160}>
                 <div className="overflow-x-auto -mx-4">
                   <table className="table-broadcast min-w-[760px]">
                     <thead>
@@ -469,37 +446,31 @@ export function LeagueAnalyzer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {seasonData.managers.map((manager, idx) => (
-                        <tr
-                          key={manager.manager_id}
-                          className="animate-fade-in-up opacity-0"
-                          style={{ animationDelay: `${130 + idx * 30}ms` }}
-                        >
+                      {seasonData.managers.map((manager) => (
+                        <tr key={manager.manager_id}>
                           <td className="font-medium text-foreground">{manager.team_name}</td>
-                          <td className="text-right font-mono">
+                          <td className="text-right">
                             {manager.decision_quality.captain_gains.toFixed(1)}
                           </td>
-                          <td className="text-right font-mono text-destructive">
+                          <td className="text-right text-destructive">
                             -{manager.decision_quality.hit_cost}
                           </td>
                           <td
-                            className={`text-right font-mono ${
+                            className={`text-right ${
                               manager.decision_quality.transfer_net_gain >= 0
-                                ? 'text-fpl-green'
+                                ? 'text-tt-green'
                                 : 'text-destructive'
                             }`}
                           >
                             {manager.decision_quality.transfer_net_gain >= 0 ? '+' : ''}
                             {manager.decision_quality.transfer_net_gain.toFixed(1)}
                           </td>
-                          <td className="text-right font-mono">
+                          <td className="text-right">
                             {manager.decision_quality.hit_roi === null
                               ? '—'
                               : manager.decision_quality.hit_roi.toFixed(2)}
                           </td>
-                          <td className="text-right font-mono">
-                            {manager.decision_quality.chip_events}
-                          </td>
+                          <td className="text-right">{manager.decision_quality.chip_events}</td>
                         </tr>
                       ))}
                     </tbody>

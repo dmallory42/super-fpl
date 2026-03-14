@@ -50,14 +50,14 @@ describe('RiskMeter', () => {
       const riskScore = createRiskScore(20, 'low', 10)
       render(<RiskMeter managerName="Test" riskScore={riskScore} />)
 
-      expect(screen.getByText('low risk')).toHaveClass('text-fpl-green')
+      expect(screen.getByText('low risk')).toHaveClass('text-tt-green')
     })
 
     it('applies correct color class for medium risk', () => {
       const riskScore = createRiskScore(50, 'medium', 30)
       render(<RiskMeter managerName="Test" riskScore={riskScore} />)
 
-      expect(screen.getByText('medium risk')).toHaveClass('text-yellow-400')
+      expect(screen.getByText('medium risk')).toHaveClass('text-tt-yellow')
     })
 
     it('applies correct color class for high risk', () => {

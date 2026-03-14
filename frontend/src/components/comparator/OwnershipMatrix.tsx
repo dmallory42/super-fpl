@@ -13,9 +13,9 @@ interface OwnershipMatrixProps {
 
 const multiplierStyles: Record<number, string> = {
   0: 'bg-surface text-foreground-dim',
-  1: 'bg-fpl-green/30 text-fpl-green border border-fpl-green/30',
-  2: 'bg-yellow-500/30 text-yellow-400 border border-yellow-500/30', // Captain
-  3: 'bg-fpl-purple/30 text-fpl-purple border border-fpl-purple/30', // Triple Captain
+  1: 'bg-tt-green/30 text-tt-green border border-tt-green/30',
+  2: 'bg-yellow-500/30 text-tt-yellow border border-yellow-500/30', // Captain
+  3: 'bg-tt-magenta/30 text-tt-magenta border border-tt-magenta/30', // Triple Captain
 }
 
 export function OwnershipMatrix({
@@ -41,16 +41,16 @@ export function OwnershipMatrix({
       <table className="w-full text-sm min-w-[600px]">
         <thead>
           <tr className="border-b border-border">
-            <th className="text-left p-3 font-display text-xs uppercase tracking-wider text-foreground-muted sticky left-0 bg-surface z-10">
+            <th className="text-left p-3 text-xs uppercase tracking-wider text-foreground-muted sticky left-0 bg-surface z-10">
               Player
             </th>
-            <th className="text-center p-3 font-display text-xs uppercase tracking-wider text-foreground-muted">
+            <th className="text-center p-3 text-xs uppercase tracking-wider text-foreground-muted">
               EO%
             </th>
             {managerIds.map((id) => (
               <th
                 key={id}
-                className="text-center p-3 font-display text-xs uppercase tracking-wider text-foreground-muted max-w-[100px]"
+                className="text-center p-3 text-xs uppercase tracking-wider text-foreground-muted max-w-[100px]"
               >
                 <span className="truncate block">{managerNames[id] || `#${id}`}</span>
               </th>
@@ -58,20 +58,16 @@ export function OwnershipMatrix({
           </tr>
         </thead>
         <tbody>
-          {sortedPlayerIds.map((playerId, idx) => {
+          {sortedPlayerIds.map((playerId) => {
             const player = players[playerId]
             const eo = effectiveOwnership[playerId]
             const ownership = ownershipMatrix[playerId] || {}
 
             return (
-              <tr
-                key={playerId}
-                className="border-b border-border hover:bg-surface-hover transition-colors animate-fade-in-up opacity-0"
-                style={{ animationDelay: `${idx * 30}ms` }}
-              >
+              <tr key={playerId} className="border-b border-border hover:bg-surface-hover">
                 <td className="p-3 sticky left-0 bg-surface z-10">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-foreground-muted">
+                    <span className="text-xs text-foreground-muted">
                       {player ? getPositionName(player.position) : ''}
                     </span>
                     <span className="text-foreground font-medium">
@@ -84,11 +80,11 @@ export function OwnershipMatrix({
                 </td>
                 <td className="text-center p-3">
                   <span
-                    className={`font-mono font-bold ${
+                    className={`font-bold ${
                       eo >= 80
-                        ? 'text-fpl-green'
+                        ? 'text-tt-green'
                         : eo >= 50
-                          ? 'text-yellow-400'
+                          ? 'text-tt-yellow'
                           : 'text-foreground-muted'
                     }`}
                   >
@@ -102,8 +98,7 @@ export function OwnershipMatrix({
                       <span
                         className={`
                           inline-flex items-center justify-center
-                          w-8 h-8 rounded-lg font-bold text-sm
-                          transition-all duration-200
+                          w-8 h-8 font-bold text-sm
                           ${multiplierStyles[multiplier] || 'bg-surface text-foreground-dim'}
                         `}
                       >
