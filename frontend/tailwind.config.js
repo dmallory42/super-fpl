@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: ["class"],
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
@@ -15,9 +14,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ['Oswald', 'sans-serif'],
-        body: ['Source Sans 3', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        teletext: ['var(--font-teletext)', 'monospace'],
+        display: ['var(--font-teletext)', 'monospace'],
+        body: ['var(--font-teletext)', 'monospace'],
+        mono: ['var(--font-teletext)', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -56,69 +56,34 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        fpl: {
-          green: "hsl(var(--fpl-green))",
-          "green-dark": "hsl(var(--fpl-green-dark))",
-          purple: "hsl(var(--fpl-purple))",
-          "purple-dark": "hsl(var(--fpl-purple-dark))",
-        },
-        highlight: {
-          DEFAULT: "hsl(var(--highlight))",
-          dim: "hsl(var(--highlight-dim))",
+        tt: {
+          black: '#000000',
+          white: '#FFFFFF',
+          cyan: '#00FFFF',
+          green: '#00FF00',
+          yellow: '#FFFF00',
+          red: '#FF0000',
+          blue: '#0000FF',
+          magenta: '#FF00FF',
+          dim: '#333333',
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "0px",
+        md: "0px",
+        sm: "0px",
       },
       animation: {
-        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
-        "slide-in-right": "slideInRight 0.3s ease-out forwards",
-        "slide-in-left": "slideInLeft 0.3s ease-out forwards",
-        "shimmer": "shimmer 2s infinite linear",
-        "pulse-glow": "pulseGlow 2s ease-in-out infinite",
-        "pulse-dot": "pulseDot 1.5s ease-in-out infinite",
-        "count-up": "countUp 0.4s ease-out forwards",
-        "scale-in": "scaleIn 0.3s ease-out forwards",
-        "draw-path": "drawPath 1.5s ease-out forwards",
+        shimmer: 'shimmer 2s infinite linear',
+        blink: 'blink 1s step-end infinite',
       },
       keyframes: {
-        fadeInUp: {
-          "0%": { opacity: "0", transform: "translateY(20px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        slideInRight: {
-          "0%": { opacity: "0", transform: "translateX(20px)" },
-          "100%": { opacity: "1", transform: "translateX(0)" },
-        },
-        slideInLeft: {
-          "0%": { opacity: "0", transform: "translateX(-20px)" },
-          "100%": { opacity: "1", transform: "translateX(0)" },
-        },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
-        pulseGlow: {
-          "0%, 100%": { boxShadow: "0 0 5px hsl(var(--fpl-green) / 0.5)" },
-          "50%": { boxShadow: "0 0 20px hsl(var(--fpl-green) / 0.8), 0 0 30px hsl(var(--fpl-green) / 0.4)" },
-        },
-        pulseDot: {
-          "0%, 100%": { opacity: "1", transform: "scale(1)" },
-          "50%": { opacity: "0.5", transform: "scale(1.2)" },
-        },
-        countUp: {
-          "0%": { opacity: "0", transform: "translateY(10px)" },
-          "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        scaleIn: {
-          "0%": { opacity: "0", transform: "scale(0.95)" },
-          "100%": { opacity: "1", transform: "scale(1)" },
-        },
-        drawPath: {
-          "0%": { strokeDashoffset: "1000" },
-          "100%": { strokeDashoffset: "0" },
+        blink: {
+          '50%': { opacity: '0' },
         },
       },
     },
