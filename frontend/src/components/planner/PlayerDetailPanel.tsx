@@ -230,7 +230,7 @@ export function PlayerDetailPanel({
                 gradient: true,
               },
               { value: `${parseFloat(player.selected_by_percent).toFixed(0)}%`, label: 'OWN' },
-            ].map((stat, i) => (
+            ].map((stat) => (
               <div key={stat.label} className="bg-surface/60 px-2 py-1.5">
                 <div className={`text-base font-bold ${stat.gradient ? '' : 'text-foreground'}`}>
                   {stat.gradient ? <span className="text-tt-cyan">{stat.value}</span> : stat.value}
@@ -332,7 +332,7 @@ export function PlayerDetailPanel({
 
             {/* GW rows */}
             <div className="divide-y divide-border/10">
-              {gameweeks.map((gw, idx) => {
+              {gameweeks.map((gw) => {
                 const displayMins = expectedMinsPerGw[gw] ?? expectedMinsIfFit
                 const isCurrentGw = gw === selectedGw
                 const xPts = scaledXPts(gw)
@@ -420,7 +420,7 @@ export function PlayerDetailPanel({
               autoFocus
             />
             <div className="max-h-[400px] overflow-y-auto space-y-1">
-              {availableReplacements.map((rPlayer, idx) => {
+              {availableReplacements.map((rPlayer) => {
                 const gain = rPlayer.total_predicted - currentPlayerPredicted
 
                 return (

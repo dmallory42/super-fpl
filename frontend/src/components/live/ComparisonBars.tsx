@@ -19,7 +19,6 @@ interface ComparisonBarsProps {
   selectedTier: Tier
   onTierChange: (tier: Tier) => void
   showTierSelector?: boolean
-  animationDelay?: number
 }
 
 export function ComparisonBars({
@@ -29,7 +28,6 @@ export function ComparisonBars({
   selectedTier,
   onTierChange,
   showTierSelector = true,
-  animationDelay = 0,
 }: ComparisonBarsProps) {
   if (comparisons.length === 0) {
     return null

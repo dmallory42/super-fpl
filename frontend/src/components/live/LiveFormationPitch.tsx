@@ -68,7 +68,7 @@ export function LiveFormationPitch({
 
     const fixture = getFixturesForTeam(fixtureData, info.team)
       .sort((a, b) => (b.minutes ?? 0) - (a.minutes ?? 0))
-      .find((f) => Boolean(f.started) && !Boolean(f.finished) && (f.minutes ?? 0) > 0)
+      .find((f) => f.started && !f.finished && (f.minutes ?? 0) > 0)
 
     return { status: 'playing', minutes: fixture?.minutes }
   }

@@ -92,7 +92,7 @@ describe('LiveFormationPitch', () => {
     expect(screen.getByText('Raya')).toBeInTheDocument()
     expect(screen.getByText('Saka')).toBeInTheDocument()
     expect(screen.getByText('BenchMID')).toBeInTheDocument()
-    expect(screen.getByText('Bench')).toBeInTheDocument()
+    expect(screen.getByText(/BENCH/)).toBeInTheDocument()
     expect(screen.getAllByText("57'").length).toBeGreaterThan(0)
   })
 

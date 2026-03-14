@@ -61,7 +61,7 @@ describe('FormationPitch', () => {
 
     render(<FormationPitch players={players} teams={mockTeams} />)
 
-    expect(screen.getByText('Bench')).toBeInTheDocument()
+    expect(screen.getByText(/BENCH/)).toBeInTheDocument()
     expect(screen.getByText('BenchPlayer')).toBeInTheDocument()
   })
 
@@ -78,7 +78,7 @@ describe('FormationPitch', () => {
 
     render(<FormationPitch players={players} teams={mockTeams} />)
 
-    expect(screen.getByText('C')).toBeInTheDocument()
+    expect(screen.getByText('(C)')).toBeInTheDocument()
   })
 
   it('shows vice captain badge for vice captains', () => {
@@ -88,7 +88,7 @@ describe('FormationPitch', () => {
 
     render(<FormationPitch players={players} teams={mockTeams} />)
 
-    expect(screen.getByText('V')).toBeInTheDocument()
+    expect(screen.getByText('(V)')).toBeInTheDocument()
   })
 
   it('shows team short name', () => {
@@ -162,7 +162,7 @@ describe('FormationPitch', () => {
         <FormationPitch players={players} teams={mockTeams} selectedPlayer={1} />
       )
 
-      expect(container.querySelector('.border-tt-green\\/60')).toBeInTheDocument()
+      expect(container.querySelector('.border-tt-cyan')).toBeInTheDocument()
     })
   })
 

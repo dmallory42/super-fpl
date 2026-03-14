@@ -141,7 +141,7 @@ describe('SquadPitch', () => {
 
       render(<SquadPitch picks={picks} players={playersMap} teams={teamsMap} />)
 
-      expect(screen.getByText('C')).toBeInTheDocument()
+      expect(screen.getByText('(C)')).toBeInTheDocument()
     })
 
     it('hides captain badge and glow when captain indicators are disabled', () => {
@@ -164,7 +164,7 @@ describe('SquadPitch', () => {
 
       render(<SquadPitch picks={picks} players={playersMap} teams={teamsMap} />)
 
-      expect(screen.getByText('V')).toBeInTheDocument()
+      expect(screen.getByText('(V)')).toBeInTheDocument()
     })
   })
 
@@ -183,7 +183,7 @@ describe('SquadPitch', () => {
 
       render(<SquadPitch picks={picks} players={playersMap} teams={teamsMap} />)
 
-      expect(screen.getByText('Bench')).toBeInTheDocument()
+      expect(screen.getByText(/BENCH/)).toBeInTheDocument()
       expect(screen.getByText('BenchGuy')).toBeInTheDocument()
     })
   })

@@ -667,7 +667,6 @@ export function Live() {
                 selectedTier={comparisonTier}
                 onTierChange={setComparisonTier}
                 showTierSelector={false}
-                animationDelay={350}
               />
               {effectivePlayersPlayed && (
                 <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
