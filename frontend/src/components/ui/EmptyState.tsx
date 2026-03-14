@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 
 interface EmptyStateProps {
+  /** @deprecated Teletext theme does not render icons */
   icon?: ReactNode
   title: string
   description?: string
