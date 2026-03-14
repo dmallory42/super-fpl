@@ -4,53 +4,49 @@
 
 @layer base {
   :root {
-    /* Typography */
-    --font-display: 'Oswald', sans-serif;
-    --font-body: 'Source Sans 3', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-teletext: 'VT323', monospace;
+    --font-teletext-alt: 'JetBrains Mono', monospace;
 
-    /* FPL-inspired color palette */
-    --fpl-green: 155 100% 50%;        /* #00FF87 - official FPL green */
-    --fpl-green-dark: 155 100% 40%;   /* Darker variant */
-    --fpl-purple: 280 80% 50%;        /* Purple accent */
-    --fpl-purple-dark: 280 60% 35%;   /* Darker purple */
-    --highlight: 340 82% 52%;         /* Hot pink for emphasis */
-    --highlight-dim: 340 60% 40%;     /* Dimmed highlight */
+    /* Teletext 8-color palette */
+    --tt-black: 0 0% 0%;
+    --tt-white: 0 0% 100%;
+    --tt-cyan: 180 100% 50%;
+    --tt-green: 120 100% 50%;
+    --tt-yellow: 60 100% 50%;
+    --tt-red: 0 100% 50%;
+    --tt-blue: 240 100% 50%;
+    --tt-magenta: 300 100% 50%;
 
-    /* Surfaces */
-    --background: 222 47% 6%;         /* Deep dark base */
-    --surface: 220 30% 12%;           /* Elevated dark surface */
-    --surface-elevated: 220 30% 16%;  /* Higher elevation */
-    --surface-hover: 220 30% 20%;     /* Hover state */
+    /* Semantic mapping */
+    --background: var(--tt-black);
+    --surface: 0 0% 4%;            /* #0A0A0A - very slight lift */
+    --surface-elevated: 0 0% 7%;   /* #121212 */
+    --surface-hover: 0 0% 7%;
 
-    /* Text */
-    --foreground: 210 40% 98%;
-    --foreground-muted: 215 20% 65%;
-    --foreground-dim: 215 15% 45%;
+    --foreground: var(--tt-white);
+    --foreground-muted: 0 0% 40%;  /* #666 dim text */
+    --foreground-dim: 0 0% 25%;    /* #404040 */
 
-    /* Semantic colors */
-    --primary: var(--fpl-green);
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 32% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: var(--fpl-purple);
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --primary: var(--tt-cyan);
+    --primary-foreground: var(--tt-black);
+    --secondary: var(--tt-blue);
+    --secondary-foreground: var(--tt-white);
+    --accent: var(--tt-yellow);
+    --accent-foreground: var(--tt-black);
+    --destructive: var(--tt-red);
+    --destructive-foreground: var(--tt-white);
+    --muted: 0 0% 7%;
+    --muted-foreground: 0 0% 40%;
 
-    /* UI elements */
-    --border: 217 32% 20%;
-    --input: 217 32% 17%;
-    --ring: 155 100% 50%;
-    --radius: 0.5rem;
+    --border: 0 0% 20%;     /* #333 */
+    --input: 0 0% 0%;
+    --ring: var(--tt-cyan);
+    --radius: 0px;           /* no rounded corners */
 
-    /* Card styles */
-    --card: 220 30% 12%;
-    --card-foreground: 210 40% 98%;
-    --popover: 220 30% 12%;
-    --popover-foreground: 210 40% 98%;
+    --card: 0 0% 0%;
+    --card-foreground: var(--tt-white);
+    --popover: 0 0% 0%;
+    --popover-foreground: var(--tt-white);
   }
 }
 
