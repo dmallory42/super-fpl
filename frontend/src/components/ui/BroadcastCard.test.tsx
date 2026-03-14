@@ -16,8 +16,7 @@ describe('BroadcastCard', () => {
         title="Header"
         headerAction={<span>Action</span>}
         className="extra-card"
-        accentColor="purple"
-        animate={false}
+        accentColor="magenta"
       >
         Child
       </BroadcastCard>

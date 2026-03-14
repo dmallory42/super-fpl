@@ -1,11 +1,21 @@
 import { ReactNode } from 'react'
 
+type TeletextAccent = 'cyan' | 'yellow' | 'red' | 'blue' | 'magenta'
+
+const accentBgColors: Record<TeletextAccent, string> = {
+  cyan: 'bg-tt-cyan text-tt-black',
+  yellow: 'bg-tt-yellow text-tt-black',
+  red: 'bg-tt-red text-tt-white',
+  blue: 'bg-tt-blue text-tt-white',
+  magenta: 'bg-tt-magenta text-tt-black',
+}
+
 interface BroadcastCardProps {
   title?: string
   children: ReactNode
   className?: string
   headerAction?: ReactNode
-  accentColor?: 'green' | 'purple' | 'highlight'
+  accentColor?: TeletextAccent
   animate?: boolean
   animationDelay?: number
 }
@@ -15,42 +25,15 @@ export function BroadcastCard({
   children,
   className = '',
   headerAction,
-  accentColor = 'green',
-  animate = true,
-  animationDelay = 0,
+  accentColor = 'cyan',
 }: BroadcastCardProps) {
-  const accentGradients = {
-    green: 'from-fpl-green/30 via-fpl-green/10 to-transparent',
-    purple: 'from-fpl-purple/30 via-fpl-purple/10 to-transparent',
-    highlight: 'from-highlight/30 via-highlight/10 to-transparent',
-  }
-
-  const accentBorders = {
-    green: 'border-fpl-green/30',
-    purple: 'border-fpl-purple/30',
-    highlight: 'border-highlight/30',
-  }
-
   return (
-    <div
-      className={`
-        broadcast-card
-        ${animate ? 'animate-fade-in-up opacity-0' : ''}
-        ${className}
-      `}
-      style={animate ? { animationDelay: `${animationDelay}ms` } : undefined}
-    >
+    <div className={`broadcast-card ${className}`}>
       {title && (
         <div
-          className={`
-            px-3 md:px-4 py-2.5 md:py-3 flex items-center justify-between
-            bg-gradient-to-r ${accentGradients[accentColor]}
-            border-b ${accentBorders[accentColor]}
-          `}
+          className={`px-3 md:px-4 py-2.5 md:py-3 flex items-center justify-between ${accentBgColors[accentColor]}`}
         >
-          <h3 className="font-display text-xs md:text-sm uppercase tracking-wide text-foreground font-semibold">
-            {title}
-          </h3>
+          <h3 className="text-xs md:text-sm uppercase tracking-wide font-semibold">{title}</h3>
           {headerAction && <div>{headerAction}</div>}
         </div>
       )}
