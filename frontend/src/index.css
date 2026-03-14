@@ -56,33 +56,25 @@
   }
 
   html {
-    scroll-behavior: smooth;
-    font-size: 112.5%; /* Global base: 18px */
+    font-size: 112.5%;
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-body);
-    font-synthesis: none;
-    text-rendering: optimizeLegibility;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    font-family: var(--font-teletext);
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
-    line-height: 1.45;
+    line-height: 1.5;
   }
 
-  /* Athletic display typography */
   h1, h2, h3, .font-display {
-    font-family: var(--font-display);
-    letter-spacing: 0.02em;
+    font-family: var(--font-teletext);
     text-transform: uppercase;
   }
 
-  /* Mono for stats and numbers */
   .font-mono, code, pre {
-    font-family: var(--font-mono);
+    font-family: var(--font-teletext);
   }
 }
 
