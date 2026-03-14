@@ -69,9 +69,15 @@ export default {
         },
       },
       borderRadius: {
-        lg: "0px",
-        md: "0px",
+        DEFAULT: "0px",
+        none: "0px",
         sm: "0px",
+        md: "0px",
+        lg: "0px",
+        xl: "0px",
+        "2xl": "0px",
+        "3xl": "0px",
+        full: "0px",
       },
       animation: {
         shimmer: 'shimmer 2s infinite linear',
