@@ -78,6 +78,11 @@
   }
 }
 
+/* Font toggle: mono mode */
+html.font-mono-mode {
+  --font-teletext: 'JetBrains Mono', monospace;
+}
+
 /* Keyframe Animations */
 @keyframes shimmer {
   0% { background-position: -200% 0; }

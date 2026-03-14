@@ -7,7 +7,6 @@ import { Planner } from './pages/Planner'
 import { Admin } from './pages/Admin'
 import { TabNav } from './components/ui/TabNav'
 import { useSyncStatus } from './hooks/useSyncStatus'
-import { GradientText } from './components/ui/GradientText'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -28,6 +27,14 @@ const tabs = [
   { id: 'planner', label: 'Planner' },
 ]
 
+const pageNumbers: Record<string, string> = {
+  'season-review': 'P101',
+  'league-analyzer': 'P201',
+  live: 'P301',
+  planner: 'P401',
+  admin: 'P901',
+}
+
 const validPages = new Set(['season-review', 'league-analyzer', 'live', 'planner', 'admin'])
 
 function getInitialPage(): Page {
@@ -44,10 +51,66 @@ function SyncWatcher() {
   return null
 }
 
+function CeefaxTime() {
+  const [time, setTime] = useState(new Date())
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const dateStr = time.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+  const timeStr = time.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  return (
+    <span className="text-tt-white">
+      {dateStr} {timeStr}
+    </span>
+  )
+}
+
+function FontToggle() {
+  const [isPixel, setIsPixel] = useState(() => {
+    return localStorage.getItem('superfpl-font') !== 'mono'
+  })
+
+  const toggle = useCallback(() => {
+    setIsPixel((prev) => {
+      const next = !prev
+      if (next) {
+        document.documentElement.classList.remove('font-mono-mode')
+        localStorage.setItem('superfpl-font', 'pixel')
+      } else {
+        document.documentElement.classList.add('font-mono-mode')
+        localStorage.setItem('superfpl-font', 'mono')
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!isPixel) {
+      document.documentElement.classList.add('font-mono-mode')
+    }
+  }, [isPixel])
+
+  return (
+    <button onClick={toggle} className="text-tt-dim hover:text-tt-cyan text-xs uppercase">
+      [A] FONT: {isPixel ? 'PIXEL' : 'MONO'}
+    </button>
+  )
+}
+
 function App() {
   const [page, setPage] = useState<Page>(getInitialPage)
 
-  // Update URL when page changes
   const handlePageChange = useCallback((newPage: Page) => {
     setPage(newPage)
     const params = new URLSearchParams(window.location.search)
@@ -56,7 +119,6 @@ function App() {
     window.history.pushState({}, '', newUrl)
   }, [])
 
-  // Handle browser back/forward
   useEffect(() => {
     const handlePopState = () => {
       setPage(getInitialPage())
@@ -69,26 +131,26 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <SyncWatcher />
       <div className="min-h-screen bg-background text-foreground">
-        {/* Header */}
-        <header className="sticky top-0 z-50 border-b border-border glass">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              {/* Logo */}
-              <div className="animate-fade-in-up">
-                <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-wider">
-                  <GradientText>SUPERFPL</GradientText>
+        {/* Ceefax page header */}
+        <header className="border-b border-border">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-tt-white">{pageNumbers[page] ?? 'P100'}</span>
+                <h1 className="text-2xl sm:text-3xl font-bold">
+                  <span className="text-tt-cyan">SUPERFPL</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-foreground-muted tracking-wide">
-                  Fantasy Analytics
-                </p>
               </div>
+              <CeefaxTime />
+            </div>
 
-              {/* Navigation */}
+            {/* Navigation - colored keys */}
+            <div className="mt-3">
               <TabNav
                 tabs={tabs}
                 activeTab={page}
                 onTabChange={(id) => handlePageChange(id as Page)}
-                className="animate-fade-in-up animation-delay-100 w-full sm:w-auto"
+                className="w-full sm:w-auto"
               />
             </div>
           </div>
@@ -107,8 +169,9 @@ function App() {
 
         {/* Footer */}
         <footer className="border-t border-border mt-auto">
-          <div className="container mx-auto px-4 py-4 text-center">
-            <p className="text-xs text-foreground-dim">Data from Official FPL API</p>
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <p className="text-xs text-tt-dim">Data from Official FPL API</p>
+            <FontToggle />
           </div>
         </footer>
       </div>
