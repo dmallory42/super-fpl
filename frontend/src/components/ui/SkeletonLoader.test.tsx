@@ -22,7 +22,7 @@ describe('SkeletonLoader', () => {
     )
 
     expect(container.querySelector('.custom-skeleton')).toBeInTheDocument()
-    expect(container.querySelectorAll('.animate-shimmer').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('.animate-blink').length).toBeGreaterThan(0)
   })
 
   it('renders card, pitch and table variants', () => {
