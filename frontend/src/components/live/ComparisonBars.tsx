@@ -177,9 +177,7 @@ export function ComparisonBars({
           <div className="relative w-4 h-4 bg-tt-green ring-2 ring-background" />
           {/* Label above */}
           <div className="absolute bottom-full mb-1.5 md:mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-            <div className="text-sm font-bold uppercase text-tt-green">
-              YOU
-            </div>
+            <div className="text-sm font-bold uppercase text-tt-green">YOU</div>
             <div className="text-sm font-bold text-tt-green">{userPoints}</div>
           </div>
         </div>
@@ -208,9 +206,7 @@ export function ComparisonBars({
             >
               <div className="flex items-center gap-1.5 md:gap-2">
                 <div className={`w-2 h-2 ${config.color}`} />
-                <span className="text-sm uppercase text-foreground-muted">
-                  {comp.tierLabel}
-                </span>
+                <span className="text-sm uppercase text-foreground-muted">{comp.tierLabel}</span>
               </div>
               <div className="text-base font-bold whitespace-nowrap">
                 <span className="text-foreground">{comp.avgPoints.toFixed(0)}</span>
@@ -237,9 +233,7 @@ export function ComparisonBars({
             <div className="pt-3 border-t border-border/50">
               {/* Header with tier selector */}
               <div className="flex items-center justify-between mb-3">
-                <div className="text-sm uppercase text-foreground-muted">
-                  Biggest Swings
-                </div>
+                <div className="text-sm uppercase text-foreground-muted">Biggest Swings</div>
                 {showTierSelector && (
                   <div className="flex items-center gap-1">
                     <span className="text-sm text-foreground-dim mr-1">vs</span>
@@ -263,9 +257,7 @@ export function ComparisonBars({
               <div key={selectedTier} className="grid grid-cols-2 gap-4">
                 {/* Gainers column */}
                 <div className="space-y-1.5">
-                  <div className="text-sm text-tt-green uppercase mb-1">
-                    ▲ Helping You
-                  </div>
+                  <div className="text-sm text-tt-green uppercase mb-1">▲ Helping You</div>
                   {gainers.length > 0 ? (
                     gainers.map((player) => (
                       <div
@@ -290,9 +282,7 @@ export function ComparisonBars({
 
                 {/* Losers column */}
                 <div className="space-y-1.5">
-                  <div className="text-sm text-destructive uppercase mb-1">
-                    ▼ Hurting You
-                  </div>
+                  <div className="text-sm text-destructive uppercase mb-1">▼ Hurting You</div>
                   {losers.length > 0 ? (
                     losers.map((player) => (
                       <div

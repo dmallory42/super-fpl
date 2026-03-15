@@ -625,9 +625,7 @@ export function Live() {
 
           {/* Global tier context */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 bg-surface-elevated/70">
-            <span className="text-sm uppercase text-foreground-muted">
-              Compare Against
-            </span>
+            <span className="text-sm uppercase text-foreground-muted">Compare Against</span>
             <div className="flex items-center gap-1 flex-wrap">
               {TIER_OPTIONS.map((tier) => (
                 <button
@@ -680,9 +678,7 @@ export function Live() {
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-tt-green" />
-                        <span className="text-sm uppercase text-tt-green">
-                          You
-                        </span>
+                        <span className="text-sm uppercase text-tt-green">You</span>
                       </div>
                       <div className="text-sm md:text-base text-foreground">
                         {effectivePlayersPlayed.you.played.toFixed(1)}/

@@ -138,9 +138,7 @@ export function PlayersRemaining({
       {/* Players left to play */}
       {playersLeft.length > 0 && (
         <div className="pt-3 border-t border-border/50">
-          <div className="text-sm text-foreground-dim uppercase mb-2">
-            Still to play
-          </div>
+          <div className="text-sm text-foreground-dim uppercase mb-2">Still to play</div>
           <div className="flex flex-wrap gap-1.5">
             {playersLeft.map((player) => {
               const info = playersMap.get(player.player_id)

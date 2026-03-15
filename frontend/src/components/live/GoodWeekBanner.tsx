@@ -28,9 +28,7 @@ export function GoodWeekBanner({ margin, rankMovement }: GoodWeekBannerProps) {
         {rankMovement != null && rankMovement > 0 && (
           <div className="text-right">
             <span className="text-lg font-bold text-tt-green">{formatRank(rankMovement)}</span>
-            <p className="text-sm text-foreground-muted uppercase">
-              places gained
-            </p>
+            <p className="text-sm text-foreground-muted uppercase">places gained</p>
           </div>
         )}
       </div>

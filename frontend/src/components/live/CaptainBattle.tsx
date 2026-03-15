@@ -115,9 +115,7 @@ export function CaptainBattle({
       {/* Tier selector */}
       <div className="flex items-center justify-between">
         {isDifferential && (
-          <span className="text-sm uppercase text-tt-green">
-            Captain differential
-          </span>
+          <span className="text-sm uppercase text-tt-green">Captain differential</span>
         )}
         <div className={`flex items-center gap-1 ${!isDifferential ? 'ml-auto' : ''}`}>
           {showTierSelector ? (
@@ -138,9 +136,7 @@ export function CaptainBattle({
               ))}
             </>
           ) : (
-            <span className="text-sm uppercase text-foreground-muted">
-              vs {activeTierLabel}
-            </span>
+            <span className="text-sm uppercase text-foreground-muted">vs {activeTierLabel}</span>
           )}
         </div>
       </div>

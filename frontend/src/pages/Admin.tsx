@@ -255,12 +255,8 @@ export function Admin() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="pb-2 text-sm uppercase text-foreground-muted">
-                    Player
-                  </th>
-                  <th className="pb-2 text-sm uppercase text-foreground-muted w-16">
-                    Pos
-                  </th>
+                  <th className="pb-2 text-sm uppercase text-foreground-muted">Player</th>
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-16">Pos</th>
                   <th className="pb-2 text-sm uppercase text-foreground-muted w-32">
                     Penalty Order
                   </th>
@@ -400,18 +396,10 @@ export function Admin() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="pb-2 text-sm uppercase text-foreground-muted">
-                    Player
-                  </th>
-                  <th className="pb-2 text-sm uppercase text-foreground-muted w-16">
-                    Team
-                  </th>
-                  <th className="pb-2 text-sm uppercase text-foreground-muted w-24">
-                    Avg Mins
-                  </th>
-                  <th className="pb-2 text-sm uppercase text-foreground-muted w-28">
-                    Override
-                  </th>
+                  <th className="pb-2 text-sm uppercase text-foreground-muted">Player</th>
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-16">Team</th>
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-24">Avg Mins</th>
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-28">Override</th>
                   <th className="pb-2 w-16"></th>
                 </tr>
               </thead>

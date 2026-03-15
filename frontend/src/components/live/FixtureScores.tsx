@@ -194,9 +194,7 @@ export function FixtureScores({
             {group.isLiveGroup && (
               <span className="w-1.5 h-1.5 rounded-full bg-tt-green animate-blink" />
             )}
-            <span className="text-sm uppercase text-foreground-dim">
-              {group.label}
-            </span>
+            <span className="text-sm uppercase text-foreground-dim">{group.label}</span>
           </div>
           {group.fixtures.map((fixture) => {
             const homeTeam = teamsMap.get(fixture.home_club_id) || '???'
@@ -287,9 +285,7 @@ export function FixtureScores({
                       </span>
                     ) : null}
                     {isFinished ? (
-                      <span className="text-sm text-foreground-dim uppercase ml-1">
-                        FT
-                      </span>
+                      <span className="text-sm text-foreground-dim uppercase ml-1">FT</span>
                     ) : null}
                   </div>
 

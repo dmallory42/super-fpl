@@ -44,9 +44,7 @@ export function OwnershipMatrix({
             <th className="text-left p-3 text-sm uppercase text-foreground-muted sticky left-0 bg-surface z-10">
               Player
             </th>
-            <th className="text-center p-3 text-sm uppercase text-foreground-muted">
-              EO%
-            </th>
+            <th className="text-center p-3 text-sm uppercase text-foreground-muted">EO%</th>
             {managerIds.map((id) => (
               <th
                 key={id}

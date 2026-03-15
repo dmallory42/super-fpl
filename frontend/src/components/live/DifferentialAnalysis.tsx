@@ -52,9 +52,7 @@ export function DifferentialAnalysis({
       {/* Header */}
       <div className="flex items-center justify-between">
         {showTierLabel ? (
-          <span className="text-sm uppercase text-foreground-muted">
-            vs {tierLabel}
-          </span>
+          <span className="text-sm uppercase text-foreground-muted">vs {tierLabel}</span>
         ) : (
           <span />
         )}
@@ -83,9 +81,7 @@ export function DifferentialAnalysis({
                   {isCaptain && <span className="text-tt-yellow text-sm">©</span>}
                   <span className="text-foreground font-medium truncate">{player.name}</span>
                 </div>
-                <span className={`text-sm uppercase shrink-0 ${config.color}`}>
-                  {config.label}
-                </span>
+                <span className={`text-sm uppercase shrink-0 ${config.color}`}>{config.label}</span>
               </div>
 
               {/* Row 2: Metrics */}

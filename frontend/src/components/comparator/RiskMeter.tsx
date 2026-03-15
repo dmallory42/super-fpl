@@ -47,9 +47,7 @@ export function RiskMeter({ managerName, riskScore, compact = false }: RiskMeter
     <div className={`p-4 ${levelBgColors[riskScore.level]} border border-border`}>
       <div className="flex items-center justify-between mb-3">
         <span className="text-foreground font-medium truncate max-w-[150px]">{managerName}</span>
-        <span
-          className={`text-sm uppercase font-bold ${levelTextColors[riskScore.level]}`}
-        >
+        <span className={`text-sm uppercase font-bold ${levelTextColors[riskScore.level]}`}>
           {riskScore.level} risk
         </span>
       </div>

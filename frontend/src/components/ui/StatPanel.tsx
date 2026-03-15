@@ -36,12 +36,8 @@ export function StatPanel({
           </span>
         )}
       </div>
-      <div className="text-sm uppercase text-tt-cyan mt-1">
-        {label}
-      </div>
-      {subValue && (
-        <div className="text-sm text-foreground-dim mt-0.5">{subValue}</div>
-      )}
+      <div className="text-sm uppercase text-tt-cyan mt-1">{label}</div>
+      {subValue && <div className="text-sm text-foreground-dim mt-0.5">{subValue}</div>}
     </div>
   )
 }

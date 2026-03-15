@@ -94,9 +94,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
       {/* Player breakdown */}
       {sortedPlayers.length > 0 && (
         <div className="pt-3 border-t border-border/50">
-          <div className="text-sm text-foreground-dim uppercase mb-2">
-            Player Breakdown
-          </div>
+          <div className="text-sm text-foreground-dim uppercase mb-2">Player Breakdown</div>
           <div className="space-y-1.5">
             {sortedPlayers.map((player) => {
               const variance = Math.round((player.actual - player.predicted) * 10) / 10

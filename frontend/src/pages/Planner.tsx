@@ -1125,9 +1125,7 @@ export function Planner() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold uppercase text-foreground mb-2">
-              Transfer Planner
-            </h2>
+            <h2 className="text-2xl font-bold uppercase text-foreground mb-2">Transfer Planner</h2>
             <p className="font-body text-foreground-muted text-sm mb-4">
               Build your squad, then press Find Plans to see optimized suggestions.
             </p>
@@ -1161,36 +1159,28 @@ export function Planner() {
               </div>
               <div className="p-5 space-y-5">
                 <div>
-                  <h4 className="text-sm uppercase text-tt-green mb-2">
-                    1. Make Transfers
-                  </h4>
+                  <h4 className="text-sm uppercase text-tt-green mb-2">1. Make Transfers</h4>
                   <p className="text-sm text-foreground-muted">
                     Click any player on the pitch to transfer them out and pick a replacement. Your
                     transfers appear in the sidebar.
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm uppercase text-tt-green mb-2">
-                    2. Find Plans
-                  </h4>
+                  <h4 className="text-sm uppercase text-tt-green mb-2">2. Find Plans</h4>
                   <p className="text-sm text-foreground-muted">
                     Press "Find Plans" to run the optimizer. It finds multi-gameweek transfer paths
                     that maximize points, respecting any transfers you've already made.
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm uppercase text-tt-green mb-2">
-                    3. Select & Save
-                  </h4>
+                  <h4 className="text-sm uppercase text-tt-green mb-2">3. Select & Save</h4>
                   <p className="text-sm text-foreground-muted">
                     Select a plan to auto-apply its transfers to your squad. Save plans you like for
                     later review.
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm uppercase text-tt-green mb-2">
-                    Solver Controls
-                  </h4>
+                  <h4 className="text-sm uppercase text-tt-green mb-2">Solver Controls</h4>
                   <p className="text-sm text-foreground-muted">
                     <span className="text-foreground font-medium">FT Value</span> controls hit
                     aversion — higher values make the solver prefer rolling transfers.
@@ -1416,9 +1406,7 @@ export function Planner() {
                 className="w-full flex items-center justify-between p-4 bg-surface-elevated hover:bg-surface-hover"
               >
                 <div className="flex items-center gap-3">
-                  <h3 className="text-sm font-bold uppercase text-foreground">
-                    Advanced Settings
-                  </h3>
+                  <h3 className="text-sm font-bold uppercase text-foreground">Advanced Settings</h3>
                   <span className="text-sm text-foreground-muted">
                     solver + chips + constraints
                   </span>
@@ -1800,9 +1788,7 @@ export function Planner() {
                     .sort(([a], [b]) => Number(a) - Number(b))
                     .map(([gwStr, transfers]) => (
                       <div key={gwStr} className="flex items-center gap-2">
-                        <span className="text-sm uppercase text-foreground-muted">
-                          GW{gwStr}:
-                        </span>
+                        <span className="text-sm uppercase text-foreground-muted">GW{gwStr}:</span>
                         {transfers.map((ft, idx) => {
                           const outPlayer = playersData?.players.find((p) => p.id === ft.out)
                           const inPlayer = playersData?.players.find((p) => p.id === ft.in)
@@ -1859,9 +1845,7 @@ export function Planner() {
                       key={plan.id}
                       className="flex items-center gap-3 px-3 py-2 bg-surface-elevated rounded-lg"
                     >
-                      <span className="text-sm uppercase text-foreground">
-                        {plan.name}
-                      </span>
+                      <span className="text-sm uppercase text-foreground">{plan.name}</span>
                       <span
                         className={`text-sm font-bold ${plan.scoreVsHold > 0 ? 'text-tt-green' : 'text-foreground'}`}
                       >
@@ -1899,9 +1883,7 @@ export function Planner() {
               className="w-full flex items-center justify-between p-4 bg-surface-elevated hover:bg-surface-hover"
             >
               <div className="flex items-center gap-3">
-                <h3 className="text-sm font-bold uppercase text-foreground">
-                  Player Explorer
-                </h3>
+                <h3 className="text-sm font-bold uppercase text-foreground">Player Explorer</h3>
                 <span className="text-sm text-foreground-muted">
                   {predictionsRange.players.length} players
                 </span>

@@ -185,9 +185,7 @@ export function PlayerDetailPanel({
         <div className="bg-tt-green/10">
           {/* Top row: name, position, close */}
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-            <h3 className="text-lg uppercase text-foreground font-bold">
-              {player.web_name}
-            </h3>
+            <h3 className="text-lg uppercase text-foreground font-bold">{player.web_name}</h3>
             <div className="flex items-center gap-2">
               <PositionBadge elementType={player.element_type} />
               <button
@@ -235,9 +233,7 @@ export function PlayerDetailPanel({
                 <div className={`text-base font-bold ${stat.gradient ? '' : 'text-foreground'}`}>
                   {stat.gradient ? <span className="text-tt-cyan">{stat.value}</span> : stat.value}
                 </div>
-                <div className="text-sm uppercase text-foreground-muted">
-                  {stat.label}
-                </div>
+                <div className="text-sm uppercase text-foreground-muted">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -316,18 +312,12 @@ export function PlayerDetailPanel({
           <div>
             {/* Column headers */}
             <div className="flex items-center px-2 pb-2 border-b border-border/30">
-              <span className="w-12 text-sm uppercase text-foreground-dim">
-                GW
-              </span>
-              <span className="w-16 text-sm uppercase text-foreground-dim text-center">
-                Fix
-              </span>
+              <span className="w-12 text-sm uppercase text-foreground-dim">GW</span>
+              <span className="w-16 text-sm uppercase text-foreground-dim text-center">Fix</span>
               <span className="flex-1 text-sm uppercase text-foreground-dim text-right pr-3">
                 xMins
               </span>
-              <span className="w-14 text-sm uppercase text-foreground-dim text-right">
-                xPts
-              </span>
+              <span className="w-14 text-sm uppercase text-foreground-dim text-right">xPts</span>
             </div>
 
             {/* GW rows */}
@@ -386,9 +376,7 @@ export function PlayerDetailPanel({
 
             {/* Summary row */}
             <div className="flex items-center px-2 py-2 mt-1 border-t border-border/40">
-              <span className="w-12 text-sm uppercase text-foreground-muted">
-                Total
-              </span>
+              <span className="w-12 text-sm uppercase text-foreground-muted">Total</span>
               <span className="w-16" />
               <span className="flex-1 text-right pr-3 text-sm font-bold text-foreground-muted">
                 {totalXMins}

@@ -85,9 +85,7 @@ export function PlayerStatusCard({
         </div>
 
         {/* Player name */}
-        <div className="text-tt-white text-sm truncate max-w-[84px] md:max-w-[96px]">
-          {webName}
-        </div>
+        <div className="text-tt-white text-sm truncate max-w-[84px] md:max-w-[96px]">{webName}</div>
 
         {/* Team + status */}
         <div className="flex items-center justify-center gap-1 text-sm">

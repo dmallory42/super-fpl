@@ -242,9 +242,7 @@ export function LeagueAnalyzer() {
               </div>
               <div className="text-right">
                 {isThisGwView && analysisData && (
-                  <div className="text-xl font-bold text-foreground">
-                    GW{analysisData.gameweek}
-                  </div>
+                  <div className="text-xl font-bold text-foreground">GW{analysisData.gameweek}</div>
                 )}
                 {!isThisGwView && seasonData && (
                   <div className="text-sm font-bold text-foreground">

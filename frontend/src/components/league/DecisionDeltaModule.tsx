@@ -126,9 +126,7 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
     <div className="space-y-4" data-testid="decision-delta-module">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h4 className="text-sm uppercase text-foreground">
-            Decision Delta vs League Median
-          </h4>
+          <h4 className="text-sm uppercase text-foreground">Decision Delta vs League Median</h4>
           <p className="text-sm text-foreground-dim">{metricConfig.description}</p>
         </div>
         <div className="flex items-center gap-2">
