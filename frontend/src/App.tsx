@@ -102,7 +102,7 @@ function FontToggle() {
   }, [isPixel])
 
   return (
-    <button onClick={toggle} className="text-tt-dim hover:text-tt-cyan text-xs uppercase">
+    <button onClick={toggle} className="text-tt-dim hover:text-tt-cyan text-sm uppercase">
       [A] FONT: {isPixel ? 'PIXEL' : 'MONO'}
     </button>
   )
@@ -170,7 +170,7 @@ function App() {
         {/* Footer */}
         <footer className="border-t border-border mt-auto">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <p className="text-xs text-tt-dim">Data from Official FPL API</p>
+            <p className="text-sm text-tt-dim">Data from Official FPL API</p>
             <FontToggle />
           </div>
         </footer>

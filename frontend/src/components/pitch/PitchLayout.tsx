@@ -38,7 +38,7 @@ export function PitchLayout({ rows, bench, variant = 'formation' }: PitchLayoutP
       {/* Bench */}
       <div className="mt-6 pt-4 border-t-2 border-[#006600]">
         <div className="flex items-center justify-center gap-2 mb-3">
-          <span className="text-tt-cyan text-xs">
+          <span className="text-tt-cyan text-sm">
             {'─'.repeat(3)} BENCH {'─'.repeat(3)}
           </span>
         </div>

@@ -26,21 +26,21 @@ export function StatPanel({
     <div className={`stat-panel ${className}`}>
       <div className="flex items-baseline gap-2">
         <span
-          className={`text-xl md:text-2xl font-bold ${highlight ? 'text-tt-yellow' : 'text-tt-white'}`}
+          className={`text-2xl md:text-3xl font-bold ${highlight ? 'text-tt-yellow' : 'text-tt-white'}`}
         >
           {value}
         </span>
         {trend && (
-          <span className={`text-xs font-medium ${trendDisplay[trend].className}`}>
+          <span className={`text-sm font-medium ${trendDisplay[trend].className}`}>
             {trendDisplay[trend].text}
           </span>
         )}
       </div>
-      <div className="text-[10px] md:text-xs uppercase tracking-wide text-tt-cyan mt-1">
+      <div className="text-sm uppercase text-tt-cyan mt-1">
         {label}
       </div>
       {subValue && (
-        <div className="text-[11px] md:text-xs text-foreground-dim mt-0.5">{subValue}</div>
+        <div className="text-sm text-foreground-dim mt-0.5">{subValue}</div>
       )}
     </div>
   )

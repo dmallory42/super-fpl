@@ -33,7 +33,7 @@ export function BroadcastCard({
         <div
           className={`px-3 md:px-4 py-2.5 md:py-3 flex items-center justify-between ${accentBgColors[accentColor]}`}
         >
-          <h3 className="text-xs md:text-sm uppercase tracking-wide font-semibold">{title}</h3>
+          <h3 className="text-sm md:text-base uppercase font-semibold">{title}</h3>
           {headerAction && <div>{headerAction}</div>}
         </div>
       )}

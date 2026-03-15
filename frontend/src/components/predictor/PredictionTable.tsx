@@ -138,7 +138,7 @@ export function PredictionTable({ predictions, teams }: PredictionTableProps) {
                   {pred.fixture ? (
                     <div className="flex items-center gap-2">
                       <span
-                        className={`w-6 h-6 flex items-center justify-center text-xs font-bold ${difficultyColors[pred.fixture.difficulty] || 'bg-gray-600'}`}
+                        className={`w-6 h-6 flex items-center justify-center text-sm font-bold ${difficultyColors[pred.fixture.difficulty] || 'bg-gray-600'}`}
                       >
                         {pred.fixture.difficulty}
                       </span>

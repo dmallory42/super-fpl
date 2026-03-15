@@ -74,7 +74,7 @@ const XMinsInput = memo(function XMinsInput({
       value={localValue}
       placeholder={String(baseXMins)}
       onChange={handleChange}
-      className={`w-14 px-1 py-0.5 text-center text-xs border bg-surface-elevated        ${hasOverride ? 'border-tt-green/60 text-tt-green' : 'border-border/30 text-foreground-muted'}
+      className={`w-14 px-1 py-0.5 text-center text-sm border bg-surface-elevated        ${hasOverride ? 'border-tt-green/60 text-tt-green' : 'border-border/30 text-foreground-muted'}
       `}
     />
   )
@@ -164,7 +164,7 @@ const ExplorerRow = memo(
         {gwValues.map(({ gw, pts }) => (
           <td
             key={gw}
-            className={`px-2 py-1.5 text-right text-xs ${getHeatClass(pts)} ${hasOverride ? 'italic' : ''}`}
+            className={`px-2 py-1.5 text-right text-sm ${getHeatClass(pts)} ${hasOverride ? 'italic' : ''}`}
           >
             {pts.toFixed(1)}
           </td>
@@ -399,7 +399,7 @@ export function PlayerExplorer({
                 setPositionFilter(pos.value)
                 setVisibleCount(50)
               }}
-              className={`px-3 py-1.5text-xs uppercase tracking-wider transition-colors ${
+              className={`px-3 py-1.5text-sm uppercase transition-colors ${
                 positionFilter === pos.value
                   ? 'bg-tt-green/20 text-tt-green border border-tt-green/40'
                   : 'bg-surface-elevated text-foreground-muted border border-transparent hover:bg-surface-hover'
@@ -410,7 +410,7 @@ export function PlayerExplorer({
           ))}
         </div>
         {hasXMinsOverrides && onResetXMins && (
-          <button onClick={onResetXMins} className="btn-secondary text-xs whitespace-nowrap">
+          <button onClick={onResetXMins} className="btn-secondary text-sm whitespace-nowrap">
             Reset xMins
           </button>
         )}
@@ -421,38 +421,38 @@ export function PlayerExplorer({
         <table className="w-full text-sm min-w-[700px]">
           <thead>
             <tr className="border-b border-border/50">
-              <th className="text-left px-3 py-2 text-xs uppercase tracking-wider text-foreground-muted sticky left-0 bg-surface z-10 w-12">
+              <th className="text-left px-3 py-2 text-sm uppercase text-foreground-muted sticky left-0 bg-surface z-10 w-12">
                 Pos
               </th>
               <th
-                className="text-left px-3 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground sticky left-12 bg-surface z-10 min-w-[120px]"
+                className="text-left px-3 py-2 text-sm uppercase text-foreground-muted cursor-pointer hover:text-foreground sticky left-12 bg-surface z-10 min-w-[120px]"
                 onClick={() => handleSort('web_name')}
               >
                 Player
                 <SortIndicator field="web_name" />
               </th>
-              <th className="text-left px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted w-14">
+              <th className="text-left px-2 py-2 text-sm uppercase text-foreground-muted w-14">
                 Team
               </th>
               <th
-                className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-16"
+                className="text-right px-2 py-2 text-sm uppercase text-foreground-muted cursor-pointer hover:text-foreground w-16"
                 onClick={() => handleSort('now_cost')}
               >
                 Price
                 <SortIndicator field="now_cost" />
               </th>
               <th
-                className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-14"
+                className="text-right px-2 py-2 text-sm uppercase text-foreground-muted cursor-pointer hover:text-foreground w-14"
                 onClick={() => handleSort('eo')}
               >
                 EO%
                 <SortIndicator field="eo" />
               </th>
-              <th className="text-center px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted w-16">
+              <th className="text-center px-2 py-2 text-sm uppercase text-foreground-muted w-16">
                 xMins
               </th>
               <th
-                className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-12"
+                className="text-right px-2 py-2 text-sm uppercase text-foreground-muted cursor-pointer hover:text-foreground w-12"
                 onClick={() => handleSort('total_points')}
               >
                 Pts
@@ -461,7 +461,7 @@ export function PlayerExplorer({
               {gameweeks.map((gw) => (
                 <th
                   key={gw}
-                  className="text-right px-2 py-2 text-xs uppercase tracking-wider text-foreground-muted cursor-pointer hover:text-foreground w-13"
+                  className="text-right px-2 py-2 text-sm uppercase text-foreground-muted cursor-pointer hover:text-foreground w-13"
                   onClick={() => handleSort(`gw_${gw}`)}
                 >
                   GW{gw}
@@ -469,7 +469,7 @@ export function PlayerExplorer({
                 </th>
               ))}
               <th
-                className="text-right px-3 py-2 text-xs uppercase tracking-wider text-tt-green cursor-pointer hover:text-tt-green/80 w-16"
+                className="text-right px-3 py-2 text-sm uppercase text-tt-green cursor-pointer hover:text-tt-green/80 w-16"
                 onClick={() => handleSort('total_predicted')}
               >
                 Total
@@ -518,11 +518,11 @@ export function PlayerExplorer({
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
-        <span className="text-xs text-foreground-muted">
+        <span className="text-sm text-foreground-muted">
           Showing {visiblePlayers.length} of {filteredAndSorted.length} players
         </span>
         {visibleCount < filteredAndSorted.length && (
-          <button onClick={() => setVisibleCount((c) => c + 50)} className="btn-secondary text-xs">
+          <button onClick={() => setVisibleCount((c) => c + 50)} className="btn-secondary text-sm">
             Show More
           </button>
         )}

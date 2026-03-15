@@ -41,16 +41,16 @@ export function OwnershipMatrix({
       <table className="w-full text-sm min-w-[600px]">
         <thead>
           <tr className="border-b border-border">
-            <th className="text-left p-3 text-xs uppercase tracking-wider text-foreground-muted sticky left-0 bg-surface z-10">
+            <th className="text-left p-3 text-sm uppercase text-foreground-muted sticky left-0 bg-surface z-10">
               Player
             </th>
-            <th className="text-center p-3 text-xs uppercase tracking-wider text-foreground-muted">
+            <th className="text-center p-3 text-sm uppercase text-foreground-muted">
               EO%
             </th>
             {managerIds.map((id) => (
               <th
                 key={id}
-                className="text-center p-3 text-xs uppercase tracking-wider text-foreground-muted max-w-[100px]"
+                className="text-center p-3 text-sm uppercase text-foreground-muted max-w-[100px]"
               >
                 <span className="truncate block">{managerNames[id] || `#${id}`}</span>
               </th>
@@ -67,13 +67,13 @@ export function OwnershipMatrix({
               <tr key={playerId} className="border-b border-border hover:bg-surface-hover">
                 <td className="p-3 sticky left-0 bg-surface z-10">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-foreground-muted">
+                    <span className="text-sm text-foreground-muted">
                       {player ? getPositionName(player.position) : ''}
                     </span>
                     <span className="text-foreground font-medium">
                       {player?.web_name || `Player ${playerId}`}
                     </span>
-                    <span className="text-xs text-foreground-dim">
+                    <span className="text-sm text-foreground-dim">
                       {player ? teams.get(player.team) : ''}
                     </span>
                   </div>

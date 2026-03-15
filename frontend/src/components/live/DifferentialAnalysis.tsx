@@ -52,7 +52,7 @@ export function DifferentialAnalysis({
       {/* Header */}
       <div className="flex items-center justify-between">
         {showTierLabel ? (
-          <span className="text-xs uppercase tracking-wide text-foreground-muted">
+          <span className="text-sm uppercase text-foreground-muted">
             vs {tierLabel}
           </span>
         ) : (
@@ -73,7 +73,7 @@ export function DifferentialAnalysis({
             <div
               key={player.playerId}
               className={`
-                p-2 text-xs
+                p-2 text-sm
                 ${category === 'differential' ? 'bg-tt-magenta/10 ring-1 ring-tt-magenta/30' : 'bg-surface-elevated'}
               `}
             >
@@ -83,13 +83,13 @@ export function DifferentialAnalysis({
                   {isCaptain && <span className="text-tt-yellow text-sm">©</span>}
                   <span className="text-foreground font-medium truncate">{player.name}</span>
                 </div>
-                <span className={`text-xs uppercase tracking-wide shrink-0 ${config.color}`}>
+                <span className={`text-sm uppercase shrink-0 ${config.color}`}>
                   {config.label}
                 </span>
               </div>
 
               {/* Row 2: Metrics */}
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-foreground-muted">{player.points} pts</span>
                   <span
@@ -128,7 +128,7 @@ export function DifferentialAnalysis({
 
       {/* Legend */}
       <div className="pt-2 border-t border-border/50">
-        <div className="flex items-center justify-center gap-4 text-xs uppercase tracking-wide">
+        <div className="flex items-center justify-center gap-4 text-sm uppercase">
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 bg-tt-magenta" />
             <span className="text-foreground-dim">

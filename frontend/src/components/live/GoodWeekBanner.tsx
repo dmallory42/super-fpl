@@ -20,15 +20,15 @@ export function GoodWeekBanner({ margin, rankMovement }: GoodWeekBannerProps) {
     <div className="relative overflow-hidden border border-tt-green/40">
       <div className="bg-tt-green/15 px-4 py-3 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold tracking-wider uppercase text-tt-green">{message}</h3>
-          <p className="text-xs text-foreground-muted mt-0.5">
+          <h3 className="text-lg font-bold uppercase text-tt-green">{message}</h3>
+          <p className="text-sm text-foreground-muted mt-0.5">
             {sub} — <span className="font-bold text-tt-green">+{Math.round(margin)}</span> pts ahead
           </p>
         </div>
         {rankMovement != null && rankMovement > 0 && (
           <div className="text-right">
             <span className="text-lg font-bold text-tt-green">{formatRank(rankMovement)}</span>
-            <p className="text-[10px] text-foreground-muted uppercase tracking-wider">
+            <p className="text-sm text-foreground-muted uppercase">
               places gained
             </p>
           </div>

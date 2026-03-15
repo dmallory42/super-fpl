@@ -56,7 +56,7 @@
   }
 
   html {
-    font-size: 112.5%;
+    font-size: 125%;
   }
 
   body {
@@ -148,7 +148,7 @@ html.font-mono-mode {
   }
 
   .broadcast-card-header {
-    @apply px-4 py-3 text-sm uppercase;
+    @apply px-4 py-3 text-base uppercase;
     background: hsl(var(--tt-cyan));
     color: #000000;
   }
@@ -175,7 +175,7 @@ html.font-mono-mode {
   }
 
   .form-section-title {
-    @apply text-[11px] font-semibold uppercase tracking-[0.08em];
+    @apply text-sm font-semibold uppercase;
     color: hsl(var(--tt-cyan));
   }
 
@@ -189,7 +189,7 @@ html.font-mono-mode {
   }
 
   .form-label {
-    @apply text-[11px] uppercase tracking-[0.08em];
+    @apply text-sm uppercase;
     color: hsl(var(--tt-cyan));
   }
 
@@ -212,7 +212,7 @@ html.font-mono-mode {
   }
 
   .form-empty-text {
-    @apply text-xs;
+    @apply text-sm;
     color: #666666;
   }
 
@@ -221,7 +221,7 @@ html.font-mono-mode {
   }
 
   .form-pill {
-    @apply inline-flex items-center gap-1 px-2 py-1 text-xs;
+    @apply inline-flex items-center gap-1 px-2 py-1 text-sm;
   }
 
   .form-pill-lock {
@@ -240,11 +240,11 @@ html.font-mono-mode {
   }
 
   .form-error-text {
-    @apply text-xs text-destructive;
+    @apply text-sm text-destructive;
   }
 
   .btn-primary {
-    @apply px-6 py-2.5 uppercase tracking-wider text-sm font-semibold;
+    @apply px-6 py-2.5 uppercase text-sm font-semibold;
     background: hsl(var(--tt-cyan));
     color: #000000;
   }
@@ -254,7 +254,7 @@ html.font-mono-mode {
   }
 
   .btn-secondary {
-    @apply px-6 py-2.5 uppercase tracking-wider text-sm font-medium;
+    @apply px-6 py-2.5 uppercase text-sm font-medium;
     background: #000000;
     color: hsl(var(--tt-cyan));
     border: 1px solid hsl(var(--tt-cyan));
@@ -295,7 +295,7 @@ html.font-mono-mode {
   }
 
   .table-broadcast th {
-    @apply px-4 py-3 text-left text-xs uppercase tracking-wider;
+    @apply px-4 py-3 text-left text-sm uppercase;
   }
 
   .table-broadcast th.text-right,

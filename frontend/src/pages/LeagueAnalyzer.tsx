@@ -146,7 +146,7 @@ export function LeagueAnalyzer() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold tracking-wider text-foreground mb-2">League Analyzer</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-2">League Analyzer</h2>
         <p className="text-foreground-muted text-sm">
           Analyze your mini-league to find differentials, compare ownership, and assess risk.
         </p>
@@ -197,7 +197,7 @@ export function LeagueAnalyzer() {
               type="button"
               onClick={() => setView(tab.id)}
               data-testid={`league-view-tab-${tab.id}`}
-              className={`px-3 py-1.5 text-xs uppercase tracking-wider ${
+              className={`px-3 py-1.5 text-sm uppercase ${
                 view === tab.id
                   ? 'bg-tt-green/20 text-tt-green border border-tt-green/30'
                   : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated border border-border/50'
@@ -231,7 +231,7 @@ export function LeagueAnalyzer() {
           <BroadcastCard animationDelay={0}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-2xl font-bold tracking-wider">
+                <h3 className="text-2xl font-bold">
                   <span className="text-tt-cyan">{activeData.league.name}</span>
                 </h3>
                 <p className="text-foreground-muted text-sm">
@@ -242,12 +242,12 @@ export function LeagueAnalyzer() {
               </div>
               <div className="text-right">
                 {isThisGwView && analysisData && (
-                  <div className="text-xl font-bold text-foreground tracking-wider">
+                  <div className="text-xl font-bold text-foreground">
                     GW{analysisData.gameweek}
                   </div>
                 )}
                 {!isThisGwView && seasonData && (
-                  <div className="text-sm font-bold text-foreground tracking-wider">
+                  <div className="text-sm font-bold text-foreground">
                     GW{seasonData.gw_from}–GW{seasonData.gw_to}
                   </div>
                 )}
@@ -296,7 +296,7 @@ export function LeagueAnalyzer() {
                                   return (
                                     <span
                                       key={d.player_id}
-                                      className="px-2 py-0.5 text-xs font-medium border bg-tt-green/20 text-tt-green border-tt-green/30"
+                                      className="px-2 py-0.5 text-sm font-medium border bg-tt-green/20 text-tt-green border-tt-green/30"
                                     >
                                       {player?.web_name || d.player_id}
                                     </span>
@@ -333,7 +333,7 @@ export function LeagueAnalyzer() {
                     const diffs = analysisData.comparison.differentials[manager.id] || []
                     return (
                       <div key={manager.id} className="p-4 bg-surface-elevated">
-                        <div className="text-sm uppercase tracking-wider text-foreground mb-3 truncate">
+                        <div className="text-sm uppercase text-foreground mb-3 truncate">
                           {manager.team_name}
                         </div>
                         {diffs.length === 0 ? (
@@ -347,17 +347,17 @@ export function LeagueAnalyzer() {
                                   key={diff.player_id}
                                   className="flex items-center gap-2 text-sm"
                                 >
-                                  <span className="text-xs w-8 text-foreground-muted">
+                                  <span className="text-sm w-8 text-foreground-muted">
                                     {player ? getPositionName(player.position) : ''}
                                   </span>
                                   <span className="text-foreground flex-1 truncate">
                                     {player?.web_name || diff.player_id}
                                   </span>
-                                  <span className="text-tt-green text-xs">
+                                  <span className="text-tt-green text-sm">
                                     {diff.eo.toFixed(0)}%
                                   </span>
                                   {diff.is_captain && (
-                                    <span className="text-tt-yellow text-xs font-bold">C</span>
+                                    <span className="text-tt-yellow text-sm font-bold">C</span>
                                   )}
                                 </li>
                               )

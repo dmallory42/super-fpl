@@ -108,7 +108,7 @@ export function PlayersRemaining({
             >
               {yourPlayersLeft}
             </span>
-            <span className="text-[11px] text-foreground-dim uppercase tracking-wide">Left</span>
+            <span className="text-sm text-foreground-dim uppercase">Left</span>
           </div>
         </div>
 
@@ -116,19 +116,19 @@ export function PlayersRemaining({
         <div className="space-y-2">
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-foreground">{playersFinished.length}</span>
-            <span className="text-xs text-foreground-dim uppercase tracking-wide">Finished</span>
+            <span className="text-sm text-foreground-dim uppercase">Finished</span>
           </div>
 
           {avgPlayersLeft !== null && (
             <div className="flex items-baseline gap-2">
               <span className="text-lg text-foreground-muted">{avgPlayersLeft.toFixed(1)}</span>
-              <span className="text-xs text-foreground-dim uppercase tracking-wide">10K Avg</span>
+              <span className="text-sm text-foreground-dim uppercase">10K Avg</span>
             </div>
           )}
 
           {/* Advantage indicator */}
           {diff !== null && Math.abs(diff) >= 0.5 && (
-            <div className={`text-xs ${diff > 0 ? 'text-tt-green' : 'text-destructive'}`}>
+            <div className={`text-sm ${diff > 0 ? 'text-tt-green' : 'text-destructive'}`}>
               {diff > 0 ? '▲' : '▼'} {Math.abs(diff).toFixed(1)} vs avg
             </div>
           )}
@@ -138,7 +138,7 @@ export function PlayersRemaining({
       {/* Players left to play */}
       {playersLeft.length > 0 && (
         <div className="pt-3 border-t border-border/50">
-          <div className="text-xs text-foreground-dim uppercase tracking-wide mb-2">
+          <div className="text-sm text-foreground-dim uppercase mb-2">
             Still to play
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -153,7 +153,7 @@ export function PlayersRemaining({
                 <div
                   key={player.player_id}
                   className={`
-                    flex items-center gap-1 px-2 py-1 text-xs
+                    flex items-center gap-1 px-2 py-1 text-sm
                     ${
                       isPlaying
                         ? 'bg-tt-green/15 text-tt-green ring-1 ring-tt-green/30'
@@ -163,7 +163,7 @@ export function PlayersRemaining({
                 >
                   {position && (
                     <span
-                      className={`text-xs uppercase ${isPlaying ? 'text-tt-green/70' : 'text-foreground-dim'}`}
+                      className={`text-sm uppercase ${isPlaying ? 'text-tt-green/70' : 'text-foreground-dim'}`}
                     >
                       {position}
                     </span>

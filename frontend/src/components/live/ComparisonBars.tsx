@@ -155,7 +155,7 @@ export function ComparisonBars({
               {/* Marker */}
               <div className={`w-3 h-3 ${config.color} ring-2 ring-background`} />
               <div
-                className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-background/90 px-1.5 py-0.5 text-[10px] text-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-background/90 px-1.5 py-0.5 text-sm text-foreground opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                 data-testid={`tier-tooltip-${comp.tier}`}
               >
                 {comp.tierLabel} {comp.avgPoints.toFixed(0)}
@@ -177,10 +177,10 @@ export function ComparisonBars({
           <div className="relative w-4 h-4 bg-tt-green ring-2 ring-background" />
           {/* Label above */}
           <div className="absolute bottom-full mb-1.5 md:mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-            <div className="text-[11px] md:text-xs font-bold uppercase tracking-wide text-tt-green">
+            <div className="text-sm font-bold uppercase text-tt-green">
               YOU
             </div>
-            <div className="text-[11px] md:text-xs font-bold text-tt-green">{userPoints}</div>
+            <div className="text-sm font-bold text-tt-green">{userPoints}</div>
           </div>
         </div>
       </div>
@@ -208,11 +208,11 @@ export function ComparisonBars({
             >
               <div className="flex items-center gap-1.5 md:gap-2">
                 <div className={`w-2 h-2 ${config.color}`} />
-                <span className="text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
+                <span className="text-sm uppercase text-foreground-muted">
                   {comp.tierLabel}
                 </span>
               </div>
-              <div className="text-sm md:text-base font-bold whitespace-nowrap">
+              <div className="text-base font-bold whitespace-nowrap">
                 <span className="text-foreground">{comp.avgPoints.toFixed(0)}</span>
                 <span className={deltaColorClass}> (</span>
                 <span className={deltaColorClass}>
@@ -237,17 +237,17 @@ export function ComparisonBars({
             <div className="pt-3 border-t border-border/50">
               {/* Header with tier selector */}
               <div className="flex items-center justify-between mb-3">
-                <div className="text-xs uppercase tracking-wide text-foreground-muted">
+                <div className="text-sm uppercase text-foreground-muted">
                   Biggest Swings
                 </div>
                 {showTierSelector && (
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-foreground-dim mr-1">vs</span>
+                    <span className="text-sm text-foreground-dim mr-1">vs</span>
                     {TIER_OPTIONS.map((tier) => (
                       <button
                         key={tier.value}
                         onClick={() => onTierChange(tier.value)}
-                        className={`px-2 py-0.5 text-xs uppercase tracking-wide ${
+                        className={`px-2 py-0.5 text-sm uppercase ${
                           selectedTier === tier.value
                             ? 'bg-tt-green/20 text-tt-green'
                             : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
@@ -263,18 +263,18 @@ export function ComparisonBars({
               <div key={selectedTier} className="grid grid-cols-2 gap-4">
                 {/* Gainers column */}
                 <div className="space-y-1.5">
-                  <div className="text-xs text-tt-green uppercase tracking-wide mb-1">
+                  <div className="text-sm text-tt-green uppercase mb-1">
                     ▲ Helping You
                   </div>
                   {gainers.length > 0 ? (
                     gainers.map((player) => (
                       <div
                         key={player.playerId}
-                        className="flex items-center justify-between text-xs"
+                        className="flex items-center justify-between text-sm"
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="text-foreground truncate">{player.name}</span>
-                          <span className="text-xs shrink-0 text-tt-green">
+                          <span className="text-sm shrink-0 text-tt-green">
                             +{player.relativeEO.toFixed(0)}%
                           </span>
                         </div>
@@ -284,20 +284,20 @@ export function ComparisonBars({
                       </div>
                     ))
                   ) : (
-                    <div className="text-xs text-foreground-dim">No gainers</div>
+                    <div className="text-sm text-foreground-dim">No gainers</div>
                   )}
                 </div>
 
                 {/* Losers column */}
                 <div className="space-y-1.5">
-                  <div className="text-xs text-destructive uppercase tracking-wide mb-1">
+                  <div className="text-sm text-destructive uppercase mb-1">
                     ▼ Hurting You
                   </div>
                   {losers.length > 0 ? (
                     losers.map((player) => (
                       <div
                         key={player.playerId}
-                        className="flex items-center justify-between text-xs"
+                        className="flex items-center justify-between text-sm"
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span
@@ -305,7 +305,7 @@ export function ComparisonBars({
                           >
                             {player.name}
                           </span>
-                          <span className="text-xs shrink-0 text-destructive">
+                          <span className="text-sm shrink-0 text-destructive">
                             {player.relativeEO.toFixed(0)}%
                           </span>
                         </div>
@@ -315,7 +315,7 @@ export function ComparisonBars({
                       </div>
                     ))
                   ) : (
-                    <div className="text-xs text-foreground-dim">No losers</div>
+                    <div className="text-sm text-foreground-dim">No losers</div>
                   )}
                 </div>
               </div>
@@ -324,7 +324,7 @@ export function ComparisonBars({
         })()}
 
       {/* Sample size note */}
-      <p className="text-xs text-foreground-dim text-center pt-1.5 md:pt-2">
+      <p className="text-sm text-foreground-dim text-center pt-1.5 md:pt-2">
         Based on {comparisons[0]?.sampleSize.toLocaleString() ?? 0} sampled managers per tier
       </p>
     </div>
@@ -341,7 +341,7 @@ export function RankMovement({ currentRank, startingRank }: RankMovementProps) {
     return (
       <div className="text-center">
         <div className="text-2xl font-bold text-foreground">~{formatRank(currentRank)}</div>
-        <div className="text-xs text-foreground-dim">Est. Rank</div>
+        <div className="text-sm text-foreground-dim">Est. Rank</div>
       </div>
     )
   }
@@ -361,7 +361,7 @@ export function RankMovement({ currentRank, startingRank }: RankMovementProps) {
         {isDown && '↓'}
         {formatRank(currentRank)}
       </div>
-      <div className="text-xs text-foreground-dim">
+      <div className="text-sm text-foreground-dim">
         {isUp
           ? `Up from ${formatRank(startingRank)}`
           : isDown

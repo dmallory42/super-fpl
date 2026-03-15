@@ -148,7 +148,7 @@ function CumulativeChart({ rows }: { rows: RowData[] }) {
         x={padding.left}
         y={height - 10}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         GW{rows[0].gameweek}
       </text>
@@ -156,7 +156,7 @@ function CumulativeChart({ rows }: { rows: RowData[] }) {
         x={width - padding.right}
         y={height - 10}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         GW{rows[rows.length - 1].gameweek}
       </text>
@@ -196,7 +196,7 @@ export function ExpectedActualLuckPanel({
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h4 className="text-sm uppercase text-foreground">Expected vs Actual</h4>
-          <p className="text-xs text-foreground-dim">
+          <p className="text-sm text-foreground-dim">
             Compare per-GW points against expected model output and benchmark tiers.
           </p>
         </div>
@@ -219,11 +219,11 @@ export function ExpectedActualLuckPanel({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className=" border border-tt-green/30 bg-tt-green/5 p-3">
-          <div className="text-xs uppercase text-foreground-muted">Cumulative Luck</div>
+          <div className="text-sm uppercase text-foreground-muted">Cumulative Luck</div>
           <div className="text-2xl text-foreground">{formatSigned(totals.cumulativeLuck, 1)}</div>
         </div>
         <div className=" border border-tt-red/30 bg-tt-red/5 p-3">
-          <div className="text-xs uppercase text-foreground-muted">Cumulative vs Benchmark</div>
+          <div className="text-sm uppercase text-foreground-muted">Cumulative vs Benchmark</div>
           <div className="text-2xl text-foreground">
             {formatSigned(totals.cumulativeBenchmarkDelta, 1)}
           </div>

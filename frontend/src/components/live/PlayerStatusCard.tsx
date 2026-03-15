@@ -69,40 +69,40 @@ export function PlayerStatusCard({
       aria-label={`${webName} (${teamName}), ${effectivePoints} points, ${statusLabel}`}
     >
       <div
-        className={`relative border ${borderColor} bg-black px-2 py-1 text-center min-w-[68px] md:min-w-[80px]`}
+        className={`relative border ${borderColor} bg-black px-2 py-1 text-center min-w-[88px] md:min-w-[100px]`}
       >
         {/* Points + captain row */}
         <div className="flex items-center justify-center gap-1">
-          <span className="text-sm md:text-base font-bold text-tt-yellow">{effectivePoints}</span>
+          <span className="text-base md:text-lg font-bold text-tt-yellow">{effectivePoints}</span>
           {isCaptain && (
-            <span className="text-tt-yellow text-xs font-bold">
+            <span className="text-tt-yellow text-sm font-bold">
               {multiplier === 3 ? '(TC)' : '(C)'}
             </span>
           )}
           {isViceCaptain && !isCaptain && (
-            <span className="text-tt-cyan text-xs font-bold">(V)</span>
+            <span className="text-tt-cyan text-sm font-bold">(V)</span>
           )}
         </div>
 
         {/* Player name */}
-        <div className="text-tt-white text-[11px] md:text-xs truncate max-w-[64px] md:max-w-[76px]">
+        <div className="text-tt-white text-sm truncate max-w-[84px] md:max-w-[96px]">
           {webName}
         </div>
 
         {/* Team + status */}
-        <div className="flex items-center justify-center gap-1 text-[10px]">
+        <div className="flex items-center justify-center gap-1 text-sm">
           <span className="text-tt-cyan">{teamName}</span>
           {status === 'playing' && <span className="text-tt-red animate-blink">●</span>}
         </div>
 
         {/* Playing indicator */}
         {status === 'playing' && matchMinute && (
-          <div className="text-tt-green text-[10px] font-bold">{matchMinute}'</div>
+          <div className="text-tt-green text-sm font-bold">{matchMinute}'</div>
         )}
 
         {/* Tooltip */}
         {showTooltip && status === 'playing' && matchMinute && (
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black border border-tt-dim text-xs whitespace-nowrap z-20 text-tt-white">
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black border border-tt-dim text-sm whitespace-nowrap z-20 text-tt-white">
             {matchMinute}' played
           </div>
         )}

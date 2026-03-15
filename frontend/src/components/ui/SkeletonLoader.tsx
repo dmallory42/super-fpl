@@ -29,7 +29,7 @@ export function SkeletonStatPanel() {
     <div className="stat-panel">
       <div className="space-y-2">
         <div className="animate-blink text-tt-dim">{'█'.repeat(6)}</div>
-        <div className="animate-blink text-tt-dim text-xs">{'█'.repeat(10)}</div>
+        <div className="animate-blink text-tt-dim text-sm">{'█'.repeat(10)}</div>
       </div>
     </div>
   )
@@ -78,7 +78,7 @@ function SkeletonPlayer() {
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="animate-blink text-tt-dim text-2xl">{'█'.repeat(3)}</div>
-      <div className="animate-blink text-tt-dim text-xs">{'█'.repeat(6)}</div>
+      <div className="animate-blink text-tt-dim text-sm">{'█'.repeat(6)}</div>
     </div>
   )
 }

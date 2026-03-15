@@ -169,7 +169,7 @@ export function TeamAnalyzer() {
           <SquadStats picks={picks.picks} players={playersMap} entryHistory={picks.entry_history} />
 
           {seasonBestSquad && (
-            <div className="text-xs text-foreground-dim -mt-2">
+            <div className="text-sm text-foreground-dim -mt-2">
               Most effective XI + bench based on points scored while owned this season.
             </div>
           )}

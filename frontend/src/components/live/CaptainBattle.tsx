@@ -96,7 +96,7 @@ export function CaptainBattle({
 
   if (!samples) {
     return (
-      <div className="text-center text-foreground-muted py-4 text-sm">
+      <div className="text-center text-foreground-muted py-4 text-base">
         No captain data available
       </div>
     )
@@ -115,19 +115,19 @@ export function CaptainBattle({
       {/* Tier selector */}
       <div className="flex items-center justify-between">
         {isDifferential && (
-          <span className="text-xs uppercase tracking-wide text-tt-green">
+          <span className="text-sm uppercase text-tt-green">
             Captain differential
           </span>
         )}
         <div className={`flex items-center gap-1 ${!isDifferential ? 'ml-auto' : ''}`}>
           {showTierSelector ? (
             <>
-              <span className="text-xs text-foreground-dim mr-1">vs</span>
+              <span className="text-sm text-foreground-dim mr-1">vs</span>
               {TIER_OPTIONS.map((tier) => (
                 <button
                   key={tier.value}
                   onClick={() => handleTierChange(tier.value)}
-                  className={`px-2 py-0.5 text-xs uppercase tracking-wide ${
+                  className={`px-2 py-0.5 text-sm uppercase ${
                     activeTier === tier.value
                       ? 'bg-tt-magenta/20 text-tt-magenta'
                       : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
@@ -138,7 +138,7 @@ export function CaptainBattle({
               ))}
             </>
           ) : (
-            <span className="text-xs uppercase tracking-wide text-foreground-muted">
+            <span className="text-sm uppercase text-foreground-muted">
               vs {activeTierLabel}
             </span>
           )}
@@ -155,7 +155,7 @@ export function CaptainBattle({
               <div
                 key={captain.playerId}
                 className={`
-                  relative p-2 text-sm overflow-hidden
+                  relative p-2 text-base overflow-hidden
                   ${
                     captain.isUserCaptain
                       ? 'bg-tt-green/10 ring-1 ring-tt-green/30'
@@ -177,7 +177,7 @@ export function CaptainBattle({
                   {/* Rank badge */}
                   <span
                     className={`
-                    inline-flex items-center justify-center w-5 h-5 text-[9px] font-bold shrink-0
+                    inline-flex items-center justify-center w-5 h-5 text-sm font-bold shrink-0
                     ${rankBadgeStyles[captain.rank] || 'bg-foreground/10 text-foreground-muted'}
                   `}
                   >
@@ -186,7 +186,7 @@ export function CaptainBattle({
 
                   {/* Name */}
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    {captain.isUserCaptain && <span className="text-tt-yellow text-xs">©</span>}
+                    {captain.isUserCaptain && <span className="text-tt-yellow text-sm">©</span>}
                     <span
                       className={`truncate ${captain.isUserCaptain ? 'text-tt-green font-medium' : 'text-foreground'}`}
                     >

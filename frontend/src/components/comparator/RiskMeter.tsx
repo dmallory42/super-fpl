@@ -36,7 +36,7 @@ export function RiskMeter({ managerName, riskScore, compact = false }: RiskMeter
             style={{ width: `${percentage}%` }}
           />
         </div>
-        <span className={`text-xs uppercase tracking-wider ${levelTextColors[riskScore.level]}`}>
+        <span className={`text-sm uppercase ${levelTextColors[riskScore.level]}`}>
           {riskScore.level}
         </span>
       </div>
@@ -48,7 +48,7 @@ export function RiskMeter({ managerName, riskScore, compact = false }: RiskMeter
       <div className="flex items-center justify-between mb-3">
         <span className="text-foreground font-medium truncate max-w-[150px]">{managerName}</span>
         <span
-          className={`text-xs uppercase tracking-wider font-bold ${levelTextColors[riskScore.level]}`}
+          className={`text-sm uppercase font-bold ${levelTextColors[riskScore.level]}`}
         >
           {riskScore.level} risk
         </span>
@@ -62,7 +62,7 @@ export function RiskMeter({ managerName, riskScore, compact = false }: RiskMeter
         />
       </div>
 
-      <div className="flex justify-between text-xs text-foreground-muted">
+      <div className="flex justify-between text-sm text-foreground-muted">
         <span>Score: {riskScore.score.toFixed(1)}</span>
         <span>Captain risk: {riskScore.breakdown.captain_risk.toFixed(0)}</span>
       </div>

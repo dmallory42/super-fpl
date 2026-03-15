@@ -99,7 +99,7 @@ function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={padding.left - 10}
         y={padding.top + 4}
         textAnchor="end"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         {formatRank(minRank)}
       </text>
@@ -107,7 +107,7 @@ function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={padding.left - 10}
         y={height - padding.bottom}
         textAnchor="end"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         {formatRank(maxRank)}
       </text>
@@ -117,7 +117,7 @@ function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={padding.left}
         y={height - 8}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         1
       </text>
@@ -125,7 +125,7 @@ function RankChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={width - padding.right}
         y={height - 8}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         {gameweeks.length}
       </text>
@@ -192,7 +192,7 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         strokeDasharray="4 4"
         strokeWidth="1"
       />
-      <text x={width - padding.right + 5} y={avgY + 4} className="fill-foreground-dim text-xs">
+      <text x={width - padding.right + 5} y={avgY + 4} className="fill-foreground-dim text-sm">
         avg
       </text>
 
@@ -229,7 +229,7 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
                 x={p.x}
                 y={p.y - 10}
                 textAnchor="middle"
-                className={`text-xs ${isMax ? 'fill-tt-green' : 'fill-destructive'}`}
+                className={`text-sm ${isMax ? 'fill-tt-green' : 'fill-destructive'}`}
               >
                 {p.points}
               </text>
@@ -243,7 +243,7 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={padding.left - 10}
         y={padding.top + 4}
         textAnchor="end"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         {maxPoints}
       </text>
@@ -251,7 +251,7 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={padding.left - 10}
         y={height - padding.bottom}
         textAnchor="end"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         {minPoints}
       </text>
@@ -261,7 +261,7 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={padding.left}
         y={height - 8}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         1
       </text>
@@ -269,7 +269,7 @@ function PointsChart({ gameweeks }: { gameweeks: EntryHistory[] }) {
         x={width - padding.right}
         y={height - 8}
         textAnchor="middle"
-        className="fill-foreground-muted text-xs"
+        className="fill-foreground-muted text-sm"
       >
         {gameweeks.length}
       </text>
@@ -410,7 +410,7 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Rank Movement */}
         <div className="p-4 bg-surface-elevated ">
-          <div className="text-xs uppercase text-foreground-muted mb-2">Rank Movement</div>
+          <div className="text-sm uppercase text-foreground-muted mb-2">Rank Movement</div>
           <div className="flex items-baseline gap-2">
             <span
               className={`text-2xl font-bold ${insights.rankImproved ? 'text-tt-green' : 'text-destructive'}`}
@@ -418,21 +418,21 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
               {insights.rankImproved ? '↑' : '↓'} {Math.abs(Number(insights.rankChangePercent))}%
             </span>
           </div>
-          <div className="text-xs text-foreground-dim mt-1">
+          <div className="text-sm text-foreground-dim mt-1">
             {formatRank(insights.startRank)} → {formatRank(insights.endRank)}
           </div>
         </div>
 
         {/* Consistency */}
         <div className="p-4 bg-surface-elevated ">
-          <div className="text-xs uppercase text-foreground-muted mb-2">Consistency</div>
+          <div className="text-sm uppercase text-foreground-muted mb-2">Consistency</div>
           <div className="text-lg font-bold text-foreground">{insights.consistencyLabel}</div>
-          <div className="text-xs text-foreground-dim mt-1">σ = {insights.stdDev} pts</div>
+          <div className="text-sm text-foreground-dim mt-1">σ = {insights.stdDev} pts</div>
         </div>
 
         {/* Team Value */}
         <div className="p-4 bg-surface-elevated ">
-          <div className="text-xs uppercase text-foreground-muted mb-2">Value Change</div>
+          <div className="text-sm uppercase text-foreground-muted mb-2">Value Change</div>
           <div
             className={`text-2xl font-bold ${insights.valueChange >= 0 ? 'text-tt-green' : 'text-destructive'}`}
           >
@@ -442,9 +442,9 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
 
         {/* Bench Management */}
         <div className="p-4 bg-surface-elevated ">
-          <div className="text-xs uppercase text-foreground-muted mb-2">Bench Management</div>
+          <div className="text-sm uppercase text-foreground-muted mb-2">Bench Management</div>
           <div className="text-lg font-bold text-foreground">{insights.avgBenchPoints} avg</div>
-          <div className="text-xs text-foreground-dim mt-1">
+          <div className="text-sm text-foreground-dim mt-1">
             {insights.highBenchWeeks} weeks with 10+ pts
           </div>
         </div>
@@ -453,19 +453,19 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
       {/* Additional stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
         <div className="text-center">
-          <div className="text-xs text-foreground-muted">Best Rank</div>
+          <div className="text-sm text-foreground-muted">Best Rank</div>
           <div className="font-bold text-tt-green">{formatRank(insights.bestRank)}</div>
         </div>
         <div className="text-center">
-          <div className="text-xs text-foreground-muted">Worst Rank</div>
+          <div className="text-sm text-foreground-muted">Worst Rank</div>
           <div className="font-bold text-foreground-muted">{formatRank(insights.worstRank)}</div>
         </div>
         <div className="text-center">
-          <div className="text-xs text-foreground-muted">Hit Rate</div>
+          <div className="text-sm text-foreground-muted">Hit Rate</div>
           <div className="font-bold text-foreground">{insights.hitsPerTransfer} pts/transfer</div>
         </div>
         <div className="text-center">
-          <div className="text-xs text-foreground-muted">High Bench Weeks</div>
+          <div className="text-sm text-foreground-muted">High Bench Weeks</div>
           <div className="font-bold text-foreground">{insights.highBenchWeeks}</div>
         </div>
       </div>
@@ -555,7 +555,7 @@ function GameweekTable({
                       <span>{gw.points}</span>
                       {typeof overallPoints === 'number' && (
                         <span
-                          className={`border px-1.5 py-0.5 text-[10px] leading-none ${pointsDeltaBadgeClass(overallDelta ?? 0)}`}
+                          className={`border px-1.5 py-0.5 text-sm leading-none ${pointsDeltaBadgeClass(overallDelta ?? 0)}`}
                         >
                           AVG {Math.round(overallPoints)}
                         </span>
@@ -596,13 +596,13 @@ function ChipsTimeline({ chips }: { chips: ChipInfo[] }) {
   return (
     <BroadcastCard title="Chips Used">
       {chips.length === 0 ? (
-        <p className="text-foreground-muted text-sm">No chips used yet</p>
+        <p className="text-foreground-muted text-base">No chips used yet</p>
       ) : (
         <div className="flex flex-wrap gap-3">
           {chips.map((chip, i) => (
             <div key={i} className="bg-tt-green px-4 py-2">
               <div className="text-white text-sm uppercase">{chip.displayName}</div>
-              <div className="text-white/70 text-xs">GW {chip.event}</div>
+              <div className="text-white/70 text-sm">GW {chip.event}</div>
             </div>
           ))}
         </div>
@@ -640,7 +640,7 @@ export function SeasonReview({ history, benchmarks }: SeasonReviewProps) {
       <div className="grid md:grid-cols-2 gap-6">
         <BroadcastCard title="Rank Progression">
           <RankChart gameweeks={history.current} />
-          <p className="text-xs text-foreground-dim text-center mt-2">Lower is better</p>
+          <p className="text-sm text-foreground-dim text-center mt-2">Lower is better</p>
         </BroadcastCard>
         <BroadcastCard title="Points Per Gameweek">
           <PointsChart gameweeks={history.current} />

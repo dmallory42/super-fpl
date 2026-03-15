@@ -103,7 +103,7 @@ const GwXMinsInput = memo(function GwXMinsInput({
       value={localValue}
       placeholder={String(baseValue)}
       onChange={handleChange}
-      className={`w-14 px-1 py-0.5 text-center text-xs border bg-surface-elevated        ${hasOverride ? 'border-tt-green/60 text-tt-green' : 'border-border/30 text-foreground-muted'}
+      className={`w-14 px-1 py-0.5 text-center text-sm border bg-surface-elevated        ${hasOverride ? 'border-tt-green/60 text-tt-green' : 'border-border/30 text-foreground-muted'}
       `}
     />
   )
@@ -185,7 +185,7 @@ export function PlayerDetailPanel({
         <div className="bg-tt-green/10">
           {/* Top row: name, position, close */}
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-            <h3 className="text-lg uppercase tracking-widest text-foreground font-bold">
+            <h3 className="text-lg uppercase text-foreground font-bold">
               {player.web_name}
             </h3>
             <div className="flex items-center gap-2">
@@ -201,17 +201,17 @@ export function PlayerDetailPanel({
 
           {/* Team + price line */}
           <div className="px-4 pb-2 flex items-center gap-2">
-            <span className="text-xs text-foreground-muted">{teamName}</span>
-            <span className="text-xs text-foreground-dim">{'\u00B7'}</span>
-            <span className="text-xs text-foreground-muted">
+            <span className="text-sm text-foreground-muted">{teamName}</span>
+            <span className="text-sm text-foreground-dim">{'\u00B7'}</span>
+            <span className="text-sm text-foreground-muted">
               {'\u00A3'}
               {(player.now_cost / 10).toFixed(1)}m
             </span>
             {player.news && (
               <>
-                <span className="text-xs text-foreground-dim">{'\u00B7'}</span>
+                <span className="text-sm text-foreground-dim">{'\u00B7'}</span>
                 <span
-                  className={`text-xs ${player.status === 'a' ? 'text-foreground-dim' : 'text-amber-400'}`}
+                  className={`text-sm ${player.status === 'a' ? 'text-foreground-dim' : 'text-amber-400'}`}
                 >
                   {player.news}
                 </span>
@@ -235,7 +235,7 @@ export function PlayerDetailPanel({
                 <div className={`text-base font-bold ${stat.gradient ? '' : 'text-foreground'}`}>
                   {stat.gradient ? <span className="text-tt-cyan">{stat.value}</span> : stat.value}
                 </div>
-                <div className="text-[10px] uppercase tracking-wider text-foreground-muted">
+                <div className="text-sm uppercase text-foreground-muted">
                   {stat.label}
                 </div>
               </div>
@@ -246,7 +246,7 @@ export function PlayerDetailPanel({
 
       {/* Season stats strip */}
       <div className="px-4 py-2 border-b border-border/30">
-        <div className="flex items-center gap-1.5 text-xs text-foreground-dim flex-wrap">
+        <div className="flex items-center gap-1.5 text-sm text-foreground-dim flex-wrap">
           {isGkp ? (
             <>
               <span>
@@ -300,7 +300,7 @@ export function PlayerDetailPanel({
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex-1 py-2 text-xs uppercase tracking-wider ${
+              className={`flex-1 py-2 text-sm uppercase ${
                 activeTab === tab.id
                   ? 'text-tt-green border-b-2 border-tt-green'
                   : 'text-foreground-muted hover:text-foreground'
@@ -316,16 +316,16 @@ export function PlayerDetailPanel({
           <div>
             {/* Column headers */}
             <div className="flex items-center px-2 pb-2 border-b border-border/30">
-              <span className="w-12 text-[10px] uppercase tracking-widest text-foreground-dim">
+              <span className="w-12 text-sm uppercase text-foreground-dim">
                 GW
               </span>
-              <span className="w-16 text-[10px] uppercase tracking-widest text-foreground-dim text-center">
+              <span className="w-16 text-sm uppercase text-foreground-dim text-center">
                 Fix
               </span>
-              <span className="flex-1 text-[10px] uppercase tracking-widest text-foreground-dim text-right pr-3">
+              <span className="flex-1 text-sm uppercase text-foreground-dim text-right pr-3">
                 xMins
               </span>
-              <span className="w-14 text-[10px] uppercase tracking-widest text-foreground-dim text-right">
+              <span className="w-14 text-sm uppercase text-foreground-dim text-right">
                 xPts
               </span>
             </div>
@@ -348,13 +348,13 @@ export function PlayerDetailPanel({
                       <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-tt-green" />
                     )}
                     <span
-                      className={`w-12 text-xs uppercase tracking-wider ${
+                      className={`w-12 text-sm uppercase ${
                         isCurrentGw ? 'text-tt-green' : 'text-foreground-muted'
                       }`}
                     >
                       GW{gw}
                     </span>
-                    <span className="w-16 text-center text-xs text-foreground-muted">
+                    <span className="w-16 text-center text-sm text-foreground-muted">
                       {formatGwFixture(gw)}
                     </span>
                     <div className="flex-1 flex justify-end pr-3">
@@ -386,7 +386,7 @@ export function PlayerDetailPanel({
 
             {/* Summary row */}
             <div className="flex items-center px-2 py-2 mt-1 border-t border-border/40">
-              <span className="w-12 text-xs uppercase tracking-wider text-foreground-muted">
+              <span className="w-12 text-sm uppercase text-foreground-muted">
                 Total
               </span>
               <span className="w-16" />
@@ -405,7 +405,7 @@ export function PlayerDetailPanel({
         {/* Transfer tab */}
         {activeTab === 'transfer' && (
           <div className="space-y-3">
-            <div className="text-xs text-foreground-muted">
+            <div className="text-sm text-foreground-muted">
               Budget:{' '}
               <span>
                 {'\u00A3'}
@@ -434,7 +434,7 @@ export function PlayerDetailPanel({
                       <div className="text-foreground font-medium text-sm truncate">
                         {rPlayer.web_name}
                       </div>
-                      <div className="text-xs text-foreground-dim">
+                      <div className="text-sm text-foreground-dim">
                         {teamsMap.get(rPlayer.team)} {'\u00B7'} {'\u00A3'}
                         {(rPlayer.now_cost / 10).toFixed(1)}m
                       </div>
@@ -444,7 +444,7 @@ export function PlayerDetailPanel({
                         {rPlayer.total_predicted.toFixed(1)}
                       </div>
                       <div
-                        className={`text-xs ${gain > 0 ? 'text-tt-green' : gain < 0 ? 'text-destructive' : 'text-foreground-muted'}`}
+                        className={`text-sm ${gain > 0 ? 'text-tt-green' : gain < 0 ? 'text-destructive' : 'text-foreground-muted'}`}
                       >
                         {gain > 0 ? '+' : ''}
                         {gain.toFixed(1)}

@@ -100,13 +100,13 @@ export function FormationPitch({
         if (customXMins !== undefined) {
           extraLines.push({
             text: `${customXMins}m`,
-            className: 'text-tt-green text-xs mt-0.5',
+            className: 'text-tt-green text-sm mt-0.5',
           })
         }
         if (showEffectiveOwnership && player.effective_ownership) {
           extraLines.push({
             text: `EO: ${player.effective_ownership.effective_ownership.toFixed(0)}%`,
-            className: `text-xs mt-0.5 font-medium ${
+            className: `text-sm mt-0.5 font-medium ${
               player.effective_ownership.points_swing > 0 ? 'text-destructive' : 'text-tt-green'
             }`,
           })

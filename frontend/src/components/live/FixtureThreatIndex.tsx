@@ -65,17 +65,17 @@ export function FixtureThreatIndex({
             {totalImpact > 0 ? '+' : ''}
             {totalImpact.toFixed(1)}
           </div>
-          <div className="text-xs uppercase tracking-wide text-foreground-dim">Fixture Swing</div>
+          <div className="text-sm uppercase text-foreground-dim">Fixture Swing</div>
         </div>
 
         {showTierSelector && (
           <div className="flex items-center gap-1">
-            <span className="text-xs text-foreground-dim mr-1">vs</span>
+            <span className="text-sm text-foreground-dim mr-1">vs</span>
             {TIER_OPTIONS.map((tier) => (
               <button
                 key={tier.value}
                 onClick={() => onTierChange(tier.value)}
-                className={`px-2 py-0.5 text-xs uppercase tracking-wide ${
+                className={`px-2 py-0.5 text-sm uppercase ${
                   selectedTier === tier.value
                     ? 'bg-tt-green/20 text-tt-green'
                     : 'text-foreground-dim hover:text-foreground hover:bg-surface-elevated'
@@ -89,7 +89,7 @@ export function FixtureThreatIndex({
       </div>
 
       {/* Summary bar */}
-      <div className="flex items-center justify-between p-2 bg-surface-elevated text-[11px] md:text-xs">
+      <div className="flex items-center justify-between p-2 bg-surface-elevated text-sm">
         <div className="flex items-center gap-2">
           <span className="text-foreground-muted">Your points:</span>
           <span className="font-bold text-tt-green">{totalUserPoints.toFixed(1)}</span>
@@ -117,9 +117,9 @@ export function FixtureThreatIndex({
               <div className="flex items-center justify-between">
                 {/* Teams and status */}
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="text-xs font-bold text-foreground">{fixture.homeTeam}</span>
-                  <span className="text-foreground-dim text-[10px]">v</span>
-                  <span className="text-xs font-bold text-foreground">{fixture.awayTeam}</span>
+                  <span className="text-sm font-bold text-foreground">{fixture.homeTeam}</span>
+                  <span className="text-foreground-dim text-sm">v</span>
+                  <span className="text-sm font-bold text-foreground">{fixture.awayTeam}</span>
 
                   {fixture.isLive && (
                     <span className="w-1.5 h-1.5 rounded-full bg-destructive animate-blink" />
@@ -129,18 +129,18 @@ export function FixtureThreatIndex({
                 {/* Points comparison */}
                 <div className="flex items-center gap-2 shrink-0">
                   <span
-                    className={`text-xs ${fixture.hasUserPlayer ? 'text-tt-green' : 'text-foreground-dim'}`}
+                    className={`text-sm ${fixture.hasUserPlayer ? 'text-tt-green' : 'text-foreground-dim'}`}
                   >
                     {fixture.userPoints.toFixed(1)}
                   </span>
-                  <span className="text-foreground-dim text-[10px]">vs</span>
-                  <span className="text-xs text-foreground-muted">
+                  <span className="text-foreground-dim text-sm">vs</span>
+                  <span className="text-sm text-foreground-muted">
                     {fixture.tierAvgPoints.toFixed(1)}
                   </span>
 
                   {/* Impact */}
                   <span
-                    className={`text-xs font-bold w-12 text-right ${
+                    className={`text-sm font-bold w-12 text-right ${
                       isPositive
                         ? 'text-tt-green'
                         : isNegative
@@ -158,7 +158,7 @@ export function FixtureThreatIndex({
         })}
       </div>
       {maxRows && sortedFixtures.length > maxRows && (
-        <p className="text-[10px] text-foreground-dim text-center">
+        <p className="text-sm text-foreground-dim text-center">
           Showing top {maxRows} fixtures by impact
         </p>
       )}

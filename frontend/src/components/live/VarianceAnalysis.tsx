@@ -36,7 +36,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
           <div className="text-2xl font-bold text-foreground-muted">
             {totalPredicted.toFixed(1)}
           </div>
-          <div className="text-xs uppercase tracking-wide text-foreground-dim">Expected</div>
+          <div className="text-sm uppercase text-foreground-dim">Expected</div>
         </div>
 
         {/* Variance indicator */}
@@ -50,7 +50,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
             {totalVariance.toFixed(1)}
           </div>
           <div
-            className={`text-xs uppercase tracking-wide ${
+            className={`text-sm uppercase ${
               isLucky ? 'text-tt-green' : isUnlucky ? 'text-destructive' : 'text-foreground-dim'
             }`}
           >
@@ -67,7 +67,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
           >
             {totalActual}
           </div>
-          <div className="text-xs uppercase tracking-wide text-foreground-dim">Actual</div>
+          <div className="text-sm uppercase text-foreground-dim">Actual</div>
         </div>
       </div>
 
@@ -94,7 +94,7 @@ export function VarianceAnalysis({ players, totalPredicted, totalActual }: Varia
       {/* Player breakdown */}
       {sortedPlayers.length > 0 && (
         <div className="pt-3 border-t border-border/50">
-          <div className="text-xs text-foreground-dim uppercase tracking-wide mb-2">
+          <div className="text-sm text-foreground-dim uppercase mb-2">
             Player Breakdown
           </div>
           <div className="space-y-1.5">

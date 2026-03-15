@@ -185,7 +185,7 @@ export function FixtureScores({
 
   return (
     <div className="space-y-3">
-      <div className="text-xs text-foreground-dim px-1">
+      <div className="text-sm text-foreground-dim px-1">
         Kickoff times shown in {localTimeZoneShort}
       </div>
       {groups.map((group) => (
@@ -194,7 +194,7 @@ export function FixtureScores({
             {group.isLiveGroup && (
               <span className="w-1.5 h-1.5 rounded-full bg-tt-green animate-blink" />
             )}
-            <span className="text-xs uppercase tracking-wide text-foreground-dim">
+            <span className="text-sm uppercase text-foreground-dim">
               {group.label}
             </span>
           </div>
@@ -233,7 +233,7 @@ export function FixtureScores({
                   onClick={() => hasDetails && setExpandedFixture(isExpanded ? null : fixture.id)}
                   disabled={!hasDetails}
                   className={`
-                w-full flex items-center justify-between p-2 text-xs
+                w-full flex items-center justify-between p-2 text-sm
                 ${
                   isLive
                     ? 'bg-tt-green/10 ring-1 ring-tt-green/40'
@@ -245,7 +245,7 @@ export function FixtureScores({
                   {/* Home team */}
                   <div className="flex-1 text-right pr-2">
                     <span
-                      className={`text-sm uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
+                      className={`text-sm uppercase ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
                     >
                       {homeTeam}
                     </span>
@@ -270,7 +270,7 @@ export function FixtureScores({
                           {fixture.home_score ?? 0}
                         </span>
                         <span
-                          className={`text-xs ${isLive ? 'text-tt-green/60' : 'text-foreground-dim'}`}
+                          className={`text-sm ${isLive ? 'text-tt-green/60' : 'text-foreground-dim'}`}
                         >
                           –
                         </span>
@@ -282,12 +282,12 @@ export function FixtureScores({
                       </>
                     )}
                     {isLive ? (
-                      <span className="text-xs text-tt-green ml-1 animate-blink font-medium">
+                      <span className="text-sm text-tt-green ml-1 animate-blink font-medium">
                         {fixture.minutes}'
                       </span>
                     ) : null}
                     {isFinished ? (
-                      <span className="text-xs text-foreground-dim uppercase ml-1 tracking-wide">
+                      <span className="text-sm text-foreground-dim uppercase ml-1">
                         FT
                       </span>
                     ) : null}
@@ -296,13 +296,13 @@ export function FixtureScores({
                   {/* Away team */}
                   <div className="flex-1 text-left pl-2 flex items-center gap-1.5">
                     <span
-                      className={`text-sm uppercase tracking-wide ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
+                      className={`text-sm uppercase ${isFinished ? 'text-foreground-muted' : 'text-foreground'}`}
                     >
                       {awayTeam}
                     </span>
                     {hasDetails && (
                       <span
-                        className={`text-xs text-foreground-dim/60 ${isExpanded ? 'rotate-180' : ''}`}
+                        className={`text-sm text-foreground-dim/60 ${isExpanded ? 'rotate-180' : ''}`}
                       >
                         ▼
                       </span>
@@ -312,7 +312,7 @@ export function FixtureScores({
 
                 {/* Expanded details */}
                 {isExpanded && hasDetails && (
-                  <div className="mt-1 mx-1 p-3 bg-surface text-xs space-y-3 border border-border/20">
+                  <div className="mt-1 mx-1 p-3 bg-surface text-sm space-y-3 border border-border/20">
                     {/* Scorers and events */}
                     {(homeEvents.length > 0 || awayEvents.length > 0) && (
                       <div className="grid grid-cols-2 gap-4">
@@ -326,14 +326,14 @@ export function FixtureScores({
                               <span className="truncate">{event.name}</span>
                               <span className="flex items-center gap-0.5 shrink-0">
                                 {event.goals > 0 && (
-                                  <span className="text-[11px]">{'⚽'.repeat(event.goals)}</span>
+                                  <span className="text-sm">{'⚽'.repeat(event.goals)}</span>
                                 )}
                                 {event.assists > 0 && (
-                                  <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
+                                  <span className="text-sm">{'🅰️'.repeat(event.assists)}</span>
                                 )}
                                 {event.yellowCards > 0 && (
                                   <span
-                                    className="text-[11px]"
+                                    className="text-sm"
                                     title={`${event.yellowCards} yellow card${event.yellowCards > 1 ? 's' : ''}`}
                                   >
                                     {'🟨'.repeat(event.yellowCards)}
@@ -341,29 +341,29 @@ export function FixtureScores({
                                 )}
                                 {event.redCards > 0 && (
                                   <span
-                                    className="text-[11px]"
+                                    className="text-sm"
                                     title={`${event.redCards} red card${event.redCards > 1 ? 's' : ''}`}
                                   >
                                     {'🟥'.repeat(event.redCards)}
                                   </span>
                                 )}
                                 {event.cleanSheet && (
-                                  <span className="text-[11px]" title="Clean sheet">
+                                  <span className="text-sm" title="Clean sheet">
                                     🛡️
                                   </span>
                                 )}
                                 {event.position === 1 && event.saves >= 3 && (
-                                  <span className="text-[11px]" title={`${event.saves} saves`}>
+                                  <span className="text-sm" title={`${event.saves} saves`}>
                                     🧤
                                   </span>
                                 )}
                                 {event.defCon && (
-                                  <span className="text-[11px]" title="Defensive contribution">
+                                  <span className="text-sm" title="Defensive contribution">
                                     💪
                                   </span>
                                 )}
                                 {isLive && (
-                                  <span className="text-[10px] text-foreground-dim ml-1">
+                                  <span className="text-sm text-foreground-dim ml-1">
                                     BPS {event.bps}
                                   </span>
                                 )}
@@ -382,14 +382,14 @@ export function FixtureScores({
                               <span className="truncate">{event.name}</span>
                               <span className="flex items-center gap-0.5 shrink-0">
                                 {event.goals > 0 && (
-                                  <span className="text-[11px]">{'⚽'.repeat(event.goals)}</span>
+                                  <span className="text-sm">{'⚽'.repeat(event.goals)}</span>
                                 )}
                                 {event.assists > 0 && (
-                                  <span className="text-[11px]">{'🅰️'.repeat(event.assists)}</span>
+                                  <span className="text-sm">{'🅰️'.repeat(event.assists)}</span>
                                 )}
                                 {event.yellowCards > 0 && (
                                   <span
-                                    className="text-[11px]"
+                                    className="text-sm"
                                     title={`${event.yellowCards} yellow card${event.yellowCards > 1 ? 's' : ''}`}
                                   >
                                     {'🟨'.repeat(event.yellowCards)}
@@ -397,29 +397,29 @@ export function FixtureScores({
                                 )}
                                 {event.redCards > 0 && (
                                   <span
-                                    className="text-[11px]"
+                                    className="text-sm"
                                     title={`${event.redCards} red card${event.redCards > 1 ? 's' : ''}`}
                                   >
                                     {'🟥'.repeat(event.redCards)}
                                   </span>
                                 )}
                                 {event.cleanSheet && (
-                                  <span className="text-[11px]" title="Clean sheet">
+                                  <span className="text-sm" title="Clean sheet">
                                     🛡️
                                   </span>
                                 )}
                                 {event.position === 1 && event.saves >= 3 && (
-                                  <span className="text-[11px]" title={`${event.saves} saves`}>
+                                  <span className="text-sm" title={`${event.saves} saves`}>
                                     🧤
                                   </span>
                                 )}
                                 {event.defCon && (
-                                  <span className="text-[11px]" title="Defensive contribution">
+                                  <span className="text-sm" title="Defensive contribution">
                                     💪
                                   </span>
                                 )}
                                 {isLive && (
-                                  <span className="text-[10px] text-foreground-dim ml-1">
+                                  <span className="text-sm text-foreground-dim ml-1">
                                     BPS {event.bps}
                                   </span>
                                 )}
@@ -433,7 +433,7 @@ export function FixtureScores({
                     {/* Bonus predictions with medal badges */}
                     {bonusPlayers.length > 0 && (
                       <div className="pt-2 border-t border-border/30">
-                        <div className="text-xs text-foreground-dim uppercase tracking-wide mb-2">
+                        <div className="text-sm text-foreground-dim uppercase mb-2">
                           Bonus Points
                         </div>
                         <div className="flex flex-wrap gap-3">
@@ -443,14 +443,14 @@ export function FixtureScores({
                               <div key={bp.player_id} className="flex items-center gap-1.5">
                                 <span
                                   className={`
-                              inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold
+                              inline-flex items-center justify-center w-5 h-5 text-sm font-bold
                               ${bonusMedalStyles[bp.predicted_bonus] || 'bg-foreground/10 text-foreground-muted'}
                             `}
                                 >
                                   {bp.predicted_bonus}
                                 </span>
                                 <span className="text-foreground">{info?.web_name || '?'}</span>
-                                <span className="text-foreground-dim text-xs">({bp.bps})</span>
+                                <span className="text-foreground-dim text-sm">({bp.bps})</span>
                               </div>
                             )
                           })}

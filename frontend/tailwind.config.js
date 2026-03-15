@@ -65,7 +65,7 @@ export default {
           red: '#FF0000',
           blue: '#0000FF',
           magenta: '#FF00FF',
-          dim: '#333333',
+          dim: '#666666',
         },
       },
       borderRadius: {

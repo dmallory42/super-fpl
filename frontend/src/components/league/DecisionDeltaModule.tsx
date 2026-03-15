@@ -126,10 +126,10 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
     <div className="space-y-4" data-testid="decision-delta-module">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h4 className="text-sm uppercase tracking-wider text-foreground">
+          <h4 className="text-sm uppercase text-foreground">
             Decision Delta vs League Median
           </h4>
-          <p className="text-xs text-foreground-dim">{metricConfig.description}</p>
+          <p className="text-sm text-foreground-dim">{metricConfig.description}</p>
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="decision-metric-select" className="form-label">
@@ -157,7 +157,7 @@ export function DecisionDeltaModule({ managers }: { managers: LeagueSeasonManage
         </div>
       </div>
 
-      <div className="text-xs text-foreground-muted">
+      <div className="text-sm text-foreground-muted">
         League median ({metricConfig.label}):
         <span className="ml-1 text-foreground">{metricConfig.formatValue(median)}</span>
       </div>

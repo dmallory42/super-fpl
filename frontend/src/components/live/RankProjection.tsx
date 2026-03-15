@@ -39,13 +39,13 @@ export function RankProjection({
             >
               {formatRank(currentRank)}
             </div>
-            <div className="text-xs uppercase tracking-wide text-foreground-dim">Current Rank</div>
+            <div className="text-sm uppercase text-foreground-dim">Current Rank</div>
           </div>
 
           {/* Movement indicator */}
           {!isSteady && (
             <div
-              className={`flex items-center gap-1 ${compact ? 'text-xs' : 'text-sm'} ${
+              className={`flex items-center gap-1 ${compact ? 'text-sm' : 'text-base'} ${
                 isGaining ? 'text-tt-green' : 'text-destructive'
               }`}
             >
@@ -83,10 +83,10 @@ export function RankProjection({
           </svg>
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={`font-bold text-tt-green ${compact ? 'text-xs' : 'text-sm'}`}>
+            <span className={`font-bold text-tt-green ${compact ? 'text-sm' : 'text-base'}`}>
               {fixturesFinished}/{fixturesTotal}
             </span>
-            <span className="text-[9px] text-foreground-dim uppercase tracking-wide">Matches</span>
+            <span className="text-sm text-foreground-dim uppercase">Matches</span>
           </div>
         </div>
       </div>

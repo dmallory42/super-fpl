@@ -168,7 +168,7 @@ export function Admin() {
     return (
       <div className="space-y-8">
         <div>
-          <h2 className="text-2xl font-bold tracking-wider uppercase">
+          <h2 className="text-2xl font-bold uppercase">
             <span className="text-tt-cyan">Admin</span>
           </h2>
           <p className="text-sm text-foreground-muted mt-1">
@@ -218,7 +218,7 @@ export function Admin() {
     <div className="space-y-8">
       {/* Page header */}
       <div>
-        <h2 className="text-2xl font-bold tracking-wider uppercase">
+        <h2 className="text-2xl font-bold uppercase">
           <span className="text-tt-cyan">Admin</span>
         </h2>
         <p className="text-sm text-foreground-muted mt-1">
@@ -230,7 +230,7 @@ export function Admin() {
       <BroadcastCard
         title="Penalty Takers"
         headerAction={
-          <span className="text-xs text-foreground-muted">{configuredTeamCount}/20 teams</span>
+          <span className="text-sm text-foreground-muted">{configuredTeamCount}/20 teams</span>
         }
       >
         {/* Team selector */}
@@ -255,13 +255,13 @@ export function Admin() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted">
+                  <th className="pb-2 text-sm uppercase text-foreground-muted">
                     Player
                   </th>
-                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-16">
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-16">
                     Pos
                   </th>
-                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-32">
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-32">
                     Penalty Order
                   </th>
                 </tr>
@@ -275,7 +275,7 @@ export function Admin() {
                       className="border-b border-border/50 hover:bg-surface-hover"
                     >
                       <td className="py-2 font-medium">{player.web_name}</td>
-                      <td className="py-2 text-xs text-foreground-muted">
+                      <td className="py-2 text-sm text-foreground-muted">
                         {POSITION_LABELS[player.element_type]}
                       </td>
                       <td className="py-2">
@@ -312,7 +312,7 @@ export function Admin() {
       <BroadcastCard
         title="Expected Minutes Overrides"
         headerAction={
-          <span className="text-xs text-foreground-muted">
+          <span className="text-sm text-foreground-muted">
             {playersWithOverrides.length} active
           </span>
         }
@@ -349,7 +349,7 @@ export function Admin() {
                   }}
                 >
                   <span className="font-medium">{p.web_name}</span>
-                  <span className="text-xs text-foreground-muted">
+                  <span className="text-sm text-foreground-muted">
                     {teamMap.get(p.team)} &middot; {getPositionName(p.element_type)}
                   </span>
                 </SearchResultButton>
@@ -400,16 +400,16 @@ export function Admin() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted">
+                  <th className="pb-2 text-sm uppercase text-foreground-muted">
                     Player
                   </th>
-                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-16">
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-16">
                     Team
                   </th>
-                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-24">
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-24">
                     Avg Mins
                   </th>
-                  <th className="pb-2 text-xs uppercase tracking-wider text-foreground-muted w-28">
+                  <th className="pb-2 text-sm uppercase text-foreground-muted w-28">
                     Override
                   </th>
                   <th className="pb-2 w-16"></th>
@@ -427,10 +427,10 @@ export function Admin() {
                       className="border-b border-border/50 hover:bg-surface-hover"
                     >
                       <td className="py-2 font-medium">{player.web_name}</td>
-                      <td className="py-2 text-xs text-foreground-muted">
+                      <td className="py-2 text-sm text-foreground-muted">
                         {teamMap.get(player.team)}
                       </td>
-                      <td className="py-2 text-xs text-foreground-muted">{avgMins}</td>
+                      <td className="py-2 text-sm text-foreground-muted">{avgMins}</td>
                       <td className="py-2">
                         <FormInput
                           type="number"
@@ -451,7 +451,7 @@ export function Admin() {
                       </td>
                       <td className="py-2">
                         <button
-                          className="text-xs text-tt-red hover:text-tt-red/80"
+                          className="text-sm text-tt-red hover:text-tt-red/80"
                           onClick={() => xminsMutation.mutate({ playerId: player.id, mins: null })}
                         >
                           Clear

@@ -451,7 +451,7 @@ export function Live() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-2">
-          <h2 className="text-2xl font-bold tracking-wider text-foreground">Live Gameweek</h2>
+          <h2 className="text-2xl font-bold text-foreground">Live Gameweek</h2>
           {gwData?.isLive && <LiveIndicator size="lg" />}
           {managerId && (
             <button onClick={handleClearManager} className="ml-auto btn-primary">
@@ -470,7 +470,7 @@ export function Live() {
           )}
         </p>
         {managerId && managerLastUpdated && (
-          <p className="text-xs text-foreground-dim mt-1">
+          <p className="text-sm text-foreground-dim mt-1">
             Updated {managerLastUpdated}
             {isRefreshingLiveData ? ' • Refreshing…' : ''}
           </p>
@@ -519,7 +519,7 @@ export function Live() {
             </button>
           </div>
           {managerInputError && (
-            <p className="mt-2 text-xs text-destructive">{managerInputError}</p>
+            <p className="mt-2 text-sm text-destructive">{managerInputError}</p>
           )}
         </div>
       )}
@@ -625,7 +625,7 @@ export function Live() {
 
           {/* Global tier context */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 bg-surface-elevated/70">
-            <span className="text-xs uppercase tracking-wide text-foreground-muted">
+            <span className="text-sm uppercase text-foreground-muted">
               Compare Against
             </span>
             <div className="flex items-center gap-1 flex-wrap">
@@ -633,7 +633,7 @@ export function Live() {
                 <button
                   key={tier.value}
                   onClick={() => setComparisonTier(tier.value)}
-                  className={`px-2 py-0.5 text-xs uppercase tracking-wide ${
+                  className={`px-2 py-0.5 text-sm uppercase ${
                     comparisonTier === tier.value
                       ? 'bg-tt-green/25 text-tt-green ring-1 ring-tt-cyan/30'
                       : 'text-foreground-dim hover:text-foreground hover:bg-surface'
@@ -670,7 +670,7 @@ export function Live() {
               />
               {effectivePlayersPlayed && (
                 <div className="pt-3 mt-3 md:pt-4 md:mt-4 border-t border-border/40">
-                  <div className="text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted mb-2">
+                  <div className="text-sm uppercase text-foreground-muted mb-2">
                     Effective Players Played
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 md:gap-2">
@@ -680,7 +680,7 @@ export function Live() {
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-tt-green" />
-                        <span className="text-[11px] md:text-xs uppercase tracking-wide text-tt-green">
+                        <span className="text-sm uppercase text-tt-green">
                           You
                         </span>
                       </div>
@@ -697,7 +697,7 @@ export function Live() {
                       >
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 ${TIER_CONFIG[tierData.tier].color}`} />
-                          <span className="text-[11px] md:text-xs uppercase tracking-wide text-foreground-muted">
+                          <span className="text-sm uppercase text-foreground-muted">
                             {tierData.label}
                           </span>
                         </div>
@@ -762,7 +762,7 @@ export function Live() {
           {/* Advanced */}
           {varianceData && (
             <details className="border border-border/40 bg-surface-elevated/30">
-              <summary className="cursor-pointer px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm uppercase tracking-wider text-foreground-muted">
+              <summary className="cursor-pointer px-3 md:px-4 py-2.5 md:py-3 text-sm uppercase text-foreground-muted">
                 Variance
               </summary>
               <div className="px-3 md:px-4 pb-3 md:pb-4 pt-1">

@@ -1125,7 +1125,7 @@ export function Planner() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-wider uppercase text-foreground mb-2">
+            <h2 className="text-2xl font-bold uppercase text-foreground mb-2">
               Transfer Planner
             </h2>
             <p className="font-body text-foreground-muted text-sm mb-4">
@@ -1134,9 +1134,9 @@ export function Planner() {
           </div>
           <button
             onClick={() => setShowHelp(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase tracking-wider text-foreground-muted hover:text-foreground hover:bg-surface-hover"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm uppercase text-foreground-muted hover:text-foreground hover:bg-surface-hover"
           >
-            <span className="w-5 h-5 border border-current flex items-center justify-center text-[10px] font-bold">
+            <span className="w-5 h-5 border border-current flex items-center justify-center text-sm font-bold">
               ?
             </span>
             Help
@@ -1155,13 +1155,13 @@ export function Planner() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="p-5 border-b border-border bg-tt-magenta/10">
-                <h3 className="text-lg font-bold tracking-wider uppercase text-foreground">
+                <h3 className="text-lg font-bold uppercase text-foreground">
                   How to Use the Planner
                 </h3>
               </div>
               <div className="p-5 space-y-5">
                 <div>
-                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
+                  <h4 className="text-sm uppercase text-tt-green mb-2">
                     1. Make Transfers
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1170,7 +1170,7 @@ export function Planner() {
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
+                  <h4 className="text-sm uppercase text-tt-green mb-2">
                     2. Find Plans
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1179,7 +1179,7 @@ export function Planner() {
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
+                  <h4 className="text-sm uppercase text-tt-green mb-2">
                     3. Select & Save
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1188,7 +1188,7 @@ export function Planner() {
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm uppercase tracking-wider text-tt-green mb-2">
+                  <h4 className="text-sm uppercase text-tt-green mb-2">
                     Solver Controls
                   </h4>
                   <p className="text-sm text-foreground-muted">
@@ -1306,7 +1306,7 @@ export function Planner() {
               </div>
 
               {parsedConstraints.hasErrors && (
-                <div className="mb-4 border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <div className="mb-4 border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   Invalid advanced settings. Open the Advanced Settings card to fix:
                   {' ' + parsedConstraints.errors.join(' | ')}
                 </div>
@@ -1348,11 +1348,11 @@ export function Planner() {
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs uppercase tracking-wider text-foreground-muted">
+                          <span className="text-sm uppercase text-foreground-muted">
                             Plan {path.id}
                           </span>
                           {path.total_hits > 0 && (
-                            <span className="text-xs text-destructive">
+                            <span className="text-sm text-destructive">
                               {path.total_hits} hit{path.total_hits > 1 ? 's' : ''}
                             </span>
                           )}
@@ -1370,7 +1370,7 @@ export function Planner() {
                             const gwData = path.transfers_by_gw[gw]
                             if (!gwData) return null
                             return (
-                              <div key={gw} className="text-xs text-foreground-muted truncate">
+                              <div key={gw} className="text-sm text-foreground-muted truncate">
                                 <span className="text-foreground-dim">GW{gw}:</span>{' '}
                                 {gwData.chip_played && (
                                   <span className="text-tt-green/80">
@@ -1402,7 +1402,7 @@ export function Planner() {
                 </div>
               )}
               {!isSolveActive && paths.length > 0 && (
-                <div className="pt-2 text-xs text-foreground-muted">
+                <div className="pt-2 text-sm text-foreground-muted">
                   Objective: {OBJECTIVE_LABELS[solveObjectiveMode]}
                 </div>
               )}
@@ -1416,10 +1416,10 @@ export function Planner() {
                 className="w-full flex items-center justify-between p-4 bg-surface-elevated hover:bg-surface-hover"
               >
                 <div className="flex items-center gap-3">
-                  <h3 className="text-sm font-bold tracking-wider uppercase text-foreground">
+                  <h3 className="text-sm font-bold uppercase text-foreground">
                     Advanced Settings
                   </h3>
-                  <span className="text-xs text-foreground-muted">
+                  <span className="text-sm text-foreground-muted">
                     solver + chips + constraints
                   </span>
                 </div>
@@ -1445,7 +1445,7 @@ export function Planner() {
                                   <button
                                     key={mode}
                                     onClick={() => setObjectiveMode(mode)}
-                                    className={`px-2 py-1 text-[10px] uppercase tracking-wider ${
+                                    className={`px-2 py-1 text-sm uppercase ${
                                       objectiveMode === mode
                                         ? 'bg-highlight/20 text-highlight border border-highlight/30'
                                         : 'text-foreground-muted hover:text-foreground hover:bg-surface-hover'
@@ -1709,7 +1709,7 @@ export function Planner() {
                         `}
                       >
                         <div
-                          className={`text-xs uppercase ${isSelected ? 'text-tt-green' : 'text-foreground-muted'}`}
+                          className={`text-sm uppercase ${isSelected ? 'text-tt-green' : 'text-foreground-muted'}`}
                         >
                           GW{gw}
                           {!selectedPath && isFirst && hitsCost > 0 && ` (-${hitsCost})`}
@@ -1721,7 +1721,7 @@ export function Planner() {
                           {pts.toFixed(1)}
                         </div>
                         {pathAction && (
-                          <div className="text-[10px] text-tt-magenta mt-0.5">
+                          <div className="text-sm text-tt-magenta mt-0.5">
                             {pathGw?.chip_played
                               ? CHIP_LABELS[pathGw.chip_played as keyof ChipPlan]
                               : pathAction === 'bank'
@@ -1730,7 +1730,7 @@ export function Planner() {
                           </div>
                         )}
                         {!selectedPath && gwUserTransfers.length > 0 && (
-                          <div className="text-[10px] text-tt-green mt-0.5">
+                          <div className="text-sm text-tt-green mt-0.5">
                             {gwUserTransfers.length} transfer
                             {gwUserTransfers.length > 1 ? 's' : ''}
                           </div>
@@ -1741,7 +1741,7 @@ export function Planner() {
                 </div>
                 {selectedGameweek !== null && selectedGwTransferStatus && (
                   <div className="border border-border/60 bg-surface-elevated/60 px-3 py-2 flex items-center justify-between">
-                    <span className="text-xs text-foreground-muted">
+                    <span className="text-sm text-foreground-muted">
                       GW{selectedGameweek} transfer budget
                     </span>
                     <span
@@ -1762,7 +1762,7 @@ export function Planner() {
                   </div>
                 )}
                 <div className="pt-3 border-t border-border/50 flex items-center justify-between">
-                  <span className="text-xs text-foreground-muted">
+                  <span className="text-sm text-foreground-muted">
                     Total ({displayHorizonLength} GWs)
                     {selectedPath && ' \u2014 Plan ' + selectedPath.id}
                   </span>
@@ -1773,7 +1773,7 @@ export function Planner() {
                   </span>
                 </div>
               </div>
-              <p className="text-xs text-foreground-muted mb-4">
+              <p className="text-sm text-foreground-muted mb-4">
                 Click a player to adjust minutes or make a transfer.
                 {selectedGameweek !== null && ` Showing squad as of GW${selectedGameweek}.`}
               </p>
@@ -1800,7 +1800,7 @@ export function Planner() {
                     .sort(([a], [b]) => Number(a) - Number(b))
                     .map(([gwStr, transfers]) => (
                       <div key={gwStr} className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase tracking-wider text-foreground-muted">
+                        <span className="text-sm uppercase text-foreground-muted">
                           GW{gwStr}:
                         </span>
                         {transfers.map((ft, idx) => {
@@ -1832,7 +1832,7 @@ export function Planner() {
                                   )
                                   setSelectedPathIndex(null)
                                 }}
-                                className="text-xs text-foreground-muted hover:text-destructive ml-1"
+                                className="text-sm text-foreground-muted hover:text-destructive ml-1"
                               >
                                 {'\u2715'}
                               </button>
@@ -1842,7 +1842,7 @@ export function Planner() {
                       </div>
                     ))}
                   {selectedPathIndex !== null && (
-                    <button onClick={handleSavePlan} className="btn-secondary text-xs">
+                    <button onClick={handleSavePlan} className="btn-secondary text-sm">
                       Save Plan
                     </button>
                   )}
@@ -1859,7 +1859,7 @@ export function Planner() {
                       key={plan.id}
                       className="flex items-center gap-3 px-3 py-2 bg-surface-elevated rounded-lg"
                     >
-                      <span className="text-xs uppercase tracking-wider text-foreground">
+                      <span className="text-sm uppercase text-foreground">
                         {plan.name}
                       </span>
                       <span
@@ -1868,18 +1868,18 @@ export function Planner() {
                         {plan.scoreVsHold > 0 ? '+' : ''}
                         {plan.scoreVsHold.toFixed(1)}
                       </span>
-                      <span className="text-xs text-foreground-muted">
+                      <span className="text-sm text-foreground-muted">
                         {plan.transfers.length} transfer{plan.transfers.length !== 1 ? 's' : ''}
                       </span>
                       <button
                         onClick={() => handleLoadSavedPlan(plan)}
-                        className="text-xs text-tt-green hover:text-tt-green/80"
+                        className="text-sm text-tt-green hover:text-tt-green/80"
                       >
                         Load
                       </button>
                       <button
                         onClick={() => handleDeleteSavedPlan(plan.id)}
-                        className="text-xs text-foreground-muted hover:text-destructive"
+                        className="text-sm text-foreground-muted hover:text-destructive"
                       >
                         Delete
                       </button>
@@ -1899,10 +1899,10 @@ export function Planner() {
               className="w-full flex items-center justify-between p-4 bg-surface-elevated hover:bg-surface-hover"
             >
               <div className="flex items-center gap-3">
-                <h3 className="text-sm font-bold tracking-wider uppercase text-foreground">
+                <h3 className="text-sm font-bold uppercase text-foreground">
                   Player Explorer
                 </h3>
-                <span className="text-xs text-foreground-muted">
+                <span className="text-sm text-foreground-muted">
                   {predictionsRange.players.length} players
                 </span>
               </div>
