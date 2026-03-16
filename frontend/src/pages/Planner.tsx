@@ -1126,7 +1126,7 @@ export function Planner() {
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-2xl font-bold uppercase text-foreground mb-2">Transfer Planner</h2>
-            <p className="font-body text-foreground-muted text-sm mb-4">
+            <p className="text-foreground-muted text-base mb-4">
               Build your squad, then press Find Plans to see optimized suggestions.
             </p>
           </div>
@@ -1160,28 +1160,28 @@ export function Planner() {
               <div className="p-5 space-y-5">
                 <div>
                   <h4 className="text-sm uppercase text-tt-green mb-2">1. Make Transfers</h4>
-                  <p className="text-sm text-foreground-muted">
+                  <p className="text-base text-foreground-muted">
                     Click any player on the pitch to transfer them out and pick a replacement. Your
                     transfers appear in the sidebar.
                   </p>
                 </div>
                 <div>
                   <h4 className="text-sm uppercase text-tt-green mb-2">2. Find Plans</h4>
-                  <p className="text-sm text-foreground-muted">
+                  <p className="text-base text-foreground-muted">
                     Press "Find Plans" to run the optimizer. It finds multi-gameweek transfer paths
                     that maximize points, respecting any transfers you've already made.
                   </p>
                 </div>
                 <div>
                   <h4 className="text-sm uppercase text-tt-green mb-2">3. Select & Save</h4>
-                  <p className="text-sm text-foreground-muted">
+                  <p className="text-base text-foreground-muted">
                     Select a plan to auto-apply its transfers to your squad. Save plans you like for
                     later review.
                   </p>
                 </div>
                 <div>
                   <h4 className="text-sm uppercase text-tt-green mb-2">Solver Controls</h4>
-                  <p className="text-sm text-foreground-muted">
+                  <p className="text-base text-foreground-muted">
                     <span className="text-foreground font-medium">FT Value</span> controls hit
                     aversion — higher values make the solver prefer rolling transfers.
                     <span className="text-foreground font-medium"> GW Horizon</span> sets how many

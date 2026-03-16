@@ -16,6 +16,15 @@ interface PitchPlayerCardProps {
   extraLines?: Array<{ text: string; className: string }>
 }
 
+function getPointsColor(pointsText?: string): string {
+  if (!pointsText) return 'text-tt-yellow'
+  const pts = parseFloat(pointsText)
+  if (isNaN(pts)) return 'text-tt-yellow'
+  if (pts >= 9) return 'text-tt-green'
+  if (pts <= 1) return 'text-tt-red'
+  return 'text-tt-yellow'
+}
+
 export function PitchPlayerCard({
   name,
   secondaryText,
@@ -30,8 +39,9 @@ export function PitchPlayerCard({
   onClick,
   extraLines = [],
 }: PitchPlayerCardProps) {
-  const borderColor = isBench ? 'border-tt-dim' : 'border-[#006600]'
+  const borderColor = isBench ? 'border-tt-dim' : 'border-border'
   const textOpacity = isBench ? 'opacity-60' : ''
+  const pointsColor = pointsClassName || getPointsColor(pointsText)
 
   return (
     <div className={`relative ${isSelected ? 'scale-110' : ''} ${textOpacity}`}>
@@ -44,9 +54,7 @@ export function PitchPlayerCard({
         {/* Points + captain/vice row */}
         <div className="flex items-center justify-center gap-1">
           {pointsText !== undefined && (
-            <span className={`text-base md:text-lg font-bold text-tt-yellow ${pointsClassName}`}>
-              {pointsText}
-            </span>
+            <span className={`text-base md:text-lg font-bold ${pointsColor}`}>{pointsText}</span>
           )}
           {isCaptain && <span className="text-tt-yellow text-sm font-bold">(C)</span>}
           {isViceCaptain && !isCaptain && (

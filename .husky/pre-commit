@@ -1,2 +1,3 @@
 npx lint-staged
 npm run test:api:routes
+npm run test:e2e

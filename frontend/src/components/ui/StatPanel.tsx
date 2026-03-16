@@ -24,9 +24,12 @@ export function StatPanel({
 
   return (
     <div className={`stat-panel ${className}`}>
-      <div className="flex items-baseline gap-2">
+      <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+        {label}
+      </div>
+      <div className="flex items-baseline gap-2 mt-2">
         <span
-          className={`text-2xl md:text-3xl font-bold ${highlight ? 'text-tt-yellow' : 'text-tt-white'}`}
+          className={`text-3xl md:text-4xl font-bold ${highlight ? 'text-tt-yellow' : 'text-tt-white'}`}
         >
           {value}
         </span>
@@ -36,8 +39,7 @@ export function StatPanel({
           </span>
         )}
       </div>
-      <div className="text-sm uppercase text-tt-cyan mt-1">{label}</div>
-      {subValue && <div className="text-sm text-foreground-dim mt-0.5">{subValue}</div>}
+      {subValue && <div className="text-sm text-foreground-dim mt-1">{subValue}</div>}
     </div>
   )
 }

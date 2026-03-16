@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --font-teletext: 'VT323', monospace;
-    --font-teletext-alt: 'JetBrains Mono', monospace;
+    --font-teletext-alt: 'Share Tech Mono', monospace;
 
     /* Teletext 8-color palette */
     --tt-black: 0 0% 0%;
@@ -56,31 +56,39 @@
   }
 
   html {
-    font-size: 125%;
+    font-size: 100%;
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: var(--font-teletext);
+    font-family: var(--font-teletext-alt);
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
     line-height: 1.5;
   }
 
-  h1, h2, h3, .font-display {
-    font-family: var(--font-teletext);
+  h1, h2, h3 {
     text-transform: uppercase;
   }
 
-  .font-mono, code, pre {
+  h2 {
+    color: hsl(var(--tt-cyan));
+    padding-bottom: 0.25rem;
+    border-bottom: 2px solid hsl(var(--tt-cyan));
+    margin-bottom: 0.75rem;
+  }
+
+  .font-teletext {
     font-family: var(--font-teletext);
   }
 }
 
-/* Font toggle: mono mode */
-html.font-mono-mode {
-  --font-teletext: 'JetBrains Mono', monospace;
+/* Font toggle: full pixel mode — everything VT323 */
+html.font-pixel-mode {
+  body {
+    font-family: var(--font-teletext);
+  }
 }
 
 /* Keyframe Animations */
@@ -137,10 +145,11 @@ html.font-mono-mode {
 @layer components {
   .stat-panel {
     @apply relative p-4;
+    border-right: 1px solid #333333;
   }
 
-  .stat-panel:hover {
-    background: #111111;
+  .stat-panel:last-child {
+    border-right: none;
   }
 
   .broadcast-card {
@@ -269,7 +278,7 @@ html.font-mono-mode {
   }
 
   .tab-nav-item {
-    @apply relative px-4 py-2 text-sm uppercase;
+    @apply relative px-5 py-2 text-lg uppercase;
     color: #000000;
   }
 

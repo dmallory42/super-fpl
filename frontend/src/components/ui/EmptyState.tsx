@@ -19,7 +19,7 @@ export function EmptyState({ title, description, action, className = '' }: Empty
     >
       <div className="text-tt-dim mb-2">{'─'.repeat(20)}</div>
       <h3 className="text-lg uppercase text-tt-cyan mb-2">{title}</h3>
-      {description && <p className="text-foreground-muted text-sm max-w-md">{description}</p>}
+      {description && <p className="text-foreground-muted text-base max-w-md">{description}</p>}
       {action && (
         <button onClick={action.onClick} className="btn-primary mt-4">
           {action.label}

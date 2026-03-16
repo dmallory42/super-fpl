@@ -147,7 +147,7 @@ export function LeagueAnalyzer() {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-foreground mb-2">League Analyzer</h2>
-        <p className="text-foreground-muted text-sm">
+        <p className="text-foreground-muted text-base">
           Analyze your mini-league to find differentials, compare ownership, and assess risk.
         </p>
       </div>

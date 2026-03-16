@@ -55,36 +55,38 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
   return (
     <div className="space-y-4" data-testid="transfer-quality-scorecard">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className=" border border-border p-3" data-testid="transfer-quality-weeks">
-          <div className="text-sm uppercase text-foreground-muted">Transfer Weeks</div>
-          <div className="text-xl text-foreground">{rows.length}</div>
+        <div className="stat-panel" data-testid="transfer-quality-weeks">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Transfer Weeks
+          </div>
+          <div className="text-xl text-foreground mt-2">{rows.length}</div>
         </div>
-        <div className=" border border-border p-3" data-testid="transfer-quality-count">
-          <div className="text-sm uppercase text-foreground-muted">Transfers</div>
-          <div className="text-xl text-foreground">{totals.transferCount}</div>
+        <div className="stat-panel" data-testid="transfer-quality-count">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Transfers
+          </div>
+          <div className="text-xl text-foreground mt-2">{totals.transferCount}</div>
         </div>
-        <div
-          className=" border border-tt-green/30 bg-tt-green/5 p-3"
-          data-testid="transfer-quality-expected"
-        >
-          <div className="text-sm uppercase text-foreground-muted">Expected Gain (Snapshot)</div>
+        <div className="stat-panel" data-testid="transfer-quality-expected">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Expected Gain (Snapshot)
+          </div>
           <div
-            className={`text-xl ${
+            className={`text-xl mt-2 ${
               totals.foresightWeeks > 0 ? signedValueClass(totals.foresightGain) : 'text-foreground'
             }`}
           >
-            {totals.foresightWeeks > 0 ? formatSigned(totals.foresightGain) : 'N/A'}
+            {totals.foresightWeeks > 0 ? formatSigned(totals.foresightGain) : '—'}
           </div>
           <div className="text-sm text-foreground-dim mt-1">
             {totals.foresightWeeks}/{rows.length} GWs covered
           </div>
         </div>
-        <div
-          className=" border border-tt-red/30 bg-tt-red/5 p-3"
-          data-testid="transfer-quality-realized"
-        >
-          <div className="text-sm uppercase text-foreground-muted">Realized Gain</div>
-          <div className={`text-xl ${signedValueClass(totals.hindsightGain)}`}>
+        <div className="stat-panel" data-testid="transfer-quality-realized">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Realized Gain
+          </div>
+          <div className={`text-xl mt-2 ${signedValueClass(totals.hindsightGain)}`}>
             {formatSigned(totals.hindsightGain)}
           </div>
         </div>
@@ -131,7 +133,7 @@ export function TransferQualityScorecard({ seasonAnalysis }: TransferQualityScor
                         : signedValueClass(row.foresight_gain)
                     }`}
                   >
-                    {row.foresight_gain === null ? 'N/A' : formatSigned(row.foresight_gain)}
+                    {row.foresight_gain === null ? '—' : formatSigned(row.foresight_gain)}
                   </td>
                   <td className={`text-right ${signedValueClass(row.hindsight_gain)}`}>
                     {formatSigned(row.hindsight_gain)}

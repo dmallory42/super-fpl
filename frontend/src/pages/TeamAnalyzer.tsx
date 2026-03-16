@@ -106,7 +106,7 @@ export function TeamAnalyzer() {
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold uppercase text-foreground mb-2">Season Review</h2>
-        <p className="text-foreground-muted text-sm mb-4">
+        <p className="text-foreground-muted text-base mb-4">
           Enter your FPL Manager ID to review your season performance. Find it in your FPL URL:
           <span className="text-tt-green ml-1">
             fantasy.premierleague.com/entry/<strong>123456</strong>/event/1
@@ -143,22 +143,23 @@ export function TeamAnalyzer() {
 
       {/* Manager Card */}
       {manager && !isLoading && (
-        <BroadcastCard>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <BroadcastCard title={manager.name} accentColor="yellow">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xl font-bold uppercase text-foreground">{manager.name}</h3>
-              <p className="text-foreground-muted">
-                {manager.player_first_name} {manager.player_last_name}
-              </p>
+              <div className="text-4xl font-bold text-tt-cyan">
+                {manager.summary_overall_points}
+              </div>
+              <div className="text-sm uppercase text-tt-cyan mt-1">Total Points</div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold">
-                <span className="text-tt-cyan">{manager.summary_overall_points}</span>
+              <div className="text-4xl font-bold text-tt-white">
+                {manager.summary_overall_rank?.toLocaleString() ?? 'N/A'}
               </div>
-              <div className="text-sm text-foreground-muted">
-                Rank: <span>{manager.summary_overall_rank?.toLocaleString() ?? 'N/A'}</span>
-              </div>
+              <div className="text-sm uppercase text-tt-cyan mt-1">Overall Rank</div>
             </div>
+          </div>
+          <div className="text-foreground-muted mt-3">
+            {manager.player_first_name} {manager.player_last_name}
           </div>
         </BroadcastCard>
       )}

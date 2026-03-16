@@ -11,8 +11,8 @@ export function LiveIndicator({
 }: LiveIndicatorProps) {
   const textSizes = {
     sm: 'text-sm',
-    md: 'text-sm',
-    lg: 'text-base',
+    md: 'text-base',
+    lg: 'text-lg',
   }
 
   return (

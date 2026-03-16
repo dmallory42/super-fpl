@@ -60,11 +60,26 @@ The frontend uses a **BBC Ceefax / Teletext aesthetic** — black background, pi
 - **Retro-Digital**: Square corners everywhere, no rounded edges, no shadows
 
 ### Typography
-```css
---font-teletext: 'VT323'           /* Primary — pixel font for everything */
-/* Alt: 'JetBrains Mono' via font toggle (html.font-mono-mode class) */
-```
-Font toggle stored in `localStorage` key `superfpl-font`. Toggle component in App footer.
+
+**Two fonts, clear roles:**
+- **VT323** (`font-teletext`) — the *voice*. Default body font. All headings, labels, navigation, buttons, player names, body text. Everything that *speaks* to the user.
+- **JetBrains Mono** (`font-mono`) — the *data*. Opt-in via `font-mono` class. Table cell values, stat panel numbers, form inputs, prices, scores, ranks. Everything that *shows* numbers.
+
+**Rule**: If it's a word, it's VT323. If it's a number in a data context, it's JetBrains Mono.
+
+**Size scale** (base 112.5% = 18px):
+| Ceefax Concept | Tailwind | Usage |
+|---|---|---|
+| Double-height title | `text-3xl` | App name, page numbers |
+| Double-height header | `text-2xl` | Page section titles |
+| Emphasized | `text-xl` | Key stat values |
+| Normal text | `text-base` | Body text, descriptions |
+| Dense data | `text-sm` | Tables, nav, labels, buttons |
+| Fine print | `text-xs` | Timestamps, attribution |
+
+**VT323 readability rule**: Never use VT323 smaller than `text-sm`. For dense data that needs smaller text, use `font-mono`.
+
+Font toggle stored in `localStorage` key `superfpl-font`. Toggle component in App footer. Modes: `DATA` (VT323 + JetBrains Mono for numbers) and `CEEFAX` (all VT323, `html.font-pixel-mode` class).
 
 ### Color Palette (Teletext 8-Color)
 | Token | Value | Usage |
@@ -129,7 +144,9 @@ The app header shows page numbers (P101, P201, P301, P401) per tab and a live cl
 - Don't use gradients or shadows
 - Don't use entry/reveal animations
 - Don't use colors outside the 8-color teletext palette (+ tt-dim)
-- Don't use `font-display`, `font-body`, or `font-mono` — everything uses `font-teletext`
+- Don't use `font-display` or `font-body` — they don't exist. Use `font-teletext` (VT323) or `font-mono` (JetBrains Mono)
+- Don't use `font-mono` for words/labels — only for numeric data values
+- Don't render VT323 text smaller than `text-sm` — it becomes unreadable
 - Don't use opacity for hover states — use color changes instead
 
 ## Workflow

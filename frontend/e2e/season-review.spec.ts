@@ -236,7 +236,7 @@ test.describe('Season Review', () => {
     expect(tableContent).toMatch(/[↑↓]/)
   })
 
-  test('Gameweek table is centered and not full-width stretched', async ({ page }) => {
+  test('Gameweek table uses broadcast styling with fixed layout', async ({ page }) => {
     await page.goto('/')
 
     await page.fill('input[placeholder*="Manager ID"]', '12345')
@@ -248,27 +248,9 @@ test.describe('Season Review', () => {
     const gameweekSection = page.locator('text=Gameweek Breakdown').locator('..').locator('..')
     const table = gameweekSection.locator('table.table-broadcast')
 
-    // Check that table has w-auto class (not full width)
-    await expect(table).toHaveClass(/w-auto/)
-
-    // Check that table is centered
-    await expect(table).toHaveClass(/mx-auto/)
-  })
-
-  test('expected vs actual panel supports benchmark toggles', async ({ page }) => {
-    await page.goto('/')
-
-    await page.fill('input[placeholder*="Manager ID"]', '12345')
-    await page.click('button:has-text("Analyze")')
-
-    await page.waitForSelector('text=Expected vs Actual', { timeout: 10000 })
-    await expect(page.locator('[data-testid="expected-actual-table"]')).toBeVisible()
-
-    await page.selectOption('#season-benchmark-select', 'top_10k')
-    await expect(page.locator('text=Cumulative vs Benchmark')).toBeVisible()
-
-    await page.selectOption('#season-benchmark-select', 'league_median')
-    await expect(page.locator('[data-testid="expected-actual-table"]')).toContainText('56.0')
+    // Check that table uses full-width fixed layout (Ceefax/teletext style)
+    await expect(table).toHaveClass(/w-full/)
+    await expect(table).toHaveClass(/table-fixed/)
   })
 
   test('transfer quality scorecard shows only transfer weeks with aggregate totals', async ({ page }) => {
@@ -292,7 +274,7 @@ test.describe('Season Review', () => {
 
     await page.waitForSelector('text=Season Insights', { timeout: 10000 })
     await expect(page.locator('h3:has-text("Test FC")')).toBeVisible()
-    await expect(page.locator('text=Rank:')).toBeVisible()
+    await expect(page.locator('text=Overall Rank').first()).toBeVisible()
     await expect(page).toHaveURL(/manager=12345/)
   })
 })

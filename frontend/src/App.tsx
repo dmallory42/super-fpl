@@ -70,25 +70,25 @@ function CeefaxTime() {
   })
 
   return (
-    <span className="text-tt-white">
+    <span className="text-tt-white text-xl">
       {dateStr} {timeStr}
     </span>
   )
 }
 
 function FontToggle() {
-  const [isPixel, setIsPixel] = useState(() => {
-    return localStorage.getItem('superfpl-font') !== 'mono'
+  const [isFullPixel, setIsFullPixel] = useState(() => {
+    return localStorage.getItem('superfpl-font') === 'pixel'
   })
 
   const toggle = useCallback(() => {
-    setIsPixel((prev) => {
+    setIsFullPixel((prev) => {
       const next = !prev
       if (next) {
-        document.documentElement.classList.remove('font-mono-mode')
+        document.documentElement.classList.add('font-pixel-mode')
         localStorage.setItem('superfpl-font', 'pixel')
       } else {
-        document.documentElement.classList.add('font-mono-mode')
+        document.documentElement.classList.remove('font-pixel-mode')
         localStorage.setItem('superfpl-font', 'mono')
       }
       return next
@@ -96,14 +96,14 @@ function FontToggle() {
   }, [])
 
   useEffect(() => {
-    if (!isPixel) {
-      document.documentElement.classList.add('font-mono-mode')
+    if (isFullPixel) {
+      document.documentElement.classList.add('font-pixel-mode')
     }
-  }, [isPixel])
+  }, [isFullPixel])
 
   return (
     <button onClick={toggle} className="text-tt-dim hover:text-tt-cyan text-sm uppercase">
-      [A] FONT: {isPixel ? 'PIXEL' : 'MONO'}
+      [A] FONT: {isFullPixel ? 'CEEFAX' : 'DATA'}
     </button>
   )
 }
@@ -132,12 +132,12 @@ function App() {
       <SyncWatcher />
       <div className="min-h-screen bg-background text-foreground">
         {/* Ceefax page header */}
-        <header className="border-b border-border">
+        <header className="border-b border-border font-teletext">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <span className="text-tt-white">{pageNumbers[page] ?? 'P100'}</span>
-                <h1 className="text-2xl sm:text-3xl font-bold">
+                <span className="text-tt-white text-xl">{pageNumbers[page] ?? 'P100'}</span>
+                <h1 className="text-6xl sm:text-7xl font-bold leading-none">
                   <span className="text-tt-cyan">SUPERFPL</span>
                 </h1>
               </div>
@@ -170,7 +170,9 @@ function App() {
         {/* Footer */}
         <footer className="border-t border-border mt-auto">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <p className="text-sm text-tt-dim">Data from Official FPL API</p>
+            <p className="text-xs text-tt-dim uppercase tracking-wider">
+              Data from Official FPL API
+            </p>
             <FontToggle />
           </div>
         </footer>

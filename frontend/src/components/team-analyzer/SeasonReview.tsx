@@ -409,9 +409,11 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
     <BroadcastCard title="Season Insights" animationDelay={100}>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Rank Movement */}
-        <div className="p-4 bg-surface-elevated ">
-          <div className="text-sm uppercase text-foreground-muted mb-2">Rank Movement</div>
-          <div className="flex items-baseline gap-2">
+        <div className="stat-panel">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Rank Movement
+          </div>
+          <div className="flex items-baseline gap-2 mt-2">
             <span
               className={`text-2xl font-bold ${insights.rankImproved ? 'text-tt-green' : 'text-destructive'}`}
             >
@@ -424,26 +426,34 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
         </div>
 
         {/* Consistency */}
-        <div className="p-4 bg-surface-elevated ">
-          <div className="text-sm uppercase text-foreground-muted mb-2">Consistency</div>
-          <div className="text-lg font-bold text-foreground">{insights.consistencyLabel}</div>
+        <div className="stat-panel">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Consistency
+          </div>
+          <div className="text-lg font-bold text-foreground mt-2">{insights.consistencyLabel}</div>
           <div className="text-sm text-foreground-dim mt-1">σ = {insights.stdDev} pts</div>
         </div>
 
         {/* Team Value */}
-        <div className="p-4 bg-surface-elevated ">
-          <div className="text-sm uppercase text-foreground-muted mb-2">Value Change</div>
+        <div className="stat-panel">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Value Change
+          </div>
           <div
-            className={`text-2xl font-bold ${insights.valueChange >= 0 ? 'text-tt-green' : 'text-destructive'}`}
+            className={`text-2xl font-bold mt-2 ${insights.valueChange >= 0 ? 'text-tt-green' : 'text-destructive'}`}
           >
             {insights.valueChange >= 0 ? '+' : ''}£{insights.valueChange.toFixed(1)}m
           </div>
         </div>
 
         {/* Bench Management */}
-        <div className="p-4 bg-surface-elevated ">
-          <div className="text-sm uppercase text-foreground-muted mb-2">Bench Management</div>
-          <div className="text-lg font-bold text-foreground">{insights.avgBenchPoints} avg</div>
+        <div className="stat-panel">
+          <div className="bg-tt-cyan text-tt-black px-2 py-0.5 text-sm uppercase font-bold inline-block">
+            Bench Management
+          </div>
+          <div className="text-lg font-bold text-foreground mt-2">
+            {insights.avgBenchPoints} avg
+          </div>
           <div className="text-sm text-foreground-dim mt-1">
             {insights.highBenchWeeks} weeks with 10+ pts
           </div>
@@ -453,19 +463,19 @@ function SeasonInsights({ gameweeks }: { gameweeks: EntryHistory[] }) {
       {/* Additional stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-border">
         <div className="text-center">
-          <div className="text-sm text-foreground-muted">Best Rank</div>
+          <div className="text-sm uppercase text-tt-cyan">Best Rank</div>
           <div className="font-bold text-tt-green">{formatRank(insights.bestRank)}</div>
         </div>
         <div className="text-center">
-          <div className="text-sm text-foreground-muted">Worst Rank</div>
+          <div className="text-sm uppercase text-tt-cyan">Worst Rank</div>
           <div className="font-bold text-foreground-muted">{formatRank(insights.worstRank)}</div>
         </div>
         <div className="text-center">
-          <div className="text-sm text-foreground-muted">Hit Rate</div>
+          <div className="text-sm uppercase text-tt-cyan">Hit Rate</div>
           <div className="font-bold text-foreground">{insights.hitsPerTransfer} pts/transfer</div>
         </div>
         <div className="text-center">
-          <div className="text-sm text-foreground-muted">High Bench Weeks</div>
+          <div className="text-sm uppercase text-tt-cyan">High Bench Weeks</div>
           <div className="font-bold text-foreground">{insights.highBenchWeeks}</div>
         </div>
       </div>
@@ -600,9 +610,9 @@ function ChipsTimeline({ chips }: { chips: ChipInfo[] }) {
       ) : (
         <div className="flex flex-wrap gap-3">
           {chips.map((chip, i) => (
-            <div key={i} className="bg-tt-green px-4 py-2">
-              <div className="text-white text-sm uppercase">{chip.displayName}</div>
-              <div className="text-white/70 text-sm">GW {chip.event}</div>
+            <div key={i} className="border border-tt-green px-4 py-2">
+              <div className="text-tt-green text-sm uppercase">{chip.displayName}</div>
+              <div className="text-foreground-muted text-sm">GW {chip.event}</div>
             </div>
           ))}
         </div>

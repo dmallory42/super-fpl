@@ -161,8 +161,8 @@ test.describe('Live Page', () => {
     await expect(page.locator('.pitch-texture').locator('text=Salah').first()).toBeVisible()
     await expect(page.locator('.pitch-texture').locator('text=Haaland').first()).toBeVisible()
 
-    // Should show captain badge (yellow background with C or TC)
-    await expect(page.locator('.bg-gradient-to-br.from-yellow-400').first()).toBeVisible()
+    // Should show captain badge (C) in teletext yellow
+    await expect(page.locator('text=(C)').first()).toBeVisible()
   })
 
   test('shows player status indicators correctly', async ({ page }) => {
@@ -331,8 +331,8 @@ test.describe('Live Page', () => {
     await page.goto('/')
     await page.click('text=Live')
 
-    // Should show LIVE indicator (the mock has is_live: true) - use the specific Live indicator component
-    await expect(page.locator('.animate-pulse-dot').first()).toBeVisible({ timeout: 10000 })
+    // Should show LIVE indicator (the mock has is_live: true) - uses animate-blink class
+    await expect(page.locator('.animate-blink').first()).toBeVisible({ timeout: 10000 })
   })
 
   test('applies auto-subs when starting player has 0 minutes and match finished', async ({ page }) => {

@@ -459,7 +459,7 @@ export function Live() {
             </button>
           )}
         </div>
-        <p className="text-foreground-muted text-sm">
+        <p className="text-foreground-muted text-base">
           {gwData ? (
             <>
               GW{gwData.gameweek} • {gwData.matchesPlayed}/{gwData.totalMatches} matches complete
@@ -624,17 +624,17 @@ export function Live() {
           </BroadcastCard>
 
           {/* Global tier context */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 sm:p-3 bg-surface-elevated/70">
-            <span className="text-sm uppercase text-foreground-muted">Compare Against</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-3 border border-border">
+            <span className="text-sm uppercase text-tt-cyan">Compare Against</span>
             <div className="flex items-center gap-1 flex-wrap">
               {TIER_OPTIONS.map((tier) => (
                 <button
                   key={tier.value}
                   onClick={() => setComparisonTier(tier.value)}
-                  className={`px-2 py-0.5 text-sm uppercase ${
+                  className={`px-3 py-1 text-sm uppercase ${
                     comparisonTier === tier.value
-                      ? 'bg-tt-green/25 text-tt-green ring-1 ring-tt-cyan/30'
-                      : 'text-foreground-dim hover:text-foreground hover:bg-surface'
+                      ? 'bg-tt-cyan text-tt-black font-bold'
+                      : 'text-foreground-dim border border-border hover:text-foreground'
                   }`}
                 >
                   {tier.label}
@@ -674,7 +674,7 @@ export function Live() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 md:gap-2">
                     <div
                       data-testid="effective-players-you"
-                      className="flex items-center justify-between p-2 bg-surface-elevated"
+                      className="flex items-center justify-between p-2 border border-border"
                     >
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-tt-green" />
@@ -689,7 +689,7 @@ export function Live() {
                       <div
                         key={tierData.tier}
                         data-testid={`effective-players-${tierData.tier}`}
-                        className="flex items-center justify-between p-2 bg-surface-elevated"
+                        className="flex items-center justify-between p-2 border border-border"
                       >
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 ${TIER_CONFIG[tierData.tier].color}`} />

@@ -15,9 +15,7 @@ export default {
     extend: {
       fontFamily: {
         teletext: ['var(--font-teletext)', 'monospace'],
-        display: ['var(--font-teletext)', 'monospace'],
-        body: ['var(--font-teletext)', 'monospace'],
-        mono: ['var(--font-teletext)', 'monospace'],
+        mono: ['var(--font-teletext-alt)', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",

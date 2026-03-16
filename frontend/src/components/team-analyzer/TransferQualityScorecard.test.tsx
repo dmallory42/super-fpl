@@ -130,11 +130,11 @@ describe('TransferQualityScorecard', () => {
 
     render(<TransferQualityScorecard seasonAnalysis={analysis} />)
 
-    expect(screen.getByTestId('transfer-quality-expected')).toHaveTextContent('N/A')
+    expect(screen.getByTestId('transfer-quality-expected')).toHaveTextContent('—')
     expect(screen.getByTestId('transfer-quality-expected')).toHaveTextContent('0/1 GWs covered')
 
     const table = screen.getByTestId('transfer-quality-table')
     const rows = within(table).getAllByRole('row').slice(1)
-    expect(within(rows[0]).getByText('N/A')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('—')).toBeInTheDocument()
   })
 })
