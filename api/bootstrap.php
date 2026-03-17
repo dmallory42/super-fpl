@@ -19,9 +19,13 @@ use SuperFPL\Api\Controllers\ManagerController;
 use SuperFPL\Api\Controllers\PlayerController;
 use SuperFPL\Api\Controllers\PredictionController;
 use SuperFPL\Api\Controllers\TransferController;
+use SuperFPL\Api\Cache\RedisResponseCacheStore;
 use SuperFPL\Api\SchemaMigrator;
 use SuperFPL\FplClient\Cache\FileCache;
 use SuperFPL\FplClient\FplClient;
+use SuperFPL\FplClient\ParallelHttpClient;
+use Maia\Core\Middleware\ResponseCacheMiddleware;
+use Predis\Client as RedisClient;
 
 $app = App::create(__DIR__ . '/config');
 
@@ -57,6 +61,17 @@ $fplClient = new FplClient(
 );
 
 $app->container()->instance(FplClient::class, $fplClient);
+
+$parallelHttpClient = new ParallelHttpClient('https://fantasy.premierleague.com/api/');
+$app->container()->instance(ParallelHttpClient::class, $parallelHttpClient);
+
+$redisUrl = (string) ($config['redis']['url'] ?? 'redis://redis:6379');
+$redis = new RedisClient($redisUrl);
+$cacheStore = new RedisResponseCacheStore($redis);
+$app->container()->instance(
+    ResponseCacheMiddleware::class,
+    new ResponseCacheMiddleware($cacheStore, ttlSeconds: 300, namespace: 'league')
+);
 
 $app->addMiddleware(new CorsMiddleware((array) ($config['security']['cors_allowed_origins'] ?? [])));
 $app->addMiddleware(new SecurityHeadersMiddleware());

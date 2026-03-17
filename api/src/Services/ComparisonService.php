@@ -7,6 +7,7 @@ namespace SuperFPL\Api\Services;
 use Maia\Orm\Connection;
 use SuperFPL\Api\Support\ConnectionSql;
 use SuperFPL\FplClient\FplClient;
+use SuperFPL\FplClient\ParallelHttpClient;
 
 /**
  * Service for comparing multiple managers' teams.
@@ -18,7 +19,8 @@ class ComparisonService
 
     public function __construct(
         private readonly Connection $connection,
-        private readonly FplClient $fplClient
+        private readonly FplClient $fplClient,
+        private readonly ?ParallelHttpClient $parallelClient = null
     ) {
     }
 
@@ -30,14 +32,8 @@ class ComparisonService
      */
     public function compare(array $managerIds, int $gameweek): array
     {
-        // Fetch picks for all managers
-        $managerPicks = [];
-        foreach ($managerIds as $managerId) {
-            $picks = $this->getManagerPicks($managerId, $gameweek);
-            if ($picks !== null) {
-                $managerPicks[$managerId] = $picks;
-            }
-        }
+        // Fetch picks for all managers (parallel when possible)
+        $managerPicks = $this->getAllManagerPicks($managerIds, $gameweek);
 
         if (empty($managerPicks)) {
             return ['error' => 'No picks found for any manager'];
@@ -77,31 +73,68 @@ class ComparisonService
     }
 
     /**
-     * Get manager's picks for a gameweek (from cache or API).
+     * Fetch picks for all managers, using DB cache first and parallel HTTP for the rest.
      *
-     * @return array<int, array{element: int, multiplier: int, is_captain: bool}>|null
+     * @param array<int> $managerIds
+     * @return array<int, array>
      */
-    private function getManagerPicks(int $managerId, int $gameweek): ?array
+    private function getAllManagerPicks(array $managerIds, int $gameweek): array
     {
-        // Try cache first
-        $cached = $this->fetchAll(
-            'SELECT player_id as element, multiplier, is_captain
-            FROM manager_picks
-            WHERE manager_id = ? AND gameweek = ?',
-            [$managerId, $gameweek]
-        );
+        $managerPicks = [];
+        $uncachedIds = [];
 
-        if (!empty($cached)) {
-            return $cached;
+        // Check DB cache for each manager
+        foreach ($managerIds as $managerId) {
+            $cached = $this->fetchAll(
+                'SELECT player_id as element, multiplier, is_captain
+                FROM manager_picks
+                WHERE manager_id = ? AND gameweek = ?',
+                [$managerId, $gameweek]
+            );
+
+            if (!empty($cached)) {
+                $managerPicks[$managerId] = $cached;
+            } else {
+                $uncachedIds[] = $managerId;
+            }
         }
 
-        // Fetch from API
-        try {
-            $picksData = $this->fplClient->entry($managerId)->picks($gameweek);
-            return $picksData['picks'] ?? null;
-        } catch (\Throwable $e) {
-            return null;
+        if (empty($uncachedIds)) {
+            return $managerPicks;
         }
+
+        // Fetch uncached picks in parallel
+        if ($this->parallelClient !== null && count($uncachedIds) > 1) {
+            $endpoints = [];
+            foreach ($uncachedIds as $id) {
+                $endpoints["entry/{$id}/event/{$gameweek}/picks/"] = $id;
+            }
+
+            $results = $this->parallelClient->getBatch(array_keys($endpoints));
+
+            foreach ($results as $endpoint => $data) {
+                $id = $endpoints[$endpoint];
+                $picks = $data['picks'] ?? null;
+                if ($picks !== null) {
+                    $managerPicks[$id] = $picks;
+                }
+            }
+        } else {
+            // Fallback to sequential
+            foreach ($uncachedIds as $managerId) {
+                try {
+                    $picksData = $this->fplClient->entry($managerId)->picks($gameweek);
+                    $picks = $picksData['picks'] ?? null;
+                    if ($picks !== null) {
+                        $managerPicks[$managerId] = $picks;
+                    }
+                } catch (\Throwable) {
+                    // Skip failed managers
+                }
+            }
+        }
+
+        return $managerPicks;
     }
 
     /**

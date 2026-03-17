@@ -22,7 +22,7 @@ export function useLeagueAnalysis(
     queryKey: ['league-analysis', leagueId, gameweek],
     queryFn: () => fetchLeagueAnalysis(leagueId!, gameweek),
     enabled: enabled && leagueId !== null && leagueId > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 15, // 15 minutes
   })
 }
 
@@ -38,6 +38,6 @@ export function useLeagueSeasonAnalysis(
     queryKey: ['league-season-analysis', leagueId, gwFrom ?? null, gwTo ?? null, topN ?? null],
     queryFn: () => fetchLeagueSeasonAnalysis(leagueId!, { gwFrom, gwTo, topN }),
     enabled: enabled && leagueId !== null && leagueId > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 15, // 15 minutes
   })
 }

@@ -7,7 +7,9 @@ namespace SuperFPL\Api\Controllers;
 use Maia\Core\Config\Config;
 use Maia\Core\Http\Request;
 use Maia\Core\Http\Response;
+use Maia\Core\Middleware\ResponseCacheMiddleware;
 use Maia\Core\Routing\Controller;
+use Maia\Core\Routing\MiddlewareAttribute;
 use Maia\Core\Routing\Route;
 use Maia\Orm\Connection;
 use SuperFPL\Api\Services\ComparisonService;
@@ -16,6 +18,7 @@ use SuperFPL\Api\Services\LeagueSeasonAnalysisService;
 use SuperFPL\Api\Services\LeagueService;
 use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\FplClient\FplClient;
+use SuperFPL\FplClient\ParallelHttpClient;
 
 #[Controller('/leagues')]
 class LeagueController extends LegacyController
@@ -23,7 +26,8 @@ class LeagueController extends LegacyController
     public function __construct(
         Connection $connection,
         Config $config,
-        private readonly FplClient $fplClient
+        private readonly FplClient $fplClient,
+        private readonly ?ParallelHttpClient $parallelClient = null
     ) {
         parent::__construct($connection, $config);
     }
@@ -55,6 +59,7 @@ class LeagueController extends LegacyController
     }
 
     #[Route('/{id}/analysis', method: 'GET')]
+    #[MiddlewareAttribute(ResponseCacheMiddleware::class)]
     public function get_league_analysis(int $id, Request $request): Response
     {
         $gameweek = $request->query('gw');
@@ -81,7 +86,7 @@ class LeagueController extends LegacyController
             return Response::json(['error' => 'League needs at least 2 managers'], 400);
         }
 
-        $comparisonService = new ComparisonService($this->connection, $this->fplClient);
+        $comparisonService = new ComparisonService($this->connection, $this->fplClient, $this->parallelClient);
         $comparison = $comparisonService->compare($managerIds, (int) $gameweek);
 
         return Response::json([
@@ -105,6 +110,7 @@ class LeagueController extends LegacyController
     }
 
     #[Route('/{id}/season-analysis', method: 'GET')]
+    #[MiddlewareAttribute(ResponseCacheMiddleware::class)]
     public function get_league_season_analysis(int $id, Request $request): Response
     {
         $gwFrom = $request->query('gw_from');

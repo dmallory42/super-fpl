@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace SuperFPL\Api\Tests\Controllers;
 
+use Maia\Core\Middleware\ResponseCacheMiddleware;
 use Maia\Core\Testing\TestCase;
 use Maia\Orm\Connection;
+use SuperFPL\Api\Cache\NullResponseCacheStore;
 use SuperFPL\Api\Controllers\LeagueController;
 use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Tests\Support\FakeFplClient;
 use SuperFPL\FplClient\FplClient;
+use SuperFPL\FplClient\ParallelHttpClient;
 
 require_once __DIR__ . '/../Support/FakeFplClient.php';
 
@@ -29,6 +32,14 @@ class LeagueControllerTest extends TestCase
         $this->database = new TestDatabase(':memory:');
         $this->app->container()->instance(Connection::class, $this->database);
         $this->app->container()->instance(FplClient::class, new FakeFplClient());
+        $this->app->container()->instance(
+            ResponseCacheMiddleware::class,
+            new ResponseCacheMiddleware(new NullResponseCacheStore())
+        );
+        $this->app->container()->instance(
+            ParallelHttpClient::class,
+            new ParallelHttpClient('https://fantasy.premierleague.com/api/')
+        );
 
         $this->database->query('CREATE TABLE leagues (
             id INTEGER PRIMARY KEY,

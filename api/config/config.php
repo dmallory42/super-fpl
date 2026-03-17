@@ -37,6 +37,9 @@ return [
         'path' => getenv('SUPERFPL_CACHE_PATH') ?: (__DIR__ . '/../cache'),
         'ttl' => 300, // 5 minutes
     ],
+    'redis' => [
+        'url' => getenv('REDIS_URL') ?: 'redis://redis:6379',
+    ],
     'fpl' => [
         'rate_limit_dir' => getenv('SUPERFPL_RATE_LIMIT_DIR') ?: '/tmp/fpl-rate-limit',
         'connect_timeout' => $fplConnectTimeout,
