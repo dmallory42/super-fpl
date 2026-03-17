@@ -70,7 +70,7 @@ $redis = new RedisClient($redisUrl);
 $cacheStore = new RedisResponseCacheStore($redis);
 $app->container()->instance(
     ResponseCacheMiddleware::class,
-    new ResponseCacheMiddleware($cacheStore, ttlSeconds: 300, namespace: 'league')
+    new ResponseCacheMiddleware($cacheStore, ttlSeconds: 3600, namespace: 'league')
 );
 
 $app->addMiddleware(new CorsMiddleware((array) ($config['security']['cors_allowed_origins'] ?? [])));
