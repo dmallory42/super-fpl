@@ -7,7 +7,9 @@ namespace SuperFPL\Api\Controllers;
 use Maia\Core\Config\Config;
 use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
+use Maia\Core\Routing\MiddlewareAttribute;
 use Maia\Core\Routing\Route;
+use SuperFPL\Api\Cache\ManagerCacheMiddleware;
 use Maia\Orm\Connection;
 use SuperFPL\Api\Services\ManagerSeasonAnalysisService;
 use SuperFPL\Api\Services\ManagerService;
@@ -25,6 +27,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}', method: 'GET')]
+    #[MiddlewareAttribute(ManagerCacheMiddleware::class)]
     public function get_manager(int $id): Response
     {
         $service = new ManagerService($this->connection, $this->fplClient);
@@ -38,6 +41,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}/picks/{gw}', method: 'GET')]
+    #[MiddlewareAttribute(ManagerCacheMiddleware::class)]
     public function get_manager_picks(int $id, int $gw): Response
     {
         $service = new ManagerService($this->connection, $this->fplClient);
@@ -51,6 +55,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}/history', method: 'GET')]
+    #[MiddlewareAttribute(ManagerCacheMiddleware::class)]
     public function get_manager_history(int $id): Response
     {
         $service = new ManagerService($this->connection, $this->fplClient);
@@ -64,6 +69,7 @@ class ManagerController extends LegacyController
     }
 
     #[Route('/{id}/season-analysis', method: 'GET')]
+    #[MiddlewareAttribute(ManagerCacheMiddleware::class)]
     public function get_manager_season_analysis(int $id): Response
     {
         $service = new ManagerSeasonAnalysisService($this->connection, $this->fplClient);

@@ -6,6 +6,8 @@ namespace SuperFPL\Api\Tests\Controllers;
 
 use Maia\Core\Testing\TestCase;
 use Maia\Orm\Connection;
+use SuperFPL\Api\Cache\ManagerCacheMiddleware;
+use SuperFPL\Api\Cache\NullResponseCacheStore;
 use SuperFPL\Api\Controllers\ManagerController;
 use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Tests\Support\FakeFplClient;
@@ -29,6 +31,10 @@ class ManagerControllerTest extends TestCase
         $this->database = new TestDatabase(':memory:');
         $this->app->container()->instance(Connection::class, $this->database);
         $this->app->container()->instance(FplClient::class, new FakeFplClient());
+        $this->app->container()->instance(
+            ManagerCacheMiddleware::class,
+            new ManagerCacheMiddleware(new NullResponseCacheStore())
+        );
 
         $this->database->query('CREATE TABLE managers (
             id INTEGER PRIMARY KEY,

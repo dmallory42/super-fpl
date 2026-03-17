@@ -7,6 +7,8 @@ namespace SuperFPL\Api\Tests\Controllers;
 use Maia\Core\Config\Config;
 use Maia\Core\Testing\TestCase;
 use Maia\Orm\Connection;
+use SuperFPL\Api\Cache\LiveCacheMiddleware;
+use SuperFPL\Api\Cache\NullResponseCacheStore;
 use SuperFPL\Api\Controllers\LiveController;
 use SuperFPL\Api\Tests\Support\TestDatabase;
 use SuperFPL\Api\Tests\Support\FakeFplClient;
@@ -43,6 +45,10 @@ class LiveControllerTest extends TestCase
             )
         );
         $this->app->container()->instance(Config::class, new Config($this->configDir));
+        $this->app->container()->instance(
+            LiveCacheMiddleware::class,
+            new LiveCacheMiddleware(new NullResponseCacheStore())
+        );
 
         $this->app->container()->instance(
             FplClient::class,

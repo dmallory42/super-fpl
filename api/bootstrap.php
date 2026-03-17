@@ -19,6 +19,8 @@ use SuperFPL\Api\Controllers\ManagerController;
 use SuperFPL\Api\Controllers\PlayerController;
 use SuperFPL\Api\Controllers\PredictionController;
 use SuperFPL\Api\Controllers\TransferController;
+use SuperFPL\Api\Cache\LiveCacheMiddleware;
+use SuperFPL\Api\Cache\ManagerCacheMiddleware;
 use SuperFPL\Api\Cache\RedisResponseCacheStore;
 use SuperFPL\Api\SchemaMigrator;
 use SuperFPL\FplClient\Cache\FileCache;
@@ -71,6 +73,14 @@ $cacheStore = new RedisResponseCacheStore($redis);
 $app->container()->instance(
     ResponseCacheMiddleware::class,
     new ResponseCacheMiddleware($cacheStore, ttlSeconds: 3600, namespace: 'league')
+);
+$app->container()->instance(
+    LiveCacheMiddleware::class,
+    new LiveCacheMiddleware($cacheStore, ttlSeconds: 60, namespace: 'live')
+);
+$app->container()->instance(
+    ManagerCacheMiddleware::class,
+    new ManagerCacheMiddleware($cacheStore, ttlSeconds: 3600, namespace: 'manager')
 );
 
 $app->addMiddleware(new CorsMiddleware((array) ($config['security']['cors_allowed_origins'] ?? [])));

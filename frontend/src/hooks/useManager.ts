@@ -14,7 +14,7 @@ export function useManager(id: number | null) {
     queryKey: ['manager', id],
     queryFn: () => fetchManager(id!),
     enabled: id !== null && id > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 15, // 15 minutes
   })
 }
 
@@ -23,7 +23,7 @@ export function useManagerPicks(id: number | null, gameweek: number | null) {
     queryKey: ['manager-picks', id, gameweek],
     queryFn: () => fetchManagerPicks(id!, gameweek!),
     enabled: id !== null && id > 0 && gameweek !== null && gameweek > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 15, // 15 minutes
   })
 }
 
@@ -32,7 +32,7 @@ export function useManagerHistory(id: number | null) {
     queryKey: ['manager-history', id],
     queryFn: () => fetchManagerHistory(id!),
     enabled: id !== null && id > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 15, // 15 minutes
   })
 }
 
@@ -41,6 +41,6 @@ export function useManagerSeasonAnalysis(id: number | null) {
     queryKey: ['manager-season-analysis', id],
     queryFn: () => fetchManagerSeasonAnalysis(id!),
     enabled: id !== null && id > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 15, // 15 minutes
   })
 }

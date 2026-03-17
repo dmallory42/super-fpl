@@ -7,7 +7,9 @@ namespace SuperFPL\Api\Controllers;
 use Maia\Core\Config\Config;
 use Maia\Core\Http\Response;
 use Maia\Core\Routing\Controller;
+use Maia\Core\Routing\MiddlewareAttribute;
 use Maia\Core\Routing\Route;
+use SuperFPL\Api\Cache\LiveCacheMiddleware;
 use Maia\Orm\Connection;
 use SuperFPL\Api\Services\GameweekService;
 use SuperFPL\Api\Services\LiveService;
@@ -27,6 +29,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/current', method: 'GET')]
+    #[MiddlewareAttribute(LiveCacheMiddleware::class)]
     public function get_current_live(): Response
     {
         $gameweekService = new GameweekService($this->connection);
@@ -40,6 +43,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}', method: 'GET')]
+    #[MiddlewareAttribute(LiveCacheMiddleware::class)]
     public function get_live_gameweek(int $gw): Response
     {
         $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
@@ -48,6 +52,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/manager/{id}', method: 'GET')]
+    #[MiddlewareAttribute(LiveCacheMiddleware::class)]
     public function get_live_manager(int $gw, int $id): Response
     {
         $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
@@ -56,6 +61,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/manager/{id}/enhanced', method: 'GET')]
+    #[MiddlewareAttribute(LiveCacheMiddleware::class)]
     public function get_live_manager_enhanced(int $gw, int $id): Response
     {
         $liveService = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
@@ -70,6 +76,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/bonus', method: 'GET')]
+    #[MiddlewareAttribute(LiveCacheMiddleware::class)]
     public function get_live_bonus(int $gw): Response
     {
         $service = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
@@ -81,6 +88,7 @@ class LiveController extends LegacyController
     }
 
     #[Route('/{gw}/samples', method: 'GET')]
+    #[MiddlewareAttribute(LiveCacheMiddleware::class)]
     public function get_live_samples(int $gw): Response
     {
         $liveService = new LiveService($this->connection, $this->fplClient, $this->cachePath('/live'));
