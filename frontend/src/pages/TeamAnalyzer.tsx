@@ -101,18 +101,34 @@ export function TeamAnalyzer() {
     playersLoading || managerLoading || picksLoading || historyLoading || seasonAnalysisLoading
   const error = managerError || picksError || historyError || seasonAnalysisError
 
+  const handleClearManager = () => {
+    setManagerId(null)
+    updateUrlManagerId(null)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold uppercase text-foreground mb-2">Season Review</h2>
-        <p className="text-foreground-muted text-base mb-4">
-          Enter your FPL Manager ID to review your season performance. Find it in your FPL URL:
-          <span className="text-tt-green ml-1">
-            fantasy.premierleague.com/entry/<strong>123456</strong>/event/1
-          </span>
-        </p>
-        <ManagerSearch onSearch={handleSearch} isLoading={isLoading} />
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-2xl font-bold uppercase text-foreground mb-2">Season Review</h2>
+          {managerId && (
+            <button onClick={handleClearManager} className="btn-primary">
+              Change Manager ID
+            </button>
+          )}
+        </div>
+        {!managerId && (
+          <>
+            <p className="text-foreground-muted text-base mb-4">
+              Enter your FPL Manager ID to review your season performance. Find it in your FPL URL:
+              <span className="text-tt-green ml-1">
+                fantasy.premierleague.com/entry/<strong>123456</strong>/event/1
+              </span>
+            </p>
+            <ManagerSearch onSearch={handleSearch} isLoading={isLoading} />
+          </>
+        )}
       </div>
 
       {/* Error State */}
